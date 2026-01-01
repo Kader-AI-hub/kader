@@ -60,6 +60,35 @@ from .exec_commands import (
     CommandExecutorTool,
 )
 
+def get_default_registry() -> ToolRegistry:
+    """
+    Get a registry populated with all standard tools.
+    
+    Includes:
+    - Filesystem tools
+    - Command executor
+    - Web tools (search, fetch)
+    """
+    registry = ToolRegistry()
+    
+    # 1. Filesystem Tools
+    for t in get_filesystem_tools():
+        registry.register(t)
+        
+    # 2. Command Execution
+    registry.register(CommandExecutorTool())
+    
+    # 3. Web Tools
+    # Note: These might fail if ollama is missing, so we wrap safely
+    try:
+        registry.register(WebSearchTool())
+        registry.register(WebFetchTool())
+    except ImportError:
+        pass
+        
+    return registry
+
+
 __all__ = [
     # Core classes
     "BaseTool",
@@ -106,5 +135,8 @@ __all__ = [
 
     # Command Execution Tool
     "CommandExecutorTool",
+    
+    # Helpers
+    "get_default_registry",
 ]
 
