@@ -1,0 +1,94 @@
+import asyncio
+import sys
+import os
+from typing import Optional
+
+# Add project root to path for direct execution
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from kader.agent.agents import PlanningAgent
+from kader.tools import ToolRegistry, get_filesystem_tools, CommandExecutorTool
+from kader.memory import SlidingWindowConversationManager
+
+# Try importing web tools if available
+try:
+    from kader.tools import WebSearchTool, WebFetchTool
+    HAS_WEB_TOOLS = True
+except ImportError:
+    HAS_WEB_TOOLS = False
+
+async def main():
+    print("=== Planning Agent Interactive Demo ===")
+    print("Type '/exit' or '/close' to quit.\n")
+
+    # Initialize Tool Registry
+    registry = ToolRegistry()
+    
+    # 1. Filesystem Tools
+    fs_tools = get_filesystem_tools()
+    for tool in fs_tools:
+        registry.register(tool)
+        
+    # 2. Command Execution Tool
+    registry.register(CommandExecutorTool())
+    
+    # 3. Web Tools (if available)
+    if HAS_WEB_TOOLS:
+        registry.register(WebSearchTool())
+        registry.register(WebFetchTool())
+    else:
+        print("Warning: Web tools not available (ollama library missing or incompatible)")
+
+    # Initialize Memory
+    # Using SlidingWindowConversationManager to keep track of history
+    memory = SlidingWindowConversationManager(window_size=10)
+
+    # Initialize Planning Agent
+    # We enable persistence to save state between runs locally
+    agent = PlanningAgent(
+        name="planning_assistant",
+        tools=registry, 
+        memory=memory, 
+        model_name="gpt-oss:120b-cloud",
+        use_persistence=True
+    )
+    
+    print(f"Agent '{agent.name}' initialized with session ID: {agent.session_id}")
+    print(f"Tools available: {list(agent.tools_map.keys())}")
+    
+    # Interactive Loop
+    while True:
+        try:
+            user_input = input("\nYou: ").strip()
+            
+            if not user_input:
+                continue
+                
+            if user_input.lower() in ["/exit", "/close", "exit", "quit"]:
+                print("Goodbye!")
+                break
+                
+            # Invoke Agent
+            # PlanningAgent uses a plan-and-execute strategy typically driven by the LLM
+            # responding to the prompt.
+            print("\nPlanning Agent is thinking...")
+            try:
+                # Stream response (using astream for async)
+                print(f"Agent: ", end="", flush=True)
+                full_content = ""
+                async for chunk in agent.astream(user_input):
+                    if chunk.content:
+                        print(chunk.content, end="", flush=True)
+                        full_content += chunk.content
+                print("\n")
+            except Exception as e:
+                print(f"\nError during invocation: {e}")
+                
+        except KeyboardInterrupt:
+            print("\nGoodbye!")
+            break
+        except Exception as e:
+            print(f"\nAn error occurred: {e}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
