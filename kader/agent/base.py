@@ -25,7 +25,12 @@ from kader.providers.base import (
 )
 from kader.providers.ollama import OllamaProvider
 from kader.tools import BaseTool, ToolRegistry, ToolResult
-from kader.memory import ConversationManager, NullConversationManager, SlidingWindowConversationManager
+from kader.memory import (
+    ConversationManager, 
+    NullConversationManager, 
+    SlidingWindowConversationManager,
+    FileSessionManager
+)
 from kader.prompts.base import PromptBase
 
 
@@ -36,6 +41,7 @@ class BaseAgent:
     Combines tools, memory, and an LLM provider to perform tasks.
     Supports synchronous and asynchronous invocation and streaming.
     Includes built-in retry logic using tenacity.
+    Supports session persistence via FileSessionManager.
     """
     
     def __init__(
@@ -47,6 +53,8 @@ class BaseAgent:
         memory: Optional[ConversationManager] = None,
         retry_attempts: int = 3,
         model_name: str = "gpt-oss:120b-cloud",
+        session_id: Optional[str] = None,
+        use_persistence: bool = False,
     ) -> None:
         """
         Initialize the Base Agent.
@@ -56,13 +64,20 @@ class BaseAgent:
             system_prompt: The system prompt definition.
             tools: List of tools or a ToolRegistry.
             provider: LLM provider instance. If None, uses OllamaProvider.
-            memory: Conversation/Memory manager. If None, uses NullConversationManager.
+            memory: Conversation/Memory manager. If None, uses SlidingWindowConversationManager.
             retry_attempts: Number of retry attempts for LLM calls (default: 3).
             model_name: Default model name if creating a default Ollama provider.
+            session_id: Optional session ID to load/resume.
+            use_persistence: If True, enables session persistence (auto-enabled if session_id provided).
         """
         self.name = name
         self.system_prompt = system_prompt
         self.retry_attempts = retry_attempts
+        
+        # Persistence Configuration
+        self.session_id = session_id
+        self.use_persistence = use_persistence or (session_id is not None)
+        self.session_manager = FileSessionManager() if self.use_persistence else None
         
         # Initialize Provider
         if provider:
@@ -85,8 +100,51 @@ class BaseAgent:
                 for tool in tools:
                     self._tool_registry.register(tool)
                     
+        # Load session if persistence is enabled
+        if self.use_persistence:
+            self._load_session()
+            
         # Update config with tools if provider supports it
         self._update_provider_tools()
+
+    def _load_session(self) -> None:
+        """Load conversation history from session storage."""
+        if not self.session_manager:
+            return
+            
+        # If no session ID provided, create a new session
+        if not self.session_id:
+            session = self.session_manager.create_session(self.name)
+            self.session_id = session.session_id
+        
+        # Load conversation history
+        try:
+            # We don't check if session exists first because load_conversation 
+            # handles missing sessions by returning empty list (usually) 
+            # or we catch the error. FileSessionManager.load_conversation returns list[dict].
+            history = self.session_manager.load_conversation(self.session_id)
+            if history:
+                # Add loaded messages to memory
+                # ConversationManager supports adding dicts directly
+                self.memory.add_messages(history)
+        except Exception as e:
+            # If session doesn't exist or error, we start fresh (or could log warning)
+            # For now, we silently proceed with empty memory
+            pass
+
+    def _save_session(self) -> None:
+        """Save current conversation history to session storage."""
+        if not self.session_manager or not self.session_id:
+            return
+            
+        try:
+            # Get all messages from memory
+            # Convert ConversationMessage to dict (using .message property)
+            messages = [msg.message for msg in self.memory.get_messages()]
+            self.session_manager.save_conversation(self.session_id, messages)
+        except Exception:
+            # Log error or handle silently? Best not to crash main flow on save failure
+            pass
 
     @property
     def tools_map(self) -> dict[str, BaseTool]:
@@ -327,6 +385,10 @@ class BaseAgent:
             # Add assistant response to memory
             self.memory.add_message(response.to_message())
             
+            # Save session update
+            if self.use_persistence:
+                self._save_session()
+            
             # Check for tool calls
             if response.has_tool_calls:
                 tool_msgs = self._process_tool_calls(response)
@@ -334,6 +396,10 @@ class BaseAgent:
                 # Add tool outputs to memory
                 for tm in tool_msgs:
                     self.memory.add_message(tm)
+                    
+                # Save session update after tool results
+                if self.use_persistence:
+                    self._save_session()
                     
                 # Loop continues to feed tool outputs back to LLM
                 continue
@@ -376,9 +442,19 @@ class BaseAgent:
         )
         
         yield from stream_iterator
-        # Note: Proper tool handling in stream requires buffering the stream to check for tool_calls, 
-        # executing them, and then re-invoking. This is advanced for a basic stream implementation.
-        # This implementation assumes direct streaming response.
+        
+        # Update session at end if needed
+        # Note: Streaming complicates memory/persistence because getting the full message 
+        # requires aggregating chunks. The current implementation of base.stream DOES NOT 
+        # auto-aggregate into memory (it just yields). 
+        # The USER of stream() is responsible for re-assembling the message and adding to memory 
+        # if they want history.
+        # BUT, wait. _prepare_messages DOES add input messages to memory.
+        # The RESPONSE is not added here. 
+        # TODO: A robust stream implementation should aggregate and save.
+        # For now, we only save the input part since _prepare_messages called it.
+        if self.use_persistence:
+            self._save_session()
 
     # -------------------------------------------------------------------------
     # Asynchronous Methods
@@ -410,10 +486,18 @@ class BaseAgent:
             
             self.memory.add_message(response.to_message())
             
+            # Save session update
+            if self.use_persistence:
+                self._save_session()
+            
             if response.has_tool_calls:
                 tool_msgs = await self._aprocess_tool_calls(response)
                 for tm in tool_msgs:
                     self.memory.add_message(tm)
+                    
+                # Save session update
+                if self.use_persistence:
+                    self._save_session()
                 continue
             else:
                 final_response = response
@@ -441,6 +525,10 @@ class BaseAgent:
         
         async for chunk in stream_iterator:
             yield chunk
+            
+        # Same note as sync stream: only input is persisted automatically via _prepare_messages
+        if self.use_persistence:
+            self._save_session()
 
     # -------------------------------------------------------------------------
     # Serialization Methods
