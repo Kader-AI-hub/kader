@@ -7,12 +7,10 @@ with tools, memory, and LLM provider integration.
 
 import yaml
 from pathlib import Path
-from typing import Any, AsyncIterator, Iterator, Union, Optional
+from typing import AsyncIterator, Iterator, Union, Optional
 from tenacity import (
-    retry,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
     RetryError
 )
 
@@ -24,10 +22,9 @@ from kader.providers.base import (
     StreamChunk,
 )
 from kader.providers.ollama import OllamaProvider
-from kader.tools import BaseTool, ToolRegistry, ToolResult
+from kader.tools import BaseTool, ToolRegistry
 from kader.memory import (
     ConversationManager, 
-    NullConversationManager, 
     SlidingWindowConversationManager,
     FileSessionManager
 )
@@ -127,7 +124,7 @@ class BaseAgent:
                 # Add loaded messages to memory
                 # ConversationManager supports adding dicts directly
                 self.memory.add_messages(history)
-        except Exception as e:
+        except Exception:
             # If session doesn't exist or error, we start fresh (or could log warning)
             # For now, we silently proceed with empty memory
             pass
@@ -162,12 +159,6 @@ class BaseAgent:
         """Update the provider's default config with registered tools."""
         if not self._tool_registry.tools:
             return
-            
-        # Get tool schemas in the format expected by the provider
-        # Note: BaseLLMProvider generic interface uses OpenAI/Standard format typically
-        # But we can try to be specific if we know the provider type
-        # For now, we use the standard OpenAI format which most providers support
-        provider_tools = self._tool_registry.to_provider_format("openai")
         
         # We need to update the default config of the provider to include these tools
         # Since we can't easily modify the internal default_config of the provider cleanly

@@ -10,7 +10,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 import json
-import os
 
 
 class SessionType(str, Enum):

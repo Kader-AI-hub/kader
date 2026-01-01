@@ -308,7 +308,6 @@ class SlidingWindowConversationManager(ConversationManager):
         # Check if first message is a tool result without its call
         # If so, find and include the tool call
         result = []
-        skip_until_call = False
         tool_call_ids_needed: set[str] = set()
         
         for msg in reversed(messages_to_keep):

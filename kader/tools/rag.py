@@ -18,8 +18,6 @@ except ImportError:
 
 import hashlib
 import pickle
-import importlib
-import json
 try:
     import faiss
     import numpy as np

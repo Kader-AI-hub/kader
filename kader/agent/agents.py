@@ -2,7 +2,7 @@
 Specific Agent Implementations.
 """
 
-from typing import Optional, Union, Any
+from typing import Optional, Union
 
 from kader.agent.base import BaseAgent
 from kader.tools import BaseTool, ToolRegistry
