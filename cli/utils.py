@@ -16,13 +16,34 @@ HELP_TEXT = """## Kader CLI Commands 📖
 | `/theme` | Cycle through color themes |
 | `/help` | Show this help message |
 | `/clear` | Clear the conversation |
-| `/new` | Start a new conversation |
+| `/save` | Save current session |
+| `/load <id>` | Load a saved session |
+| `/sessions` | List saved sessions |
+| `/refresh` | Refresh file tree |
 | `/exit` | Exit the CLI |
+
+### Keyboard Shortcuts ⌨️
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+L` | Clear conversation |
+| `Ctrl+T` | Cycle theme |
+| `Ctrl+S` | Save session |
+| `Ctrl+R` | Refresh file tree |
+| `Ctrl+Q` | Quit |
+
+### Input Editing 📝
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+C` | Copy selected text |
+| `Ctrl+V` | Paste from clipboard |
+| `Ctrl+A` | Select all text |
+| Click+Drag | Select text |
 
 ### Tips:
 - Type any question to chat with the AI
-- Use **Tab** to navigate between panels
-- Press **Ctrl+C** to cancel current operation"""
+- Use **Tab** to navigate between panels"""
 
 
 def get_models_text() -> str:
