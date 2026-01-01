@@ -425,7 +425,14 @@ class OllamaProvider(BaseLLMProvider):
         try:
             client = Client(host=host) if host else Client()
             response = client.list()
-            return [model.model for model in response.models]
+            models = [model.model for model in response.models]
+            models_config = {}
+            for model in models:
+                models_config[model] = client.show(model)
+            return [
+                model for model, config in models_config.items()
+                if config.capabilities == ['completion', 'tools', 'thinking']
+            ]
         except Exception:
             return []
     
