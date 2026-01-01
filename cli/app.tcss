@@ -1,0 +1,648 @@
+/* Kader CLI - Modern Terminal UI Stylesheet */
+
+/* ===== Color Themes ===== */
+
+/* Default Dark Theme */
+$primary: #7c3aed;
+$secondary: #06b6d4;
+$success: #10b981;
+$warning: #f59e0b;
+$error: #ef4444;
+$surface: #1e1e2e;
+$background: #11111b;
+$text: #cdd6f4;
+$text-muted: #6c7086;
+
+/* ===== Root App ===== */
+
+Screen {
+    background: $background;
+}
+
+/* ===== Header ===== */
+
+Header {
+    background: $primary;
+    color: $text;
+    text-style: bold;
+    height: 3;
+    dock: top;
+}
+
+/* ===== Footer ===== */
+
+Footer {
+    background: $surface;
+    color: $text-muted;
+    height: 1;
+    dock: bottom;
+}
+
+FooterKey {
+    background: transparent;
+    color: $text-muted;
+}
+
+FooterKey > .footer-key--key {
+    background: $primary;
+    color: $text;
+}
+
+/* ===== Main Layout ===== */
+
+#main-container {
+    layout: horizontal;
+    height: 1fr;
+}
+
+/* ===== Sidebar (Directory Tree) ===== */
+
+#sidebar {
+    width: 30;
+    min-width: 20;
+    max-width: 50;
+    background: $surface;
+    border-right: thick $primary;
+    padding: 0;
+}
+
+#sidebar-title {
+    background: $primary 20%;
+    color: $text;
+    text-style: bold;
+    padding: 1;
+    text-align: center;
+    height: 3;
+}
+
+DirectoryTree {
+    background: transparent;
+    padding: 0 1;
+    scrollbar-size: 1 1;
+}
+
+DirectoryTree > .directory-tree--folder {
+    color: $secondary;
+}
+
+DirectoryTree > .directory-tree--file {
+    color: $text;
+}
+
+DirectoryTree > .directory-tree--extension {
+    color: $text-muted;
+}
+
+DirectoryTree:focus > .directory-tree--cursor {
+    background: $primary 40%;
+}
+
+/* ===== Content Area ===== */
+
+#content-area {
+    width: 1fr;
+    layout: vertical;
+}
+
+/* ===== Conversation ===== */
+
+#conversation {
+    height: 1fr;
+    background: $background;
+    border-bottom: thick $surface;
+}
+
+ConversationView {
+    scrollbar-size: 1 1;
+}
+
+/* ===== Welcome Message ===== */
+
+#welcome {
+    padding: 2 4;
+    text-align: center;
+}
+
+#welcome Markdown {
+    text-align: center;
+}
+
+/* ===== Input Area ===== */
+
+#input-container {
+    height: auto;
+    min-height: 3;
+    max-height: 5;
+    background: $surface;
+    padding: 1;
+    border-top: thick $primary;
+}
+
+#prompt-input {
+    background: $background;
+    border: round $primary;
+    padding: 0 1;
+    height: 3;
+}
+
+#prompt-input:focus {
+    border: round $secondary;
+}
+
+Input.-valid {
+    border: round $success;
+}
+
+Input > .input--placeholder {
+    color: $text-muted;
+    text-style: italic;
+}
+
+/* ===== Loading Spinner ===== */
+
+LoadingSpinner {
+    background: $surface;
+    margin: 0 2;
+    padding: 1;
+    border-left: thick $warning;
+}
+
+/* ===== Command Hints in Footer ===== */
+
+#command-hints {
+    dock: bottom;
+    height: 1;
+    background: $surface;
+    padding: 0 1;
+    text-align: center;
+}
+
+.command-hint {
+    margin: 0 1;
+    color: $text-muted;
+}
+
+.command-key {
+    color: $primary;
+    text-style: bold;
+}
+
+/* ===== Markdown Styling ===== */
+
+Markdown {
+    margin: 0;
+    padding: 0;
+}
+
+MarkdownH1 {
+    color: $primary;
+    text-style: bold underline;
+    margin: 1 0;
+}
+
+MarkdownH2 {
+    color: $secondary;
+    text-style: bold;
+    margin: 1 0;
+}
+
+MarkdownH3 {
+    color: $success;
+    text-style: bold;
+    margin: 1 0;
+}
+
+MarkdownFence {
+    background: $surface;
+    border: round #6c7086;
+    margin: 1 0;
+    padding: 1;
+}
+
+MarkdownBlockQuote {
+    background: $primary 10%;
+    border-left: thick $primary;
+    padding: 0 1;
+    margin: 1 0;
+}
+
+MarkdownBulletList {
+    margin: 0;
+    padding-left: 2;
+}
+
+MarkdownTable {
+    margin: 1 0;
+}
+
+MarkdownTH {
+    background: $primary 20%;
+    text-style: bold;
+}
+
+MarkdownTD {
+    padding: 0 1;
+}
+
+/* ===== Scrollbars ===== */
+
+Scrollbar {
+    background: $surface;
+}
+
+ScrollbarSlider {
+    color: $primary;
+}
+
+ScrollbarSlider:hover {
+    color: $secondary;
+}
+
+/* ===== Theme Variants ===== */
+
+/* Ocean Theme */
+.theme-ocean Screen {
+    background: #0f172a;
+}
+
+.theme-ocean Header {
+    background: #3b82f6;
+    color: #f1f5f9;
+}
+
+.theme-ocean Footer {
+    background: #1e293b;
+    color: #94a3b8;
+}
+
+.theme-ocean FooterKey > .footer-key--key {
+    background: #3b82f6;
+    color: #f1f5f9;
+}
+
+.theme-ocean #sidebar {
+    background: #1e293b;
+    border-right: thick #3b82f6;
+}
+
+.theme-ocean #sidebar-title {
+    background: #3b82f6 20%;
+    color: #f1f5f9;
+}
+
+.theme-ocean DirectoryTree > .directory-tree--folder {
+    color: #06b6d4;
+}
+
+.theme-ocean DirectoryTree > .directory-tree--file {
+    color: #f1f5f9;
+}
+
+.theme-ocean DirectoryTree > .directory-tree--extension {
+    color: #94a3b8;
+}
+
+.theme-ocean DirectoryTree:focus > .directory-tree--cursor {
+    background: #3b82f6 40%;
+}
+
+.theme-ocean #conversation {
+    background: #0f172a;
+    border-bottom: thick #1e293b;
+}
+
+.theme-ocean #input-container {
+    background: #1e293b;
+    border-top: thick #3b82f6;
+}
+
+.theme-ocean #prompt-input {
+    background: #0f172a;
+    border: round #3b82f6;
+}
+
+.theme-ocean #prompt-input:focus {
+    border: round #06b6d4;
+}
+
+.theme-ocean Input.-valid {
+    border: round #10b981;
+}
+
+.theme-ocean Input > .input--placeholder {
+    color: #94a3b8;
+    text-style: italic;
+}
+
+.theme-ocean LoadingSpinner {
+    background: #1e293b;
+    border-left: thick #f59e0b;
+}
+
+.theme-ocean #command-hints {
+    background: #1e293b;
+}
+
+.theme-ocean .command-hint {
+    color: #94a3b8;
+}
+
+.theme-ocean .command-key {
+    color: #3b82f6;
+}
+
+.theme-ocean MarkdownH1 {
+    color: #3b82f6;
+}
+
+.theme-ocean MarkdownH2 {
+    color: #06b6d4;
+}
+
+.theme-ocean MarkdownH3 {
+    color: #10b981;
+}
+
+.theme-ocean MarkdownFence {
+    background: #1e293b;
+    border: round #94a3b8;
+}
+
+.theme-ocean MarkdownBlockQuote {
+    background: #3b82f6 10%;
+    border-left: thick #3b82f6;
+}
+
+.theme-ocean MarkdownTH {
+    background: #3b82f6 20%;
+}
+
+.theme-ocean Scrollbar {
+    background: #1e293b;
+}
+
+.theme-ocean ScrollbarSlider {
+    color: #3b82f6;
+}
+
+.theme-ocean ScrollbarSlider:hover {
+    color: #06b6d4;
+}
+
+/* Forest Theme */
+.theme-forest Screen {
+    background: #0d1f0d;
+}
+
+.theme-forest Header {
+    background: #16a34a;
+    color: #dcfce7;
+}
+
+.theme-forest Footer {
+    background: #0f2f0f;
+    color: #6ee7b7;
+}
+
+.theme-forest FooterKey > .footer-key--key {
+    background: #16a34a;
+    color: #dcfce7;
+}
+
+.theme-forest #sidebar {
+    background: #0f2f0f;
+    border-right: thick #16a34a;
+}
+
+.theme-forest #sidebar-title {
+    background: #16a34a 20%;
+    color: #dcfce7;
+}
+
+.theme-forest DirectoryTree > .directory-tree--folder {
+    color: #0891b2;
+}
+
+.theme-forest DirectoryTree > .directory-tree--file {
+    color: #dcfce7;
+}
+
+.theme-forest DirectoryTree > .directory-tree--extension {
+    color: #6ee7b7;
+}
+
+.theme-forest DirectoryTree:focus > .directory-tree--cursor {
+    background: #16a34a 40%;
+}
+
+.theme-forest #conversation {
+    background: #0d1f0d;
+    border-bottom: thick #0f2f0f;
+}
+
+.theme-forest #input-container {
+    background: #0f2f0f;
+    border-top: thick #16a34a;
+}
+
+.theme-forest #prompt-input {
+    background: #0d1f0d;
+    border: round #16a34a;
+}
+
+.theme-forest #prompt-input:focus {
+    border: round #0891b2;
+}
+
+.theme-forest Input.-valid {
+    border: round #22c55e;
+}
+
+.theme-forest Input > .input--placeholder {
+    color: #6ee7b7;
+    text-style: italic;
+}
+
+.theme-forest LoadingSpinner {
+    background: #0f2f0f;
+    border-left: thick #eab308;
+}
+
+.theme-forest #command-hints {
+    background: #0f2f0f;
+}
+
+.theme-forest .command-hint {
+    color: #6ee7b7;
+}
+
+.theme-forest .command-key {
+    color: #16a34a;
+}
+
+.theme-forest MarkdownH1 {
+    color: #16a34a;
+}
+
+.theme-forest MarkdownH2 {
+    color: #0891b2;
+}
+
+.theme-forest MarkdownH3 {
+    color: #22c55e;
+}
+
+.theme-forest MarkdownFence {
+    background: #0f2f0f;
+    border: round #6ee7b7;
+}
+
+.theme-forest MarkdownBlockQuote {
+    background: #16a34a 10%;
+    border-left: thick #16a34a;
+}
+
+.theme-forest MarkdownTH {
+    background: #16a34a 20%;
+}
+
+.theme-forest Scrollbar {
+    background: #0f2f0f;
+}
+
+.theme-forest ScrollbarSlider {
+    color: #16a34a;
+}
+
+.theme-forest ScrollbarSlider:hover {
+    color: #0891b2;
+}
+
+/* Sunset Theme */
+.theme-sunset Screen {
+    background: #1f1315;
+}
+
+.theme-sunset Header {
+    background: #dc2626;
+    color: #fef2f2;
+}
+
+.theme-sunset Footer {
+    background: #2f171a;
+    color: #fecaca;
+}
+
+.theme-sunset FooterKey > .footer-key--key {
+    background: #dc2626;
+    color: #fef2f2;
+}
+
+.theme-sunset #sidebar {
+    background: #2f171a;
+    border-right: thick #dc2626;
+}
+
+.theme-sunset #sidebar-title {
+    background: #dc2626 20%;
+    color: #fef2f2;
+}
+
+.theme-sunset DirectoryTree > .directory-tree--folder {
+    color: #ea580c;
+}
+
+.theme-sunset DirectoryTree > .directory-tree--file {
+    color: #fef2f2;
+}
+
+.theme-sunset DirectoryTree > .directory-tree--extension {
+    color: #fecaca;
+}
+
+.theme-sunset DirectoryTree:focus > .directory-tree--cursor {
+    background: #dc2626 40%;
+}
+
+.theme-sunset #conversation {
+    background: #1f1315;
+    border-bottom: thick #2f171a;
+}
+
+.theme-sunset #input-container {
+    background: #2f171a;
+    border-top: thick #dc2626;
+}
+
+.theme-sunset #prompt-input {
+    background: #1f1315;
+    border: round #dc2626;
+}
+
+.theme-sunset #prompt-input:focus {
+    border: round #ea580c;
+}
+
+.theme-sunset Input.-valid {
+    border: round #16a34a;
+}
+
+.theme-sunset Input > .input--placeholder {
+    color: #fecaca;
+    text-style: italic;
+}
+
+.theme-sunset LoadingSpinner {
+    background: #2f171a;
+    border-left: thick #eab308;
+}
+
+.theme-sunset #command-hints {
+    background: #2f171a;
+}
+
+.theme-sunset .command-hint {
+    color: #fecaca;
+}
+
+.theme-sunset .command-key {
+    color: #dc2626;
+}
+
+.theme-sunset MarkdownH1 {
+    color: #dc2626;
+}
+
+.theme-sunset MarkdownH2 {
+    color: #ea580c;
+}
+
+.theme-sunset MarkdownH3 {
+    color: #16a34a;
+}
+
+.theme-sunset MarkdownFence {
+    background: #2f171a;
+    border: round #fecaca;
+}
+
+.theme-sunset MarkdownBlockQuote {
+    background: #dc2626 10%;
+    border-left: thick #dc2626;
+}
+
+.theme-sunset MarkdownTH {
+    background: #dc2626 20%;
+}
+
+.theme-sunset Scrollbar {
+    background: #2f171a;
+}
+
+.theme-sunset ScrollbarSlider {
+    color: #dc2626;
+}
+
+.theme-sunset ScrollbarSlider:hover {
+    color: #ea580c;
+}
