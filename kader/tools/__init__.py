@@ -56,7 +56,7 @@ from .web import (
     WebFetchTool,
 )
 
-from .exec_commands import (
+from kader.tools.exec_commands import (
     CommandExecutorTool,
 )
 
@@ -87,7 +87,6 @@ def get_default_registry() -> ToolRegistry:
         pass
         
     return registry
-
 
 __all__ = [
     # Core classes
