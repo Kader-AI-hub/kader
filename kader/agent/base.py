@@ -506,27 +506,39 @@ class BaseAgent:
         return final_response
 
     async def astream(self, messages: Union[str, list[Message]], config: Optional[ModelConfig] = None) -> AsyncIterator[StreamChunk]:
-        """Asynchronous streaming."""
-        from tenacity import AsyncRetrying
-        
-        runner = AsyncRetrying(
-            stop=stop_after_attempt(self.retry_attempts),
-            wait=wait_exponential(multiplier=1, min=4, max=10),
-            reraise=True
-        )
-        
+        """Asynchronous streaming with memory aggregation."""
+        # Prepare messages
         full_history = self._prepare_messages(messages)
         
-        stream_iterator = await runner(
-            self.provider.astream,
-            full_history,
-            self._get_run_config(config)
-        )
+        # Determine config
+        run_config = self._get_run_config(config)
+        
+        # Get stream iterator directly (cannot use tenacity on async generator creation easily)
+        stream_iterator = self.provider.astream(full_history, run_config)
+        
+        aggregated_content = ""
+        aggregated_tool_calls = []
         
         async for chunk in stream_iterator:
+            aggregated_content += chunk.content
+            if chunk.tool_calls:
+                 # TODO: robust tool call aggregation if streaming partial JSON
+                 # For now, assume provider yields complete tool calls in chunks or we just collect them
+                 aggregated_tool_calls.extend(chunk.tool_calls)
             yield chunk
             
-        # Same note as sync stream: only input is persisted automatically via _prepare_messages
+        # Create Message and add to memory
+        # Note: If no content and no tools, we don't add (or adds empty message)
+        
+        # If we have tool calls, we might need to properly format them
+        final_msg = Message(
+            role="assistant",
+            content=aggregated_content,
+            tool_calls=aggregated_tool_calls if aggregated_tool_calls else None
+        )
+        
+        self.memory.add_message(final_msg)
+        
         if self.use_persistence:
             self._save_session()
 
