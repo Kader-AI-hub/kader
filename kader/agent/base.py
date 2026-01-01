@@ -598,9 +598,20 @@ class BaseAgent:
         # Reconstruct tools
         tools = []
         tool_names = data.get("tools", [])
-        if tool_names and tool_registry:
+        
+        # Use provided registry or fallback to default
+        registry = tool_registry
+        if registry is None:
+            # Lazy import to avoid circular dependencies if any
+            try:
+                from kader.tools import get_default_registry
+                registry = get_default_registry()
+            except ImportError:
+                 pass
+                 
+        if tool_names and registry:
             for t_name in tool_names:
-                t = tool_registry.get(t_name)
+                t = registry.get(t_name)
                 if t:
                     tools.append(t)
         
