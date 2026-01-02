@@ -73,14 +73,8 @@ async def main():
             # responding to the prompt.
             print("\nPlanning Agent is thinking...")
             try:
-                # Stream response (using astream for async)
-                print(f"Agent: ", end="", flush=True)
-                full_content = ""
-                async for chunk in agent.astream(user_input):
-                    if chunk.content:
-                        print(chunk.content, end="", flush=True)
-                        full_content += chunk.content
-                print("\n")
+                response = agent.invoke(user_input)
+                print(f"\rAgent: {response.content}\n")
             except Exception as e:
                 print(f"\nError during invocation: {e}")
                 
