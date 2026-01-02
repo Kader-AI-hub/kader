@@ -60,6 +60,8 @@ from kader.tools.exec_commands import (
     CommandExecutorTool,
 )
 
+from .todo import TodoTool
+
 def get_default_registry() -> ToolRegistry:
     """
     Get a registry populated with all standard tools.
@@ -75,6 +77,7 @@ def get_default_registry() -> ToolRegistry:
     for t in get_filesystem_tools():
         registry.register(t)
         
+    # 2. Command Execution
     # 2. Command Execution
     registry.register(CommandExecutorTool())
     
@@ -133,7 +136,11 @@ __all__ = [
     "WebFetchTool",
 
     # Command Execution Tool
+    # Command Execution Tool
     "CommandExecutorTool",
+    
+    # Todo Tool
+    "TodoTool",
     
     # Helpers
     "get_default_registry",

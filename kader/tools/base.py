@@ -426,6 +426,18 @@ class BaseTool(ABC, Generic[T]):
         self._execution_count = 0
         self._total_execution_time_ms = 0.0
         self._last_execution_time_ms: float | None = None
+        
+        # Session Context
+        self._session_id: str | None = None
+
+    def set_session_id(self, session_id: str) -> None:
+        """
+        Set the session ID for the tool.
+        
+        Args:
+            session_id: The session ID to associate with this tool instance.
+        """
+        self._session_id = session_id
     
     @property
     def name(self) -> str:
