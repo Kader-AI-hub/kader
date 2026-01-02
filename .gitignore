@@ -17,3 +17,6 @@ wheels/
 
 # secret files
 .env
+
+# optimization
+optimizers/
