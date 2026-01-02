@@ -84,7 +84,7 @@ cli/
 Edit `DEFAULT_MODEL` in `utils.py`:
 
 ```python
-DEFAULT_MODEL = "llama3.2"  # or any Ollama model
+DEFAULT_MODEL = "gpt-oss:120b-cloud"
 ```
 
 ## Development
