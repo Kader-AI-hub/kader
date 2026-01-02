@@ -5,7 +5,7 @@ Specific Agent Implementations.
 from typing import Optional, Union
 
 from kader.agent.base import BaseAgent
-from kader.tools import BaseTool, ToolRegistry
+from kader.tools import BaseTool, ToolRegistry, TodoTool
 from kader.providers.base import BaseLLMProvider
 from kader.memory import ConversationManager
 from kader.prompts import ReActAgentPrompt, PlanningAgentPrompt, PromptBase
@@ -85,6 +85,15 @@ class PlanningAgent(BaseAgent):
         use_persistence: bool = False,
     ) -> None:
         
+        # Ensure TodoTool is available
+        _todo_tool = TodoTool()
+        if isinstance(tools, ToolRegistry):
+             if _todo_tool.name not in tools:
+                 tools.register(_todo_tool)
+        elif isinstance(tools, list):
+             if not any(t.name == _todo_tool.name for t in tools):
+                 tools.append(_todo_tool)
+
         _tools_list = []
         if isinstance(tools, list):
             _tools_list = tools

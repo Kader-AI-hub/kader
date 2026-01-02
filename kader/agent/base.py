@@ -97,9 +97,11 @@ class BaseAgent:
                 for tool in tools:
                     self._tool_registry.register(tool)
                     
-        # Load session if persistence is enabled
         if self.use_persistence:
             self._load_session()
+            
+        # Propagate session to tools
+        self._propagate_session_to_tools()
             
         # Update config with tools if provider supports it
         self._update_provider_tools()
@@ -109,10 +111,12 @@ class BaseAgent:
         if not self.session_manager:
             return
             
-        # If no session ID provided, create a new session
         if not self.session_id:
             session = self.session_manager.create_session(self.name)
             self.session_id = session.session_id
+        
+        # Propagate session to tools
+        self._propagate_session_to_tools()
         
         # Load conversation history
         try:
@@ -128,6 +132,15 @@ class BaseAgent:
             # If session doesn't exist or error, we start fresh (or could log warning)
             # For now, we silently proceed with empty memory
             pass
+
+    def _propagate_session_to_tools(self) -> None:
+        """Propagate current session ID to all registered tools."""
+        if not self.session_id:
+            return
+            
+        for tool in self._tool_registry.tools:
+            if hasattr(tool, "set_session_id"):
+                tool.set_session_id(self.session_id)
 
     def _save_session(self) -> None:
         """Save current conversation history to session storage."""
