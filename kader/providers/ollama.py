@@ -415,10 +415,10 @@ class OllamaProvider(BaseLLMProvider):
     def get_supported_models(cls, host: str | None = None) -> list[str]:
         """
         Get list of models available on the Ollama server.
-        
+
         Args:
             host: Optional Ollama server host
-            
+
         Returns:
             List of available model names
         """
@@ -431,7 +431,7 @@ class OllamaProvider(BaseLLMProvider):
                 models_config[model] = client.show(model)
             return [
                 model for model, config in models_config.items()
-                if config.capabilities == ['completion', 'tools', 'thinking']
+                if config.capabilities in [['completion', 'tools', 'thinking'], ['completion', 'tools']]
             ]
         except Exception:
             return []
