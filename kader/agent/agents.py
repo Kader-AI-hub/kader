@@ -28,6 +28,7 @@ class ReActAgent(BaseAgent):
         model_name: str = "gpt-oss:120b-cloud",
         session_id: Optional[str] = None,
         use_persistence: bool = False,
+        interrupt_before_tool: bool = True,
     ) -> None:
         
         # Resolve tools for prompt context if necessary
@@ -62,7 +63,8 @@ class ReActAgent(BaseAgent):
             retry_attempts=retry_attempts,
             model_name=model_name,
             session_id=session_id,
-            use_persistence=use_persistence
+            use_persistence=use_persistence,
+            interrupt_before_tool=interrupt_before_tool
         )
 
 
@@ -83,6 +85,7 @@ class PlanningAgent(BaseAgent):
         model_name: str = "gpt-oss:120b-cloud",
         session_id: Optional[str] = None,
         use_persistence: bool = False,
+        interrupt_before_tool: bool = True,
     ) -> None:
         
         # Ensure TodoTool is available
@@ -116,5 +119,6 @@ class PlanningAgent(BaseAgent):
             retry_attempts=retry_attempts,
             model_name=model_name,
             session_id=session_id,
-            use_persistence=use_persistence
+            use_persistence=use_persistence,
+            interrupt_before_tool=interrupt_before_tool
         )

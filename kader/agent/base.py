@@ -52,6 +52,7 @@ class BaseAgent:
         model_name: str = "gpt-oss:120b-cloud",
         session_id: Optional[str] = None,
         use_persistence: bool = False,
+        interrupt_before_tool: bool = True,
     ) -> None:
         """
         Initialize the Base Agent.
@@ -66,10 +67,12 @@ class BaseAgent:
             model_name: Default model name if creating a default Ollama provider.
             session_id: Optional session ID to load/resume.
             use_persistence: If True, enables session persistence (auto-enabled if session_id provided).
+            interrupt_before_tool: If True, pauses and asks for user confirmation before executing tools.
         """
         self.name = name
         self.system_prompt = system_prompt
         self.retry_attempts = retry_attempts
+        self.interrupt_before_tool = interrupt_before_tool
         
         # Persistence Configuration
         self.session_id = session_id
@@ -262,7 +265,84 @@ class BaseAgent:
             
         return final_messages
 
-    def _process_tool_calls(self, response: LLMResponse) -> list[Message]:
+    def _format_tool_call_for_display(self, tool_call_dict: dict) -> str:
+        """
+        Format a tool call for display to the user.
+        
+        Args:
+            tool_call_dict: The tool call dictionary from LLM response.
+            
+        Returns:
+            The tool's interruption message.
+        """
+        import json
+        
+        fn_info = tool_call_dict.get("function", {})
+        if not fn_info and "name" in tool_call_dict:
+            fn_info = tool_call_dict
+            
+        tool_name = fn_info.get("name", "unknown")
+        arguments = fn_info.get("arguments", {})
+        
+        # Parse arguments if string
+        if isinstance(arguments, str):
+            try:
+                arguments = json.loads(arguments)
+            except json.JSONDecodeError:
+                pass
+        
+        # Get the tool's interruption message if available
+        tool = self._tool_registry.get(tool_name)
+        if tool and isinstance(arguments, dict):
+            return tool.get_interruption_message(**arguments)
+        
+        # Fallback for unknown tools
+        return f"execute {tool_name}"
+
+    def _confirm_tool_execution(self, tool_call_dict: dict) -> tuple[bool, Optional[str]]:
+        """
+        Ask user for confirmation before executing a tool.
+        
+        Args:
+            tool_call_dict: The tool call dictionary from LLM response.
+            
+        Returns:
+            Tuple of (should_execute: bool, user_input: Optional[str]).
+            If should_execute is False, user_input contains additional context.
+        """
+        display_str = self._format_tool_call_for_display(tool_call_dict)
+        print(display_str)
+        
+        while True:
+            user_input = input("\nExecute this tool? (yes/no): ").strip().lower()
+            
+            if user_input in ("yes", "y"):
+                return True, None
+            elif user_input in ("no", "n"):
+                elaboration = input("Please provide more context or instructions: ").strip()
+                return False, elaboration if elaboration else None
+            else:
+                print("Please enter 'yes' or 'no'.")
+
+    async def _aconfirm_tool_execution(self, tool_call_dict: dict) -> tuple[bool, Optional[str]]:
+        """
+        Async version - Ask user for confirmation before executing a tool.
+        
+        Note: This uses synchronous input() as async stdin is complex.
+        For production use, consider using aioconsole or similar.
+        
+        Args:
+            tool_call_dict: The tool call dictionary from LLM response.
+            
+        Returns:
+            Tuple of (should_execute: bool, user_input: Optional[str]).
+        """
+        # For simplicity, we use the sync version in async context
+        # In production, use asyncio.to_thread or aioconsole
+        import asyncio
+        return await asyncio.to_thread(self._confirm_tool_execution, tool_call_dict)
+
+    def _process_tool_calls(self, response: LLMResponse) -> Union[list[Message], tuple[bool, str]]:
         """
         Execute tool calls from response and return tool messages.
         
@@ -270,11 +350,19 @@ class BaseAgent:
             response: The LLM response containing tool calls.
             
         Returns:
-            List of Message objects representing tool results.
+            List of Message objects representing tool results, or
+            Tuple of (False, user_input) if user declined tool execution.
         """
         tool_messages = []
         if response.has_tool_calls:
             for tool_call_dict in response.tool_calls:
+                # Check for interrupt before tool execution
+                if self.interrupt_before_tool:
+                    should_execute, user_input = self._confirm_tool_execution(tool_call_dict)
+                    if not should_execute:
+                        # Return the user's elaboration to be processed
+                        return (False, user_input)
+                
                 # Need to convert dict to ToolCall object or handle manually
                 # ToolRegistry.run takes ToolCall
                 from kader.tools.base import ToolCall
@@ -309,11 +397,23 @@ class BaseAgent:
                 
         return tool_messages
 
-    async def _aprocess_tool_calls(self, response: LLMResponse) -> list[Message]:
-        """Async version of _process_tool_calls."""
+    async def _aprocess_tool_calls(self, response: LLMResponse) -> Union[list[Message], tuple[bool, str]]:
+        """
+        Async version of _process_tool_calls.
+        
+        Returns:
+            List of Message objects representing tool results, or
+            Tuple of (False, user_input) if user declined tool execution.
+        """
         tool_messages = []
         if response.has_tool_calls:
             for tool_call_dict in response.tool_calls:
+                # Check for interrupt before tool execution
+                if self.interrupt_before_tool:
+                    should_execute, user_input = await self._aconfirm_tool_execution(tool_call_dict)
+                    if not should_execute:
+                        return (False, user_input)
+                
                 from kader.tools.base import ToolCall
                 
                 # Check structure - Ollama/OpenAI usually: {'id':..., 'type': 'function', 'function': {'name':.., 'arguments':..}}
@@ -395,7 +495,21 @@ class BaseAgent:
             
             # Check for tool calls
             if response.has_tool_calls:
-                tool_msgs = self._process_tool_calls(response)
+                tool_result = self._process_tool_calls(response)
+                
+                # Check if user declined tool execution
+                if isinstance(tool_result, tuple) and tool_result[0] is False:
+                    # User declined - add their input as a new message and continue
+                    user_elaboration = tool_result[1]
+                    if user_elaboration:
+                        self.memory.add_message(Message.user(user_elaboration))
+                    else:
+                        # User provided no elaboration, return current response
+                        final_response = response
+                        break
+                    continue
+                
+                tool_msgs = tool_result
                 
                 # Add tool outputs to memory
                 for tm in tool_msgs:
@@ -495,7 +609,21 @@ class BaseAgent:
                 self._save_session()
             
             if response.has_tool_calls:
-                tool_msgs = await self._aprocess_tool_calls(response)
+                tool_result = await self._aprocess_tool_calls(response)
+                
+                # Check if user declined tool execution
+                if isinstance(tool_result, tuple) and tool_result[0] is False:
+                    # User declined - add their input as a new message and continue
+                    user_elaboration = tool_result[1]
+                    if user_elaboration:
+                        self.memory.add_message(Message.user(user_elaboration))
+                    else:
+                        final_response = response
+                        break
+                    continue
+                
+                tool_msgs = tool_result
+                
                 for tm in tool_msgs:
                     self.memory.add_message(tm)
                     
