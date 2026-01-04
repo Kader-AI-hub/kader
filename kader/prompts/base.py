@@ -32,7 +32,7 @@ class PromptBase:
         self.template = kwargs.pop("template", self.template)
         self.template_path = kwargs.pop("template_path", self.template_path)
         self.vars = kwargs
-        
+
         if self.template:
             env = Environment()
             self.prompt = env.from_string(self.template)
@@ -55,7 +55,7 @@ class PromptBase:
         render = self.prompt.render(**self.vars)
         render = re.sub(r"\n{3,}", "\n\n", render)
         return render
-    
+
     def resolve_prompt(self) -> str:
         """Resolve the prompt by rendering it if it hasn't been already.
 
@@ -69,7 +69,7 @@ class PromptBase:
         if self._resolved_prompt is None:
             self._resolved_prompt = self.render_template()
         return self._resolved_prompt
-    
+
     def __str__(self) -> str:
         """Return the resolved prompt when the object is converted to a string.
 

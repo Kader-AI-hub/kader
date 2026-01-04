@@ -14,8 +14,8 @@ import io
 from pathlib import Path
 
 # Force utf-8 output for Windows consoles
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -24,17 +24,19 @@ from kader.agent.base import BaseAgent
 from kader.prompts import PromptBase
 from kader.tools import BaseTool, ParameterSchema, tool
 
+
 # 1. Define a simple tool using the decorator
 @tool(
     name="calculator",
     description="Useful for calculating sums",
     parameters=[
         ParameterSchema(name="a", type="number", description="First number"),
-        ParameterSchema(name="b", type="number", description="Second number")
-    ]
+        ParameterSchema(name="b", type="number", description="Second number"),
+    ],
 )
 def calculator(a: float, b: float) -> str:
     return str(a + b)
+
 
 def main():
     print("=== Simple Agent Demo ===\n")
@@ -42,7 +44,7 @@ def main():
     # 2. Define System Prompt
     system_prompt = PromptBase(
         template="You are a helpful AI assistant named {{ name }}. You have access to tools.",
-        name="KaderBot"
+        name="KaderBot",
     )
 
     # 3. Initialize Agent
@@ -54,11 +56,11 @@ def main():
         system_prompt=system_prompt,
         tools=[calculator],
         retry_attempts=2,
-        interrupt_before_tool=True
+        interrupt_before_tool=True,
     )
 
     print(f"Agent '{agent.name}' initialized.")
-    print(f"System Prompt: {agent.system_prompt}") # Resolves to string
+    print(f"System Prompt: {agent.system_prompt}")  # Resolves to string
     print(f"Tools: {list(agent.tools_map.keys())}\n")
 
     # 4. Save to YAML
@@ -81,6 +83,7 @@ def main():
     # Clean up
     if yaml_file.exists():
         yaml_file.unlink()
+
 
 if __name__ == "__main__":
     main()

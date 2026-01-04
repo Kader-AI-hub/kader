@@ -52,7 +52,7 @@ def get_models_text() -> str:
         models = OllamaProvider.get_supported_models()
         if not models:
             return "## Available Models 🤖\n\n*No models found. Is Ollama running?*"
-        
+
         lines = ["## Available Models 🤖\n", "| Model | Status |", "|-------|--------|"]
         for model in models:
             lines.append(f"| {model} | ✅ Available |")
@@ -60,4 +60,3 @@ def get_models_text() -> str:
         return "\n".join(lines)
     except Exception as e:
         return f"## Available Models 🤖\n\n*Error fetching models: {e}*"
-

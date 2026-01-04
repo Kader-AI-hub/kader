@@ -29,14 +29,11 @@ class MockLLM(BaseLLMProvider):
         """Synchronous mock invocation."""
         last_msg = messages[-1] if messages else Message.user("")
         content = f"Mock response to: {last_msg.content}"
-        
+
         usage = Usage(prompt_tokens=10, completion_tokens=10)
-        
+
         return LLMResponse(
-            content=content,
-            model=self.model,
-            usage=usage,
-            finish_reason="stop"
+            content=content, model=self.model, usage=usage, finish_reason="stop"
         )
 
     async def ainvoke(
@@ -46,6 +43,7 @@ class MockLLM(BaseLLMProvider):
     ) -> LLMResponse:
         """Asynchronous mock invocation."""
         import asyncio
+
         return await asyncio.to_thread(self.invoke, messages, config)
 
     def stream(
@@ -57,24 +55,21 @@ class MockLLM(BaseLLMProvider):
         last_msg = messages[-1] if messages else Message.user("")
         content = f"Mock response to: {last_msg.content}"
         words = content.split()
-        
+
         accumulated = ""
         for i, word in enumerate(words):
             word_with_space = word + " "
             accumulated += word_with_space
             yield StreamChunk(
-                content=accumulated,
-                delta=word_with_space,
-                index=i,
-                finish_reason=None
+                content=accumulated, delta=word_with_space, index=i, finish_reason=None
             )
-        
+
         yield StreamChunk(
             content=content,
             delta="",
             index=len(words),
             finish_reason="stop",
-            usage=Usage(prompt_tokens=10, completion_tokens=10)
+            usage=Usage(prompt_tokens=10, completion_tokens=10),
         )
 
     async def astream(
@@ -90,7 +85,7 @@ class MockLLM(BaseLLMProvider):
         """Mock token counting (1 word = 1 token)."""
         if isinstance(text, str):
             return len(text.split())
-        
+
         count = 0
         for msg in text:
             count += len(msg.content.split())

@@ -85,11 +85,40 @@ class CommandExecutorTool(BaseTool[str]):
         if self._host_os == "windows":
             # Common Unix/Linux commands that typically won't work on Windows
             unix_commands = [
-                "ls", "grep", "awk", "sed", "find", "chmod", "chown",
-                "cp", "mv", "rm", "mkdir", "rmdir", "touch", "cat",
-                "head", "tail", "wc", "sort", "uniq", "ps", "kill",
-                "top", "df", "du", "which", "whoami", "uname",
-                "pwd", "man", "tar", "zip", "unzip", "curl", "wget"
+                "ls",
+                "grep",
+                "awk",
+                "sed",
+                "find",
+                "chmod",
+                "chown",
+                "cp",
+                "mv",
+                "rm",
+                "mkdir",
+                "rmdir",
+                "touch",
+                "cat",
+                "head",
+                "tail",
+                "wc",
+                "sort",
+                "uniq",
+                "ps",
+                "kill",
+                "top",
+                "df",
+                "du",
+                "which",
+                "whoami",
+                "uname",
+                "pwd",
+                "man",
+                "tar",
+                "zip",
+                "unzip",
+                "curl",
+                "wget",
             ]
 
             if first_part in unix_commands:
@@ -101,9 +130,24 @@ class CommandExecutorTool(BaseTool[str]):
         else:  # Unix-like systems (Linux, macOS)
             # Common Windows commands that won't work on Unix
             windows_commands = [
-                "dir", "copy", "move", "del", "ren", "md", "rd",
-                "cls", "ver", "vol", "label", "attrib", "xcopy",
-                "robocopy", "ipconfig", "netstat", "tasklist", "taskkill"
+                "dir",
+                "copy",
+                "move",
+                "del",
+                "ren",
+                "md",
+                "rd",
+                "cls",
+                "ver",
+                "vol",
+                "label",
+                "attrib",
+                "xcopy",
+                "robocopy",
+                "ipconfig",
+                "netstat",
+                "tasklist",
+                "taskkill",
             ]
 
             if first_part in windows_commands:
@@ -114,8 +158,14 @@ class CommandExecutorTool(BaseTool[str]):
                 )
 
             # Special handling for PowerShell commands
-            if first_part in ["get-command", "get-help", "get-process",
-                             "stop-process", "get-service", "start-service"]:
+            if first_part in [
+                "get-command",
+                "get-help",
+                "get-process",
+                "stop-process",
+                "get-service",
+                "start-service",
+            ]:
                 return False, (
                     f"The command '{first_part}' is a PowerShell command "
                     "and may not be available on this Unix-like system."
@@ -144,11 +194,7 @@ class CommandExecutorTool(BaseTool[str]):
             if self._host_os == "windows":
                 # On Windows, use shell=True to allow for more complex commands
                 result = subprocess.run(
-                    command,
-                    shell=True,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout
+                    command, shell=True, capture_output=True, text=True, timeout=timeout
                 )
             else:
                 # On Unix-like systems, use the appropriate shell
@@ -158,7 +204,7 @@ class CommandExecutorTool(BaseTool[str]):
                     capture_output=True,
                     text=True,
                     timeout=timeout,
-                    executable=self._shell
+                    executable=self._shell,
                 )
 
             # Format result as a string
@@ -171,14 +217,18 @@ class CommandExecutorTool(BaseTool[str]):
             else:
                 stdout = result.stdout.strip()
                 stderr = result.stderr.strip()
-                
+
                 output_parts = [f"Command failed with exit code {result.returncode}"]
                 if stdout:
                     output_parts.append(stdout)
                 if stderr:
                     output_parts.append(stderr)
-                
-                return ":\n".join(output_parts) if len(output_parts) > 1 else output_parts[0]
+
+                return (
+                    ":\n".join(output_parts)
+                    if len(output_parts) > 1
+                    else output_parts[0]
+                )
 
         except subprocess.TimeoutExpired:
             return f"Command timed out after {timeout} seconds"

@@ -8,11 +8,7 @@ with tools, memory, and LLM provider integration.
 import yaml
 from pathlib import Path
 from typing import AsyncIterator, Iterator, Union, Optional
-from tenacity import (
-    stop_after_attempt,
-    wait_exponential,
-    RetryError
-)
+from tenacity import stop_after_attempt, wait_exponential, RetryError
 
 from kader.providers.base import (
     BaseLLMProvider,
@@ -24,9 +20,9 @@ from kader.providers.base import (
 from kader.providers.ollama import OllamaProvider
 from kader.tools import BaseTool, ToolRegistry
 from kader.memory import (
-    ConversationManager, 
+    ConversationManager,
     SlidingWindowConversationManager,
-    FileSessionManager
+    FileSessionManager,
 )
 from kader.prompts.base import PromptBase
 
@@ -34,13 +30,13 @@ from kader.prompts.base import PromptBase
 class BaseAgent:
     """
     Base class for Agents.
-    
+
     Combines tools, memory, and an LLM provider to perform tasks.
     Supports synchronous and asynchronous invocation and streaming.
     Includes built-in retry logic using tenacity.
     Supports session persistence via FileSessionManager.
     """
-    
+
     def __init__(
         self,
         name: str,
@@ -57,7 +53,7 @@ class BaseAgent:
     ) -> None:
         """
         Initialize the Base Agent.
-        
+
         Args:
             name: Name of the agent.
             system_prompt: The system prompt definition.
@@ -78,24 +74,24 @@ class BaseAgent:
         self.retry_attempts = retry_attempts
         self.interrupt_before_tool = interrupt_before_tool
         self.tool_confirmation_callback = tool_confirmation_callback
-        
+
         # Persistence Configuration
         self.session_id = session_id
         self.use_persistence = use_persistence or (session_id is not None)
         self.session_manager = FileSessionManager() if self.use_persistence else None
-        
+
         # Initialize Provider
         if provider:
             self.provider = provider
         else:
             self.provider = OllamaProvider(model=model_name)
-            
+
         # Initialize Memory
         if memory:
             self.memory = memory
         else:
             self.memory = SlidingWindowConversationManager()
-            
+
         # Initialize Tools
         self._tool_registry = ToolRegistry()
         if tools:
@@ -104,13 +100,13 @@ class BaseAgent:
             elif isinstance(tools, list):
                 for tool in tools:
                     self._tool_registry.register(tool)
-                    
+
         if self.use_persistence:
             self._load_session()
-            
+
         # Propagate session to tools
         self._propagate_session_to_tools()
-            
+
         # Update config with tools if provider supports it
         self._update_provider_tools()
 
@@ -118,18 +114,18 @@ class BaseAgent:
         """Load conversation history from session storage."""
         if not self.session_manager:
             return
-            
+
         if not self.session_id:
             session = self.session_manager.create_session(self.name)
             self.session_id = session.session_id
-        
+
         # Propagate session to tools
         self._propagate_session_to_tools()
-        
+
         # Load conversation history
         try:
-            # We don't check if session exists first because load_conversation 
-            # handles missing sessions by returning empty list (usually) 
+            # We don't check if session exists first because load_conversation
+            # handles missing sessions by returning empty list (usually)
             # or we catch the error. FileSessionManager.load_conversation returns list[dict].
             history = self.session_manager.load_conversation(self.session_id)
             if history:
@@ -145,7 +141,7 @@ class BaseAgent:
         """Propagate current session ID to all registered tools."""
         if not self.session_id:
             return
-            
+
         for tool in self._tool_registry.tools:
             if hasattr(tool, "set_session_id"):
                 tool.set_session_id(self.session_id)
@@ -154,7 +150,7 @@ class BaseAgent:
         """Save current conversation history to session storage."""
         if not self.session_manager or not self.session_id:
             return
-            
+
         try:
             # Get all messages from memory
             # Convert ConversationMessage to dict (using .message property)
@@ -168,7 +164,7 @@ class BaseAgent:
     def tools_map(self) -> dict[str, BaseTool]:
         """
         Get a dictionary mapping tool names to tool instances.
-        
+
         Returns:
             Dictionary of {tool_name: tool_instance}
         """
@@ -180,7 +176,7 @@ class BaseAgent:
         """Update the provider's default config with registered tools."""
         if not self._tool_registry.tools:
             return
-        
+
         # We need to update the default config of the provider to include these tools
         # Since we can't easily modify the internal default_config of the provider cleanly
         # from here without accessing protected members, strict encapsulation might prevent this.
@@ -190,7 +186,7 @@ class BaseAgent:
     def _get_run_config(self, config: Optional[ModelConfig] = None) -> ModelConfig:
         """Prepare execution config with tools."""
         base_config = config or ModelConfig()
-        
+
         # If tools are available and not explicitly disabled or overridden
         if self._tool_registry.tools and not base_config.tools:
             # Detect provider type to format tools correctly
@@ -198,7 +194,7 @@ class BaseAgent:
             provider_type = "openai"
             if isinstance(self.provider, OllamaProvider):
                 provider_type = "ollama"
-                
+
             base_config = ModelConfig(
                 temperature=base_config.temperature,
                 max_tokens=base_config.max_tokens,
@@ -209,12 +205,14 @@ class BaseAgent:
                 stream=base_config.stream,
                 tools=self._tool_registry.to_provider_format(provider_type),
                 tool_choice=base_config.tool_choice,
-                extra=base_config.extra
+                extra=base_config.extra,
             )
-        
+
         return base_config
 
-    def _prepare_messages(self, messages: Union[str, list[Message], list[dict]]) -> list[Message]:
+    def _prepare_messages(
+        self, messages: Union[str, list[Message], list[dict]]
+    ) -> list[Message]:
         """Prepare messages adding system prompt and history."""
         # Normalize input to list of Message objects
         input_msgs: list[Message] = []
@@ -224,20 +222,19 @@ class BaseAgent:
             if not messages:
                 pass
             elif isinstance(messages[0], dict):
-                 # Convert dicts to Messages
-                 pass # simplified for now, assuming user passes Message objects or string
-                 # But we should handle it better
-                 input_msgs = [
-                     Message(**msg) if isinstance(msg, dict) else msg 
-                     for msg in messages
-                 ]
+                # Convert dicts to Messages
+                pass  # simplified for now, assuming user passes Message objects or string
+                # But we should handle it better
+                input_msgs = [
+                    Message(**msg) if isinstance(msg, dict) else msg for msg in messages
+                ]
             else:
-                input_msgs = messages # Assuming list[Message]
+                input_msgs = messages  # Assuming list[Message]
 
         # Add to memory
         for msg in input_msgs:
             self.memory.add_message(msg)
-            
+
         # Retrieve context (system prompt + history)
         # 1. Start with System Prompt
         if isinstance(self.system_prompt, PromptBase):
@@ -246,16 +243,16 @@ class BaseAgent:
             sys_prompt_content = str(self.system_prompt)
 
         final_messages = [Message.system(sys_prompt_content)]
-        
+
         # 2. Get history from memory (windowed)
         # memory.apply_window() returns list[dict], need to convert back to Message
         history_dicts = self.memory.apply_window()
-        
+
         # We need to act smart here. invoke/stream usually take the *new* messages
         # plus history. Memory managers usually store everything.
         # If we added input_msgs to memory, apply_window should return them too if relevant.
         # So we just use what Memory gives us.
-        
+
         for msg_dict in history_dicts:
             # Basic conversion from dict back to Message
             # Note: conversation.py Message support might be limited to dicts
@@ -264,102 +261,111 @@ class BaseAgent:
                 content=msg_dict.get("content"),
                 name=msg_dict.get("name"),
                 tool_call_id=msg_dict.get("tool_call_id"),
-                tool_calls=msg_dict.get("tool_calls")
+                tool_calls=msg_dict.get("tool_calls"),
             )
             final_messages.append(msg)
-            
+
         return final_messages
 
     def _format_tool_call_for_display(self, tool_call_dict: dict) -> str:
         """
         Format a tool call for display to the user.
-        
+
         Args:
             tool_call_dict: The tool call dictionary from LLM response.
-            
+
         Returns:
             The tool's interruption message.
         """
         import json
-        
+
         fn_info = tool_call_dict.get("function", {})
         if not fn_info and "name" in tool_call_dict:
             fn_info = tool_call_dict
-            
+
         tool_name = fn_info.get("name", "unknown")
         arguments = fn_info.get("arguments", {})
-        
+
         # Parse arguments if string
         if isinstance(arguments, str):
             try:
                 arguments = json.loads(arguments)
             except json.JSONDecodeError:
                 pass
-        
+
         # Get the tool's interruption message if available
         tool = self._tool_registry.get(tool_name)
         if tool and isinstance(arguments, dict):
             return tool.get_interruption_message(**arguments)
-        
+
         # Fallback for unknown tools
         return f"execute {tool_name}"
 
-    def _confirm_tool_execution(self, tool_call_dict: dict) -> tuple[bool, Optional[str]]:
+    def _confirm_tool_execution(
+        self, tool_call_dict: dict
+    ) -> tuple[bool, Optional[str]]:
         """
         Ask user for confirmation before executing a tool.
-        
+
         Args:
             tool_call_dict: The tool call dictionary from LLM response.
-            
+
         Returns:
             Tuple of (should_execute: bool, user_input: Optional[str]).
             If should_execute is False, user_input contains additional context.
         """
         display_str = self._format_tool_call_for_display(tool_call_dict)
-        
+
         # Use callback if provided (e.g., for GUI/TUI)
         if self.tool_confirmation_callback:
             return self.tool_confirmation_callback(display_str)
-        
+
         # Default: use console input
         print(display_str)
-        
+
         while True:
             user_input = input("\nExecute this tool? (yes/no): ").strip().lower()
-            
+
             if user_input in ("yes", "y"):
                 return True, None
             elif user_input in ("no", "n"):
-                elaboration = input("Please provide more context or instructions: ").strip()
+                elaboration = input(
+                    "Please provide more context or instructions: "
+                ).strip()
                 return False, elaboration if elaboration else None
             else:
                 print("Please enter 'yes' or 'no'.")
 
-    async def _aconfirm_tool_execution(self, tool_call_dict: dict) -> tuple[bool, Optional[str]]:
+    async def _aconfirm_tool_execution(
+        self, tool_call_dict: dict
+    ) -> tuple[bool, Optional[str]]:
         """
         Async version - Ask user for confirmation before executing a tool.
-        
+
         Note: This uses synchronous input() as async stdin is complex.
         For production use, consider using aioconsole or similar.
-        
+
         Args:
             tool_call_dict: The tool call dictionary from LLM response.
-            
+
         Returns:
             Tuple of (should_execute: bool, user_input: Optional[str]).
         """
         # For simplicity, we use the sync version in async context
         # In production, use asyncio.to_thread or aioconsole
         import asyncio
+
         return await asyncio.to_thread(self._confirm_tool_execution, tool_call_dict)
 
-    def _process_tool_calls(self, response: LLMResponse) -> Union[list[Message], tuple[bool, str]]:
+    def _process_tool_calls(
+        self, response: LLMResponse
+    ) -> Union[list[Message], tuple[bool, str]]:
         """
         Execute tool calls from response and return tool messages.
-        
+
         Args:
             response: The LLM response containing tool calls.
-            
+
         Returns:
             List of Message objects representing tool results, or
             Tuple of (False, user_input) if user declined tool execution.
@@ -369,49 +375,56 @@ class BaseAgent:
             for tool_call_dict in response.tool_calls:
                 # Check for interrupt before tool execution
                 if self.interrupt_before_tool:
-                    should_execute, user_input = self._confirm_tool_execution(tool_call_dict)
+                    should_execute, user_input = self._confirm_tool_execution(
+                        tool_call_dict
+                    )
                     if not should_execute:
                         # Return the user's elaboration to be processed
                         return (False, user_input)
-                
+
                 # Need to convert dict to ToolCall object or handle manually
                 # ToolRegistry.run takes ToolCall
                 from kader.tools.base import ToolCall
-                
+
                 # Create ToolCall object
                 # Some providers might differ in specific dict keys, relying on normalization
                 try:
                     tool_call = ToolCall(
                         id=tool_call_dict.get("id", ""),
                         name=tool_call_dict.get("function", {}).get("name", ""),
-                        arguments=tool_call_dict.get("function", {}).get("arguments", {}),
-                        raw_arguments=str(tool_call_dict.get("function", {}).get("arguments", {}))
+                        arguments=tool_call_dict.get("function", {}).get(
+                            "arguments", {}
+                        ),
+                        raw_arguments=str(
+                            tool_call_dict.get("function", {}).get("arguments", {})
+                        ),
                     )
                 except Exception:
                     # Fallback or simplified parsing if structure differs
                     tool_call = ToolCall(
                         id=tool_call_dict.get("id", ""),
                         name=tool_call_dict.get("function", {}).get("name", ""),
-                        arguments={}, # Error case
+                        arguments={},  # Error case
                     )
-                
+
                 # Execute tool
                 tool_result = self._tool_registry.run(tool_call)
-                
+
                 # add result to memory
                 # But here we just return messages, caller handles memory add
                 tool_msg = Message.tool(
-                    tool_call_id=tool_result.tool_call_id,
-                    content=tool_result.content
+                    tool_call_id=tool_result.tool_call_id, content=tool_result.content
                 )
                 tool_messages.append(tool_msg)
-                
+
         return tool_messages
 
-    async def _aprocess_tool_calls(self, response: LLMResponse) -> Union[list[Message], tuple[bool, str]]:
+    async def _aprocess_tool_calls(
+        self, response: LLMResponse
+    ) -> Union[list[Message], tuple[bool, str]]:
         """
         Async version of _process_tool_calls.
-        
+
         Returns:
             List of Message objects representing tool results, or
             Tuple of (False, user_input) if user declined tool execution.
@@ -421,43 +434,46 @@ class BaseAgent:
             for tool_call_dict in response.tool_calls:
                 # Check for interrupt before tool execution
                 if self.interrupt_before_tool:
-                    should_execute, user_input = await self._aconfirm_tool_execution(tool_call_dict)
+                    should_execute, user_input = await self._aconfirm_tool_execution(
+                        tool_call_dict
+                    )
                     if not should_execute:
                         return (False, user_input)
-                
+
                 from kader.tools.base import ToolCall
-                
+
                 # Check structure - Ollama/OpenAI usually: {'id':..., 'type': 'function', 'function': {'name':.., 'arguments':..}}
                 fn_info = tool_call_dict.get("function", {})
-                if not fn_info and "name" in tool_call_dict: 
-                     # Handle flat structure if any
-                     fn_info = tool_call_dict
-                
+                if not fn_info and "name" in tool_call_dict:
+                    # Handle flat structure if any
+                    fn_info = tool_call_dict
+
                 tool_call = ToolCall(
                     id=tool_call_dict.get("id", "call_default"),
                     name=fn_info.get("name", ""),
                     arguments=fn_info.get("arguments", {}),
                 )
-                
+
                 # Execute tool async
                 tool_result = await self._tool_registry.arun(tool_call)
-                
+
                 tool_msg = Message.tool(
-                    tool_call_id=tool_result.tool_call_id,
-                    content=tool_result.content
+                    tool_call_id=tool_result.tool_call_id, content=tool_result.content
                 )
                 tool_messages.append(tool_msg)
-                
+
         return tool_messages
 
     # -------------------------------------------------------------------------
     # Synchronous Methods
     # -------------------------------------------------------------------------
 
-    def invoke(self, messages: Union[str, list[Message]], config: Optional[ModelConfig] = None) -> LLMResponse:
+    def invoke(
+        self, messages: Union[str, list[Message]], config: Optional[ModelConfig] = None
+    ) -> LLMResponse:
         """
         Synchronously invoke the agent.
-        
+
         Handles message preparation, LLM invocation with retries, and tool execution loop.
         """
         # Retry decorator wrapper logic
@@ -465,49 +481,47 @@ class BaseAgent:
         # but we want dynamic retry attempts (from self) which decorators strictly speaking don't support easily without specialized usage.
         # We will use the functional API of tenacity for dynamic configuration.
         from tenacity import Retrying
-        
+
         runner = Retrying(
             stop=stop_after_attempt(self.retry_attempts),
             wait=wait_exponential(multiplier=1, min=4, max=10),
-            reraise=True
+            reraise=True,
         )
 
         final_response = None
-        
+
         # Main Agent Loop (Limit turns to avoid infinite loops)
         max_turns = 10
         current_turn = 0
-        
+
         while current_turn < max_turns:
             current_turn += 1
-            
+
             # Prepare full context
-            full_history = self._prepare_messages(messages if current_turn == 1 else []) 
-            # Note: _prepare_messages adds input to memory. On subsequent turns (tools), 
+            full_history = self._prepare_messages(messages if current_turn == 1 else [])
+            # Note: _prepare_messages adds input to memory. On subsequent turns (tools),
             # we don't re-add the user input. self.memory already has it + previous turns.
-            
+
             # Call LLM with retry
             try:
                 response = runner(
-                    self.provider.invoke,
-                    full_history,
-                    self._get_run_config(config)
+                    self.provider.invoke, full_history, self._get_run_config(config)
                 )
             except RetryError as e:
                 # Should not happen with reraise=True, but just in case
                 raise e
-            
+
             # Add assistant response to memory
             self.memory.add_message(response.to_message())
-            
+
             # Save session update
             if self.use_persistence:
                 self._save_session()
-            
+
             # Check for tool calls
             if response.has_tool_calls:
                 tool_result = self._process_tool_calls(response)
-                
+
                 # Check if user declined tool execution
                 if isinstance(tool_result, tuple) and tool_result[0] is False:
                     # User declined - add their input as a new message and continue
@@ -519,67 +533,68 @@ class BaseAgent:
                         final_response = response
                         break
                     continue
-                
+
                 tool_msgs = tool_result
-                
+
                 # Add tool outputs to memory
                 for tm in tool_msgs:
                     self.memory.add_message(tm)
-                    
+
                 # Save session update after tool results
                 if self.use_persistence:
                     self._save_session()
-                    
+
                 # Loop continues to feed tool outputs back to LLM
                 continue
             else:
                 # No tools, final response
                 final_response = response
                 break
-                
+
         return final_response
 
-    def stream(self, messages: Union[str, list[Message]], config: Optional[ModelConfig] = None) -> Iterator[StreamChunk]:
+    def stream(
+        self, messages: Union[str, list[Message]], config: Optional[ModelConfig] = None
+    ) -> Iterator[StreamChunk]:
         """
         Synchronously stream the agent response.
-        
-        Note: Tool execution breaks streaming flow typically. 
+
+        Note: Tool execution breaks streaming flow typically.
         If tools are called, we consume the stream to execute tools, then stream the final answer.
         """
         # For simplicity in this base implementation, we'll only stream if there are no tool calls initially,
         # or we buffer if we detect tools. Logic can get complex.
-        
+
         # Current simplified approach:
         # 1. Prepare messages
         full_history = self._prepare_messages(messages)
-        
+
         # 2. Stream from provider
         # We need to handle retries for the *start* of the stream
         from tenacity import Retrying
+
         runner = Retrying(
             stop=stop_after_attempt(self.retry_attempts),
             wait=wait_exponential(multiplier=1, min=4, max=10),
-            reraise=True
+            reraise=True,
         )
-        
+
         # We can't retry the *iteration* easily if it fails mid-stream without complex logic.
         # We will retry obtaining the iterator.
         stream_iterator = runner(
-            self.provider.stream,
-            full_history,
-            self._get_run_config(config)
+            self.provider.stream, full_history, self._get_run_config(config)
         )
-        
+
         yield from stream_iterator
-        
+
         # Update session at end if needed
-        # Note: Streaming complicates memory/persistence because getting the full message 
-        # requires aggregating chunks. The current implementation of base.stream DOES NOT 
-        # auto-aggregate into memory (it just yields). 
-        # The USER of stream() is responsible for re-assembling the message and adding to memory 
+        # Note: Streaming complicates memory/persistence because getting the full message
+        # requires aggregating chunks. The current implementation of base.stream DOES NOT
+        # auto-aggregate into memory (it just yields).
+        # The USER of stream() is responsible for re-assembling the message and adding to memory
         # if they want history.
         # BUT, wait. _prepare_messages DOES add input messages to memory.
-        # The RESPONSE is not added here. 
+        # The RESPONSE is not added here.
         # TODO: A robust stream implementation should aggregate and save.
         # For now, we only save the input part since _prepare_messages called it.
         if self.use_persistence:
@@ -589,39 +604,39 @@ class BaseAgent:
     # Asynchronous Methods
     # -------------------------------------------------------------------------
 
-    async def ainvoke(self, messages: Union[str, list[Message]], config: Optional[ModelConfig] = None) -> LLMResponse:
+    async def ainvoke(
+        self, messages: Union[str, list[Message]], config: Optional[ModelConfig] = None
+    ) -> LLMResponse:
         """Asynchronous invocation with retries and tool loop."""
         from tenacity import AsyncRetrying
-        
+
         runner = AsyncRetrying(
             stop=stop_after_attempt(self.retry_attempts),
             wait=wait_exponential(multiplier=1, min=4, max=10),
-            reraise=True
+            reraise=True,
         )
-        
+
         max_turns = 10
         current_turn = 0
         final_response = None
-        
+
         while current_turn < max_turns:
             current_turn += 1
             full_history = self._prepare_messages(messages if current_turn == 1 else [])
-            
+
             response = await runner(
-                self.provider.ainvoke,
-                full_history,
-                self._get_run_config(config)
+                self.provider.ainvoke, full_history, self._get_run_config(config)
             )
-            
+
             self.memory.add_message(response.to_message())
-            
+
             # Save session update
             if self.use_persistence:
                 self._save_session()
-            
+
             if response.has_tool_calls:
                 tool_result = await self._aprocess_tool_calls(response)
-                
+
                 # Check if user declined tool execution
                 if isinstance(tool_result, tuple) and tool_result[0] is False:
                     # User declined - add their input as a new message and continue
@@ -632,12 +647,12 @@ class BaseAgent:
                         final_response = response
                         break
                     continue
-                
+
                 tool_msgs = tool_result
-                
+
                 for tm in tool_msgs:
                     self.memory.add_message(tm)
-                    
+
                 # Save session update
                 if self.use_persistence:
                     self._save_session()
@@ -645,43 +660,45 @@ class BaseAgent:
             else:
                 final_response = response
                 break
-                
+
         return final_response
 
-    async def astream(self, messages: Union[str, list[Message]], config: Optional[ModelConfig] = None) -> AsyncIterator[StreamChunk]:
+    async def astream(
+        self, messages: Union[str, list[Message]], config: Optional[ModelConfig] = None
+    ) -> AsyncIterator[StreamChunk]:
         """Asynchronous streaming with memory aggregation."""
         # Prepare messages
         full_history = self._prepare_messages(messages)
-        
+
         # Determine config
         run_config = self._get_run_config(config)
-        
+
         # Get stream iterator directly (cannot use tenacity on async generator creation easily)
         stream_iterator = self.provider.astream(full_history, run_config)
-        
+
         aggregated_content = ""
         aggregated_tool_calls = []
-        
+
         async for chunk in stream_iterator:
             aggregated_content += chunk.content
             if chunk.tool_calls:
-                 # TODO: robust tool call aggregation if streaming partial JSON
-                 # For now, assume provider yields complete tool calls in chunks or we just collect them
-                 aggregated_tool_calls.extend(chunk.tool_calls)
+                # TODO: robust tool call aggregation if streaming partial JSON
+                # For now, assume provider yields complete tool calls in chunks or we just collect them
+                aggregated_tool_calls.extend(chunk.tool_calls)
             yield chunk
-            
+
         # Create Message and add to memory
         # Note: If no content and no tools, we don't add (or adds empty message)
-        
+
         # If we have tool calls, we might need to properly format them
         final_msg = Message(
             role="assistant",
             content=aggregated_content,
-            tool_calls=aggregated_tool_calls if aggregated_tool_calls else None
+            tool_calls=aggregated_tool_calls if aggregated_tool_calls else None,
         )
-        
+
         self.memory.add_message(final_msg)
-        
+
         if self.use_persistence:
             self._save_session()
 
@@ -692,11 +709,15 @@ class BaseAgent:
     def to_yaml(self, path: Union[str, Path]) -> None:
         """
         Serialize agent configuration to YAML.
-        
+
         Args:
            path: File path to save YAML.
         """
-        system_prompt_str = self.system_prompt.resolve_prompt() if isinstance(self.system_prompt, PromptBase) else str(self.system_prompt)
+        system_prompt_str = (
+            self.system_prompt.resolve_prompt()
+            if isinstance(self.system_prompt, PromptBase)
+            else str(self.system_prompt)
+        )
         data = {
             "name": self.name,
             "system_prompt": system_prompt_str,
@@ -708,60 +729,63 @@ class BaseAgent:
             "tools": self._tool_registry.names,
             # Memory state could be saved here too, but usually configured separately
         }
-        
+
         path_obj = Path(path)
         path_obj.parent.mkdir(parents=True, exist_ok=True)
-        
+
         with open(path_obj, "w", encoding="utf-8") as f:
             yaml.dump(data, f, sort_keys=False, default_flow_style=False)
 
     @classmethod
-    def from_yaml(cls, path: Union[str, Path], tool_registry: Optional[ToolRegistry] = None) -> "BaseAgent":
+    def from_yaml(
+        cls, path: Union[str, Path], tool_registry: Optional[ToolRegistry] = None
+    ) -> "BaseAgent":
         """
         Load agent from YAML configuration.
-        
+
         Args:
             path: Path to YAML file.
             tool_registry: Registry containing *available* tools to re-hydrate the agent.
                            The agent's tools will be selected from this registry based on names in YAML.
-        
+
         Returns:
             Instantiated BaseAgent.
         """
         path_obj = Path(path)
         with open(path_obj, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
-            
+
         name = data.get("name", "unnamed_agent")
         system_prompt = data.get("system_prompt", "")
         retry_attempts = data.get("retry_attempts", 3)
         provider_config = data.get("provider", {})
         model_name = provider_config.get("model", "qwen3-coder:480b-cloud")
-        
+
         # Reconstruct tools
         tools = []
         tool_names = data.get("tools", [])
-        
+
         # Use provided registry or fallback to default
         registry = tool_registry
         if registry is None:
             # Lazy import to avoid circular dependencies if any
             try:
                 from kader.tools import get_default_registry
+
                 registry = get_default_registry()
             except ImportError:
-                 pass
-                 
+                pass
+
         if tool_names and registry:
             for t_name in tool_names:
                 t = registry.get(t_name)
                 if t:
                     tools.append(t)
-        
+
         return cls(
             name=name,
             system_prompt=system_prompt,
             tools=tools,
             retry_attempts=retry_attempts,
-            model_name=model_name
+            model_name=model_name,
         )

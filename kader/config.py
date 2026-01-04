@@ -20,12 +20,12 @@ def load_env_file(env_file_path):
         return False
 
     try:
-        with open(env_file_path, 'r', encoding='utf-8') as file:
+        with open(env_file_path, "r", encoding="utf-8") as file:
             for line in file:
                 line = line.strip()
                 # Skip comments and empty lines
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
                     key = key.strip()
                     value = value.strip()
 
@@ -109,7 +109,9 @@ def initialize_kader_config():
         return kader_dir, True
 
     except PermissionError as e:
-        print(f"Permission denied: Unable to create .kader directory in {Path.home()}. {str(e)}")
+        print(
+            f"Permission denied: Unable to create .kader directory in {Path.home()}. {str(e)}"
+        )
         return None, False
     except Exception as e:
         print(f"Error initializing Kader config: {str(e)}")

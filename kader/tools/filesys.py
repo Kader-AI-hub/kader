@@ -21,10 +21,10 @@ from .protocol import FileInfo
 class ReadFileTool(BaseTool[str]):
     """
     Tool to read the contents of a file.
-    
+
     Uses FilesystemBackend for secure file access with path containment.
     """
-    
+
     def __init__(
         self,
         base_path: Path | None = None,
@@ -32,7 +32,7 @@ class ReadFileTool(BaseTool[str]):
     ) -> None:
         """
         Initialize the read file tool.
-        
+
         Args:
             base_path: Base path for file operations (defaults to CWD)
             virtual_mode: If True, use virtual path mode (sandboxed to base_path)
@@ -72,7 +72,7 @@ class ReadFileTool(BaseTool[str]):
             root_dir=base_path,
             virtual_mode=virtual_mode,
         )
-    
+
     def execute(
         self,
         path: str,
@@ -81,17 +81,17 @@ class ReadFileTool(BaseTool[str]):
     ) -> str:
         """
         Read file contents.
-        
+
         Args:
             path: Path to the file
             offset: Line offset to start reading from (0-indexed)
             limit: Maximum number of lines to read
-            
+
         Returns:
             File contents with line numbers, or error message
         """
         return self._backend.read(path, offset=offset, limit=limit)
-    
+
     async def aexecute(
         self,
         path: str,
@@ -109,10 +109,10 @@ class ReadFileTool(BaseTool[str]):
 class ReadDirectoryTool(BaseTool[list[dict[str, Any]]]):
     """
     Tool to list the contents of a directory.
-    
+
     Uses FilesystemBackend for secure directory listing.
     """
-    
+
     def __init__(
         self,
         base_path: Path | None = None,
@@ -120,7 +120,7 @@ class ReadDirectoryTool(BaseTool[list[dict[str, Any]]]):
     ) -> None:
         """
         Initialize the read directory tool.
-        
+
         Args:
             base_path: Base path for file operations (defaults to CWD)
             virtual_mode: If True, use virtual path mode (sandboxed to base_path)
@@ -145,24 +145,24 @@ class ReadDirectoryTool(BaseTool[list[dict[str, Any]]]):
             root_dir=base_path,
             virtual_mode=virtual_mode,
         )
-    
+
     def execute(
         self,
         path: str = ".",
     ) -> list[dict[str, Any]]:
         """
         List directory contents.
-        
+
         Args:
             path: Path to directory
-            
+
         Returns:
             List of file/directory information dictionaries
         """
         result: list[FileInfo] = self._backend.ls_info(path)
         # Convert FileInfo TypedDict to regular dict for JSON serialization
         return [dict(item) for item in result]
-    
+
     async def aexecute(
         self,
         path: str = ".",
@@ -178,11 +178,11 @@ class ReadDirectoryTool(BaseTool[list[dict[str, Any]]]):
 class WriteFileTool(BaseTool[dict[str, Any]]):
     """
     Tool to write content to a new file.
-    
+
     Uses FilesystemBackend for secure file creation.
     Only creates new files; fails if file already exists.
     """
-    
+
     def __init__(
         self,
         base_path: Path | None = None,
@@ -190,7 +190,7 @@ class WriteFileTool(BaseTool[dict[str, Any]]):
     ) -> None:
         """
         Initialize the write file tool.
-        
+
         Args:
             base_path: Base path for file operations (defaults to CWD)
             virtual_mode: If True, use virtual path mode (sandboxed to base_path)
@@ -219,7 +219,7 @@ class WriteFileTool(BaseTool[dict[str, Any]]):
             root_dir=base_path,
             virtual_mode=virtual_mode,
         )
-    
+
     def execute(
         self,
         path: str,
@@ -227,25 +227,25 @@ class WriteFileTool(BaseTool[dict[str, Any]]):
     ) -> dict[str, Any]:
         """
         Write content to a new file.
-        
+
         Args:
             path: Path to the file to create
             content: Content to write
-            
+
         Returns:
             Dictionary with operation result
         """
         result = self._backend.write(path, content)
-        
+
         if result.error:
             return {"error": result.error}
-        
+
         return {
             "path": result.path,
             "success": True,
             "bytes_written": len(content.encode("utf-8")),
         }
-    
+
     async def aexecute(
         self,
         path: str,
@@ -262,10 +262,10 @@ class WriteFileTool(BaseTool[dict[str, Any]]):
 class EditFileTool(BaseTool[dict[str, Any]]):
     """
     Tool to edit an existing file by string replacement.
-    
+
     Uses FilesystemBackend for secure file editing.
     """
-    
+
     def __init__(
         self,
         base_path: Path | None = None,
@@ -273,7 +273,7 @@ class EditFileTool(BaseTool[dict[str, Any]]):
     ) -> None:
         """
         Initialize the edit file tool.
-        
+
         Args:
             base_path: Base path for file operations (defaults to CWD)
             virtual_mode: If True, use virtual path mode (sandboxed to base_path)
@@ -314,7 +314,7 @@ class EditFileTool(BaseTool[dict[str, Any]]):
             root_dir=base_path,
             virtual_mode=virtual_mode,
         )
-    
+
     def execute(
         self,
         path: str,
@@ -324,27 +324,27 @@ class EditFileTool(BaseTool[dict[str, Any]]):
     ) -> dict[str, Any]:
         """
         Edit a file by replacing string occurrences.
-        
+
         Args:
             path: Path to the file
             old_string: String to replace
             new_string: Replacement string
             replace_all: Whether to replace all occurrences
-            
+
         Returns:
             Dictionary with operation result
         """
         result = self._backend.edit(path, old_string, new_string, replace_all)
-        
+
         if result.error:
             return {"error": result.error}
-        
+
         return {
             "path": result.path,
             "success": True,
             "occurrences": result.occurrences,
         }
-    
+
     async def aexecute(
         self,
         path: str,
@@ -365,10 +365,10 @@ class EditFileTool(BaseTool[dict[str, Any]]):
 class GrepTool(BaseTool[list[dict[str, Any]]]):
     """
     Tool to search for patterns in files using regex.
-    
+
     Uses FilesystemBackend's grep_raw with ripgrep fallback to Python.
     """
-    
+
     def __init__(
         self,
         base_path: Path | None = None,
@@ -376,7 +376,7 @@ class GrepTool(BaseTool[list[dict[str, Any]]]):
     ) -> None:
         """
         Initialize the grep tool.
-        
+
         Args:
             base_path: Base path for search operations (defaults to CWD)
             virtual_mode: If True, use virtual path mode (sandboxed to base_path)
@@ -413,7 +413,7 @@ class GrepTool(BaseTool[list[dict[str, Any]]]):
             root_dir=base_path,
             virtual_mode=virtual_mode,
         )
-    
+
     def execute(
         self,
         pattern: str,
@@ -422,24 +422,24 @@ class GrepTool(BaseTool[list[dict[str, Any]]]):
     ) -> list[dict[str, Any]]:
         """
         Search for pattern in files.
-        
+
         Args:
             pattern: Regex pattern to search for
             path: Directory to search in
             glob: Optional glob pattern to filter files
-            
+
         Returns:
             List of match dictionaries with path, line, and text
         """
         result = self._backend.grep_raw(pattern, path, glob)
-        
+
         if isinstance(result, str):
             # Error message
             return [{"error": result}]
-        
+
         # Convert GrepMatch TypedDict to regular dict
         return [dict(match) for match in result]
-    
+
     async def aexecute(
         self,
         pattern: str,
@@ -457,10 +457,10 @@ class GrepTool(BaseTool[list[dict[str, Any]]]):
 class GlobTool(BaseTool[list[dict[str, Any]]]):
     """
     Tool to find files matching a glob pattern.
-    
+
     Uses FilesystemBackend's glob_info for pattern matching.
     """
-    
+
     def __init__(
         self,
         base_path: Path | None = None,
@@ -468,7 +468,7 @@ class GlobTool(BaseTool[list[dict[str, Any]]]):
     ) -> None:
         """
         Initialize the glob tool.
-        
+
         Args:
             base_path: Base path for search operations (defaults to CWD)
             virtual_mode: If True, use virtual path mode (sandboxed to base_path)
@@ -499,7 +499,7 @@ class GlobTool(BaseTool[list[dict[str, Any]]]):
             root_dir=base_path,
             virtual_mode=virtual_mode,
         )
-    
+
     def execute(
         self,
         pattern: str,
@@ -507,17 +507,17 @@ class GlobTool(BaseTool[list[dict[str, Any]]]):
     ) -> list[dict[str, Any]]:
         """
         Find files matching glob pattern.
-        
+
         Args:
             pattern: Glob pattern to match
             path: Base directory to search from
-            
+
         Returns:
             List of file info dictionaries
         """
         result: list[FileInfo] = self._backend.glob_info(pattern, path)
         return [dict(item) for item in result]
-    
+
     async def aexecute(
         self,
         pattern: str,
@@ -534,10 +534,10 @@ class GlobTool(BaseTool[list[dict[str, Any]]]):
 class SearchInDirectoryTool(BaseTool[list[dict[str, Any]]]):
     """
     Tool to search for content in files using RAG-based semantic search.
-    
+
     Uses Ollama embeddings and FAISS for intelligent code search.
     """
-    
+
     def __init__(
         self,
         base_path: Path | None = None,
@@ -545,7 +545,7 @@ class SearchInDirectoryTool(BaseTool[list[dict[str, Any]]]):
     ) -> None:
         """
         Initialize the search tool.
-        
+
         Args:
             base_path: Base path for search operations (defaults to CWD)
             embedding_model: Ollama embedding model to use
@@ -581,15 +581,15 @@ class SearchInDirectoryTool(BaseTool[list[dict[str, Any]]]):
             ],
             category=ToolCategory.SEARCH,
         )
-        
+
         # Lazy import to avoid loading dependencies at module import time
         from .rag import RAGSearchTool
-        
+
         self._rag_tool = RAGSearchTool(
             base_path=base_path,
             embedding_model=embedding_model,
         )
-    
+
     def execute(
         self,
         query: str,
@@ -598,17 +598,17 @@ class SearchInDirectoryTool(BaseTool[list[dict[str, Any]]]):
     ) -> list[dict[str, Any]]:
         """
         Search for content in the directory.
-        
+
         Args:
             query: Natural language search query
             top_k: Number of results to return
             rebuild_index: Force rebuild the index
-            
+
         Returns:
             List of search result dictionaries
         """
         return self._rag_tool.execute(query, top_k, rebuild_index)
-    
+
     async def aexecute(
         self,
         query: str,
@@ -630,11 +630,11 @@ def get_filesystem_tools(
 ) -> list[BaseTool]:
     """
     Get all file system tools configured with the given base path.
-    
+
     Args:
         base_path: Base path for all tools (defaults to CWD)
         virtual_mode: If True, use virtual path mode for security
-        
+
     Returns:
         List of configured file system tools
     """

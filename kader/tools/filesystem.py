@@ -79,7 +79,9 @@ class FilesystemBackend(BackendProtocol):
             try:
                 full.relative_to(self.cwd)
             except ValueError:
-                raise ValueError(f"Path:{full} outside root directory: {self.cwd}") from None
+                raise ValueError(
+                    f"Path:{full} outside root directory: {self.cwd}"
+                ) from None
             return full
 
         path = Path(key)
@@ -101,7 +103,7 @@ class FilesystemBackend(BackendProtocol):
             dir_path = self._resolve_path(path)
         except ValueError:
             return []
-            
+
         if not dir_path.exists() or not dir_path.is_dir():
             return []
 
@@ -133,7 +135,9 @@ class FilesystemBackend(BackendProtocol):
                                     "path": abs_path,
                                     "is_dir": False,
                                     "size": int(st.st_size),
-                                    "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                                    "modified_at": datetime.fromtimestamp(
+                                        st.st_mtime
+                                    ).isoformat(),
                                 }
                             )
                         except OSError:
@@ -146,7 +150,9 @@ class FilesystemBackend(BackendProtocol):
                                     "path": abs_path + "/",
                                     "is_dir": True,
                                     "size": 0,
-                                    "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                                    "modified_at": datetime.fromtimestamp(
+                                        st.st_mtime
+                                    ).isoformat(),
                                 }
                             )
                         except OSError:
@@ -172,7 +178,9 @@ class FilesystemBackend(BackendProtocol):
                                     "path": virt_path,
                                     "is_dir": False,
                                     "size": int(st.st_size),
-                                    "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                                    "modified_at": datetime.fromtimestamp(
+                                        st.st_mtime
+                                    ).isoformat(),
                                 }
                             )
                         except OSError:
@@ -185,7 +193,9 @@ class FilesystemBackend(BackendProtocol):
                                     "path": virt_path + "/",
                                     "is_dir": True,
                                     "size": 0,
-                                    "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                                    "modified_at": datetime.fromtimestamp(
+                                        st.st_mtime
+                                    ).isoformat(),
                                 }
                             )
                         except OSError:
@@ -239,7 +249,9 @@ class FilesystemBackend(BackendProtocol):
                 return f"Error: Line offset {offset} exceeds file length ({len(lines)} lines)"
 
             selected_lines = lines[start_idx:end_idx]
-            return format_content_with_line_numbers(selected_lines, start_line=start_idx + 1)
+            return format_content_with_line_numbers(
+                selected_lines, start_line=start_idx + 1
+            )
         except (OSError, UnicodeDecodeError) as e:
             return f"Error reading file '{file_path}': {e}"
 
@@ -254,7 +266,9 @@ class FilesystemBackend(BackendProtocol):
         resolved_path = self._resolve_path(file_path)
 
         if resolved_path.exists():
-            return WriteResult(error=f"Cannot write to {file_path} because it already exists. Read and then make an edit, or write to a new path.")
+            return WriteResult(
+                error=f"Cannot write to {file_path} because it already exists. Read and then make an edit, or write to a new path."
+            )
 
         try:
             # Create parent directories if needed
@@ -293,7 +307,9 @@ class FilesystemBackend(BackendProtocol):
             with os.fdopen(fd, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            result = perform_string_replacement(content, old_string, new_string, replace_all)
+            result = perform_string_replacement(
+                content, old_string, new_string, replace_all
+            )
 
             if isinstance(result, str):
                 return EditResult(error=result)
@@ -308,7 +324,9 @@ class FilesystemBackend(BackendProtocol):
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write(new_content)
 
-            return EditResult(path=file_path, files_update=None, occurrences=int(occurrences))
+            return EditResult(
+                path=file_path, files_update=None, occurrences=int(occurrences)
+            )
         except (OSError, UnicodeDecodeError, UnicodeEncodeError) as e:
             return EditResult(error=f"Error editing file '{file_path}': {e}")
 
@@ -341,10 +359,14 @@ class FilesystemBackend(BackendProtocol):
         matches: list[GrepMatch] = []
         for fpath, items in results.items():
             for line_num, line_text in items:
-                matches.append({"path": fpath, "line": int(line_num), "text": line_text})
+                matches.append(
+                    {"path": fpath, "line": int(line_num), "text": line_text}
+                )
         return matches
 
-    def _ripgrep_search(self, pattern: str, base_full: Path, include_glob: str | None) -> dict[str, list[tuple[int, str]]] | None:
+    def _ripgrep_search(
+        self, pattern: str, base_full: Path, include_glob: str | None
+    ) -> dict[str, list[tuple[int, str]]] | None:
         cmd = ["rg", "--json"]
         if include_glob:
             cmd.extend(["--glob", include_glob])
@@ -389,7 +411,9 @@ class FilesystemBackend(BackendProtocol):
 
         return results
 
-    def _python_search(self, pattern: str, base_full: Path, include_glob: str | None) -> dict[str, list[tuple[int, str]]]:
+    def _python_search(
+        self, pattern: str, base_full: Path, include_glob: str | None
+    ) -> dict[str, list[tuple[int, str]]]:
         try:
             regex = re.compile(pattern)
         except re.error:
@@ -401,7 +425,9 @@ class FilesystemBackend(BackendProtocol):
         for fp in root.rglob("*"):
             if not fp.is_file():
                 continue
-            if include_glob and not wcglob.globmatch(fp.name, include_glob, flags=wcglob.BRACE):
+            if include_glob and not wcglob.globmatch(
+                fp.name, include_glob, flags=wcglob.BRACE
+            ):
                 continue
             try:
                 if fp.stat().st_size > self.max_file_size_bytes:
@@ -452,7 +478,9 @@ class FilesystemBackend(BackendProtocol):
                                 "path": abs_path,
                                 "is_dir": False,
                                 "size": int(st.st_size),
-                                "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                                "modified_at": datetime.fromtimestamp(
+                                    st.st_mtime
+                                ).isoformat(),
                             }
                         )
                     except OSError:
@@ -475,7 +503,9 @@ class FilesystemBackend(BackendProtocol):
                                 "path": virt,
                                 "is_dir": False,
                                 "size": int(st.st_size),
-                                "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                                "modified_at": datetime.fromtimestamp(
+                                    st.st_mtime
+                                ).isoformat(),
                             }
                         )
                     except OSError:
@@ -515,14 +545,20 @@ class FilesystemBackend(BackendProtocol):
             except FileNotFoundError:
                 responses.append(FileUploadResponse(path=path, error="file_not_found"))
             except PermissionError:
-                responses.append(FileUploadResponse(path=path, error="permission_denied"))
+                responses.append(
+                    FileUploadResponse(path=path, error="permission_denied")
+                )
             except (ValueError, OSError) as e:
                 # ValueError from _resolve_path for path traversal, OSError for other file errors
                 if isinstance(e, ValueError) or "invalid" in str(e).lower():
-                    responses.append(FileUploadResponse(path=path, error="invalid_path"))
+                    responses.append(
+                        FileUploadResponse(path=path, error="invalid_path")
+                    )
                 else:
                     # Generic error fallback
-                    responses.append(FileUploadResponse(path=path, error="invalid_path"))
+                    responses.append(
+                        FileUploadResponse(path=path, error="invalid_path")
+                    )
 
         return responses
 
@@ -544,14 +580,28 @@ class FilesystemBackend(BackendProtocol):
                 fd = os.open(resolved_path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
                 with os.fdopen(fd, "rb") as f:
                     content = f.read()
-                responses.append(FileDownloadResponse(path=path, content=content, error=None))
+                responses.append(
+                    FileDownloadResponse(path=path, content=content, error=None)
+                )
             except FileNotFoundError:
-                responses.append(FileDownloadResponse(path=path, content=None, error="file_not_found"))
+                responses.append(
+                    FileDownloadResponse(
+                        path=path, content=None, error="file_not_found"
+                    )
+                )
             except PermissionError:
-                responses.append(FileDownloadResponse(path=path, content=None, error="permission_denied"))
+                responses.append(
+                    FileDownloadResponse(
+                        path=path, content=None, error="permission_denied"
+                    )
+                )
             except IsADirectoryError:
-                responses.append(FileDownloadResponse(path=path, content=None, error="is_directory"))
+                responses.append(
+                    FileDownloadResponse(path=path, content=None, error="is_directory")
+                )
             except ValueError:
-                responses.append(FileDownloadResponse(path=path, content=None, error="invalid_path"))
+                responses.append(
+                    FileDownloadResponse(path=path, content=None, error="invalid_path")
+                )
             # Let other errors propagate
         return responses

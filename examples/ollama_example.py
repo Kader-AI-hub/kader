@@ -26,12 +26,14 @@ def demo_basic_invocation():
 
     # Initialize the provider with a model (using a common Ollama model)
     # Note: Make sure you have Ollama installed and running with the model pulled
-    provider = OllamaProvider(model="gpt-oss:120b-cloud")  # Using the model from the docstring
+    provider = OllamaProvider(
+        model="gpt-oss:120b-cloud"
+    )  # Using the model from the docstring
 
     # Create a simple conversation
     messages = [
         Message.system("You are a helpful assistant that responds concisely."),
-        Message.user("What are the benefits of using Ollama for local LLMs?")
+        Message.user("What are the benefits of using Ollama for local LLMs?"),
     ]
 
     try:
@@ -50,7 +52,9 @@ def demo_basic_invocation():
 
     except Exception as e:
         print(f"Error during invocation: {e}")
-        print("Make sure Ollama is running and the model is pulled with: ollama pull gpt-oss:120b-cloud")
+        print(
+            "Make sure Ollama is running and the model is pulled with: ollama pull gpt-oss:120b-cloud"
+        )
 
 
 def demo_streaming():
@@ -59,9 +63,7 @@ def demo_streaming():
 
     provider = OllamaProvider(model="gpt-oss:120b-cloud")
 
-    messages = [
-        Message.user("Write a short poem about artificial intelligence.")
-    ]
+    messages = [Message.user("Write a short poem about artificial intelligence.")]
 
     try:
         print("Streaming response:")
@@ -88,7 +90,9 @@ def demo_async_invocation():
 
         messages = [
             Message.system("You are a helpful assistant."),
-            Message.user("What is the difference between synchronous and asynchronous API calls?")
+            Message.user(
+                "What is the difference between synchronous and asynchronous API calls?"
+            ),
         ]
 
         try:
@@ -114,9 +118,7 @@ def demo_async_streaming():
     async def async_stream_demo():
         provider = OllamaProvider(model="gpt-oss:120b-cloud")
 
-        messages = [
-            Message.user("Explain quantum computing in simple terms.")
-        ]
+        messages = [Message.user("Explain quantum computing in simple terms.")]
 
         try:
             print("Async streaming response:")
@@ -142,15 +144,13 @@ def demo_configuration():
     # Create a provider with default configuration
     default_config = ModelConfig(
         temperature=0.7,  # More creative
-        max_tokens=150,   # Limit response length
-        top_p=0.9
+        max_tokens=150,  # Limit response length
+        top_p=0.9,
     )
 
     provider = OllamaProvider(model="gpt-oss:120b-cloud", default_config=default_config)
 
-    messages = [
-        Message.user("Tell me a creative fact about space.")
-    ]
+    messages = [Message.user("Tell me a creative fact about space.")]
 
     try:
         # This will use the default configuration
@@ -161,7 +161,7 @@ def demo_configuration():
         # Override configuration for this specific call
         creative_config = ModelConfig(
             temperature=1.2,  # Even more creative/random
-            max_tokens=200
+            max_tokens=200,
         )
 
         messages = [Message.user("Generate an original haiku about technology.")]
@@ -183,7 +183,9 @@ def demo_conversation_history():
     conversation = [
         Message.system("You are a helpful coding assistant."),
         Message.user("What is Python used for?"),
-        Message.assistant("Python is a versatile programming language used for web development, data science, AI/ML, automation, and more."),
+        Message.assistant(
+            "Python is a versatile programming language used for web development, data science, AI/ML, automation, and more."
+        ),
         Message.user("Can you give me a simple Python example?"),
     ]
 
@@ -204,10 +206,10 @@ def demo_error_handling():
     try:
         # Try to use a model that might not exist
         provider = OllamaProvider(model="nonexistent-model-123")
-        
+
         messages = [Message.user("Hello")]
         response = provider.invoke(messages)
-        
+
     except Exception as e:
         print(f"Expected error with non-existent model: {e}")
         print("This demonstrates proper error handling.")

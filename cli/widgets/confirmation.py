@@ -12,10 +12,10 @@ from textual.widgets import Static
 class InlineSelector(Widget, can_focus=True):
     """
     Inline selector widget for Yes/No confirmation.
-    
+
     Uses arrow keys to navigate, Enter to confirm.
     """
-    
+
     BINDINGS = [
         Binding("up", "move_up", "Up", show=False),
         Binding("down", "move_down", "Down", show=False),
@@ -25,7 +25,7 @@ class InlineSelector(Widget, can_focus=True):
         Binding("y", "confirm_yes", "Yes", show=False),
         Binding("n", "confirm_no", "No", show=False),
     ]
-    
+
     DEFAULT_CSS = """
     InlineSelector {
         width: 100%;
@@ -78,69 +78,73 @@ class InlineSelector(Widget, can_focus=True):
         text-style: bold;
     }
     """
-    
+
     selected_index: reactive[int] = reactive(0)
-    
-    def __init__(
-        self, 
-        message: str,
-        options: list[str] = None,
-        **kwargs
-    ) -> None:
+
+    def __init__(self, message: str, options: list[str] = None, **kwargs) -> None:
         super().__init__(**kwargs)
         self.message = message
         self.options = options or ["✅ Yes", "❌ No"]
-    
+
     def compose(self) -> ComposeResult:
         from textual.containers import Horizontal
+
         yield Static(f"🔧 {self.message}", classes="message-text")
-        yield Static("↑↓ to select • Enter to confirm • Y/N for quick select", classes="prompt-text")
+        yield Static(
+            "↑↓ to select • Enter to confirm • Y/N for quick select",
+            classes="prompt-text",
+        )
         with Horizontal(classes="selector-container"):
             for i, option in enumerate(self.options):
-                cls = "option selected" if i == self.selected_index else "option not-selected"
+                cls = (
+                    "option selected"
+                    if i == self.selected_index
+                    else "option not-selected"
+                )
                 yield Static(option, classes=cls, id=f"option-{i}")
-    
+
     def on_mount(self) -> None:
         """Focus self when mounted."""
         self.focus()
-    
+
     def watch_selected_index(self, old_index: int, new_index: int) -> None:
         """Update visual selection when index changes."""
         try:
             old_option = self.query_one(f"#option-{old_index}", Static)
             old_option.remove_class("selected")
             old_option.add_class("not-selected")
-            
+
             new_option = self.query_one(f"#option-{new_index}", Static)
             new_option.remove_class("not-selected")
             new_option.add_class("selected")
         except Exception:
             pass
-    
+
     def action_move_up(self) -> None:
         """Move selection up/left."""
         self.selected_index = (self.selected_index - 1) % len(self.options)
-    
+
     def action_move_down(self) -> None:
         """Move selection down/right."""
         self.selected_index = (self.selected_index + 1) % len(self.options)
-    
+
     def action_confirm(self) -> None:
         """Confirm current selection."""
         self.post_message(self.Confirmed(self.selected_index == 0))
-    
+
     def action_confirm_yes(self) -> None:
         """Quick confirm Yes."""
         self.selected_index = 0
         self.post_message(self.Confirmed(True))
-    
+
     def action_confirm_no(self) -> None:
         """Quick confirm No."""
         self.selected_index = 1
         self.post_message(self.Confirmed(False))
-    
+
     class Confirmed(TextualMessage):
         """Message sent when user confirms selection."""
+
         def __init__(self, confirmed: bool) -> None:
             super().__init__()
             self.confirmed = confirmed
@@ -149,17 +153,17 @@ class InlineSelector(Widget, can_focus=True):
 class ModelSelector(Widget, can_focus=True):
     """
     Model selector widget for choosing LLM models.
-    
+
     Uses arrow keys to navigate, Enter to confirm, Escape to cancel.
     """
-    
+
     BINDINGS = [
         Binding("up", "move_up", "Up", show=False),
         Binding("down", "move_down", "Down", show=False),
         Binding("enter", "confirm", "Confirm", show=False),
         Binding("escape", "cancel", "Cancel", show=False),
     ]
-    
+
     DEFAULT_CSS = """
     ModelSelector {
         width: 100%;
@@ -214,25 +218,22 @@ class ModelSelector(Widget, can_focus=True):
         color: $success;
     }
     """
-    
+
     selected_index: reactive[int] = reactive(0)
-    
-    def __init__(
-        self, 
-        models: list[str],
-        current_model: str = "",
-        **kwargs
-    ) -> None:
+
+    def __init__(self, models: list[str], current_model: str = "", **kwargs) -> None:
         super().__init__(**kwargs)
         self.models = models
         self.current_model = current_model
         # Start with current model selected if it exists
         if current_model in models:
             self.selected_index = models.index(current_model)
-    
+
     def compose(self) -> ComposeResult:
         yield Static("🤖 Select Model", classes="title-text")
-        yield Static("↑↓ to navigate • Enter to select • Esc to cancel", classes="prompt-text")
+        yield Static(
+            "↑↓ to navigate • Enter to select • Esc to cancel", classes="prompt-text"
+        )
         with Vertical(classes="model-list"):
             for i, model in enumerate(self.models):
                 is_current = model == self.current_model
@@ -248,11 +249,11 @@ class ModelSelector(Widget, can_focus=True):
                 if is_current:
                     label += " (current)"
                 yield Static(label, classes=classes, id=f"model-{i}")
-    
+
     def on_mount(self) -> None:
         """Focus self when mounted."""
         self.focus()
-    
+
     def watch_selected_index(self, old_index: int, new_index: int) -> None:
         """Update visual selection when index changes."""
         try:
@@ -265,7 +266,7 @@ class ModelSelector(Widget, can_focus=True):
             if old_model == self.current_model:
                 old_label += " (current)"
             old_option.update(old_label)
-            
+
             # Update new option
             new_option = self.query_one(f"#model-{new_index}", Static)
             new_option.remove_class("not-selected")
@@ -277,30 +278,32 @@ class ModelSelector(Widget, can_focus=True):
             new_option.update(new_label)
         except Exception:
             pass
-    
+
     def action_move_up(self) -> None:
         """Move selection up."""
         self.selected_index = (self.selected_index - 1) % len(self.models)
-    
+
     def action_move_down(self) -> None:
         """Move selection down."""
         self.selected_index = (self.selected_index + 1) % len(self.models)
-    
+
     def action_confirm(self) -> None:
         """Confirm current selection."""
         selected_model = self.models[self.selected_index]
         self.post_message(self.ModelSelected(selected_model))
-    
+
     def action_cancel(self) -> None:
         """Cancel selection."""
         self.post_message(self.ModelCancelled())
-    
+
     class ModelSelected(TextualMessage):
         """Message sent when user selects a model."""
+
         def __init__(self, model: str) -> None:
             super().__init__()
             self.model = model
-    
+
     class ModelCancelled(TextualMessage):
         """Message sent when user cancels selection."""
+
         pass

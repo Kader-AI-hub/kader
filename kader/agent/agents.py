@@ -14,9 +14,10 @@ from kader.prompts import ReActAgentPrompt, PlanningAgentPrompt, PromptBase
 class ReActAgent(BaseAgent):
     """
     ReAct (Reasoning and Acting) Agent.
-    
+
     Uses a ReAct prompt strategy to reason about tasks and use tools.
     """
+
     def __init__(
         self,
         name: str,
@@ -31,30 +32,29 @@ class ReActAgent(BaseAgent):
         interrupt_before_tool: bool = True,
         tool_confirmation_callback: Optional[callable] = None,
     ) -> None:
-        
         # Resolve tools for prompt context if necessary
         # The base agent handles tool registration, but for the prompt template
         # we might need to pass tool descriptions initially.
-        
+
         # Temporary logic to get tool names/descriptions for the prompt
         # In a real scenario, this might need dynamic updates or be handled by the Prompt class itself
         # accessing the agent's registry. Here we do a best-effort pre-fill.
-        
+
         _tools_list = []
         if isinstance(tools, list):
             _tools_list = tools
         elif isinstance(tools, ToolRegistry):
-             _tools_list = tools.tools
-             
+            _tools_list = tools.tools
+
         tool_names = ", ".join([t.name for t in _tools_list])
-        
+
         if system_prompt is None:
             system_prompt = ReActAgentPrompt(
                 tools=_tools_list,
                 tool_names=tool_names,
-                input="" # This acts as a placeholder or initial context
+                input="",  # This acts as a placeholder or initial context
             )
-            
+
         super().__init__(
             name=name,
             system_prompt=system_prompt,
@@ -73,9 +73,10 @@ class ReActAgent(BaseAgent):
 class PlanningAgent(BaseAgent):
     """
     Planning Agent.
-    
+
     Breaks tasks into plans and executes them.
     """
+
     def __init__(
         self,
         name: str,
@@ -90,29 +91,26 @@ class PlanningAgent(BaseAgent):
         interrupt_before_tool: bool = True,
         tool_confirmation_callback: Optional[callable] = None,
     ) -> None:
-        
         # Ensure TodoTool is available
         _todo_tool = TodoTool()
         if isinstance(tools, ToolRegistry):
-             if _todo_tool.name not in tools:
-                 tools.register(_todo_tool)
+            if _todo_tool.name not in tools:
+                tools.register(_todo_tool)
         elif isinstance(tools, list):
-             if not any(t.name == _todo_tool.name for t in tools):
-                 tools.append(_todo_tool)
+            if not any(t.name == _todo_tool.name for t in tools):
+                tools.append(_todo_tool)
 
         _tools_list = []
         if isinstance(tools, list):
             _tools_list = tools
         elif isinstance(tools, ToolRegistry):
-             _tools_list = tools.tools
-             
+            _tools_list = tools.tools
+
         if system_prompt is None:
             system_prompt = PlanningAgentPrompt(
-                tools=_tools_list,
-                input="",
-                agent_scratchpad=""
+                tools=_tools_list, input="", agent_scratchpad=""
             )
-            
+
         super().__init__(
             name=name,
             system_prompt=system_prompt,

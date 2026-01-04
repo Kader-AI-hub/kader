@@ -19,7 +19,11 @@ from textual.widgets import (
 
 from kader.agent.agents import ReActAgent
 from kader.tools import get_default_registry
-from kader.memory import SlidingWindowConversationManager, FileSessionManager, MemoryConfig
+from kader.memory import (
+    SlidingWindowConversationManager,
+    FileSessionManager,
+    MemoryConfig,
+)
 
 from .utils import (
     HELP_TEXT,
@@ -78,7 +82,7 @@ class KaderApp(App):
         self._confirmation_result: tuple[bool, Optional[str]] = (True, None)
         self._inline_selector: Optional[InlineSelector] = None
         self._model_selector: Optional[ModelSelector] = None
-        
+
         self._agent = self._create_agent(self._current_model)
 
     def _create_agent(self, model_name: str) -> ReActAgent:
@@ -98,21 +102,21 @@ class KaderApp(App):
     def _tool_confirmation_callback(self, message: str) -> tuple[bool, Optional[str]]:
         """
         Callback for tool confirmation - called from agent thread.
-        
+
         Shows inline selector with arrow key navigation.
         """
         # Set up synchronization
         self._confirmation_event = threading.Event()
         self._confirmation_result = (True, None)  # Default
-        
+
         # Schedule selector to be shown on main thread
         # Use call_from_thread to safely call from background thread
         self.call_from_thread(self._show_inline_selector, message)
-        
+
         # Wait for user response (blocking in agent thread)
         # This is safe because we're in a background thread
         self._confirmation_event.wait()
-        
+
         # Return the result
         return self._confirmation_result
 
@@ -124,36 +128,36 @@ class KaderApp(App):
             spinner.stop()
         except Exception:
             pass
-        
+
         conversation = self.query_one("#conversation-view", ConversationView)
-        
+
         # Create and mount the selector
         self._inline_selector = InlineSelector(message, id="tool-selector")
         conversation.mount(self._inline_selector)
         conversation.scroll_end()
-        
+
         # Disable input and focus selector
         prompt_input = self.query_one("#prompt-input", Input)
         prompt_input.disabled = True
-        
+
         # Force focus on the selector widget
         self.set_focus(self._inline_selector)
-        
+
         # Force refresh
         self.refresh()
 
     def on_inline_selector_confirmed(self, event: InlineSelector.Confirmed) -> None:
         """Handle confirmation from inline selector."""
         conversation = self.query_one("#conversation-view", ConversationView)
-        
+
         # Set result
         self._confirmation_result = (event.confirmed, None)
-        
+
         # Remove selector and show result message
         if self._inline_selector:
             self._inline_selector.remove()
             self._inline_selector = None
-        
+
         if event.confirmed:
             conversation.add_message("✅ Executing tool...", "assistant")
             # Restart spinner
@@ -164,90 +168,90 @@ class KaderApp(App):
                 pass
         else:
             conversation.add_message("❌ Tool execution skipped.", "assistant")
-        
+
         # Re-enable input
         prompt_input = self.query_one("#prompt-input", Input)
         prompt_input.disabled = False
-        
+
         # Signal the waiting thread BEFORE focusing input
         # This ensures the agent thread can continue
         if self._confirmation_event:
             self._confirmation_event.set()
-        
+
         # Now focus input
         prompt_input.focus()
 
     async def _show_model_selector(self, conversation: ConversationView) -> None:
         """Show the model selector widget."""
         from kader.providers import OllamaProvider
-        
+
         try:
             models = OllamaProvider.get_supported_models()
             if not models:
                 conversation.add_message(
-                    "## Models 🤖\n\n*No models found. Is Ollama running?*",
-                    "assistant"
+                    "## Models 🤖\n\n*No models found. Is Ollama running?*", "assistant"
                 )
                 return
-            
+
             # Create and mount the model selector
             self._model_selector = ModelSelector(
-                models=models,
-                current_model=self._current_model,
-                id="model-selector"
+                models=models, current_model=self._current_model, id="model-selector"
             )
             conversation.mount(self._model_selector)
             conversation.scroll_end()
-            
+
             # Disable input and focus selector
             prompt_input = self.query_one("#prompt-input", Input)
             prompt_input.disabled = True
             self.set_focus(self._model_selector)
-            
+
         except Exception as e:
             conversation.add_message(
-                f"## Models 🤖\n\n*Error fetching models: {e}*",
-                "assistant"
+                f"## Models 🤖\n\n*Error fetching models: {e}*", "assistant"
             )
 
-    def on_model_selector_model_selected(self, event: ModelSelector.ModelSelected) -> None:
+    def on_model_selector_model_selected(
+        self, event: ModelSelector.ModelSelected
+    ) -> None:
         """Handle model selection."""
         conversation = self.query_one("#conversation-view", ConversationView)
-        
+
         # Remove selector
         if self._model_selector:
             self._model_selector.remove()
             self._model_selector = None
-        
+
         # Update model and recreate agent
         old_model = self._current_model
         self._current_model = event.model
         self._agent = self._create_agent(self._current_model)
-        
+
         conversation.add_message(
             f"✅ Model changed from `{old_model}` to `{self._current_model}`",
-            "assistant"
+            "assistant",
         )
-        
+
         # Re-enable input
         prompt_input = self.query_one("#prompt-input", Input)
         prompt_input.disabled = False
         prompt_input.focus()
 
-    def on_model_selector_model_cancelled(self, event: ModelSelector.ModelCancelled) -> None:
+    def on_model_selector_model_cancelled(
+        self, event: ModelSelector.ModelCancelled
+    ) -> None:
         """Handle model selection cancelled."""
         conversation = self.query_one("#conversation-view", ConversationView)
-        
+
         # Remove selector
         if self._model_selector:
             self._model_selector.remove()
             self._model_selector = None
-        
+
         conversation.add_message(
             f"Model selection cancelled. Current model: `{self._current_model}`",
-            "assistant"
+            "assistant",
         )
-        
+
         # Re-enable input
         prompt_input = self.query_one("#prompt-input", Input)
         prompt_input.disabled = False
@@ -284,7 +288,7 @@ class KaderApp(App):
         # Show welcome message
         conversation = self.query_one("#conversation-view", ConversationView)
         conversation.mount(Markdown(WELCOME_MESSAGE, id="welcome"))
-        
+
         # Focus the input
         self.query_one("#prompt-input", Input).focus()
 
@@ -332,7 +336,7 @@ class KaderApp(App):
             if len(parts) < 2:
                 conversation.add_message(
                     "❌ Usage: `/load <session_id>`\n\nUse `/sessions` to see available sessions.",
-                    "assistant"
+                    "assistant",
                 )
             else:
                 self._handle_load_session(parts[1], conversation)
@@ -374,15 +378,14 @@ class KaderApp(App):
         """Worker to invoke agent in background."""
         conversation = self.query_one("#conversation-view", ConversationView)
         spinner = self.query_one(LoadingSpinner)
-        
+
         try:
             # Run the agent invoke in a thread
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
-                None,
-                lambda: self._agent.invoke(message)
+                None, lambda: self._agent.invoke(message)
             )
-            
+
             # Hide spinner and show response (this runs on main thread via await)
             spinner.stop()
             if response and response.content:
@@ -452,21 +455,23 @@ class KaderApp(App):
             if not self._current_session_id:
                 session = self._session_manager.create_session("kader_cli")
                 self._current_session_id = session.session_id
-            
+
             # Get messages from agent memory and save
             messages = [msg.message for msg in self._agent.memory.get_messages()]
             self._session_manager.save_conversation(self._current_session_id, messages)
-            
+
             conversation.add_message(
                 f"✅ Session saved!\n\n**Session ID:** `{self._current_session_id}`",
-                "assistant"
+                "assistant",
             )
             self.notify("Session saved!", severity="information")
         except Exception as e:
             conversation.add_message(f"❌ Error saving session: {e}", "assistant")
             self.notify(f"Error: {e}", severity="error")
 
-    def _handle_load_session(self, session_id: str, conversation: ConversationView) -> None:
+    def _handle_load_session(
+        self, session_id: str, conversation: ConversationView
+    ) -> None:
         """Load a saved session by ID."""
         try:
             # Check if session exists
@@ -474,17 +479,17 @@ class KaderApp(App):
             if not session:
                 conversation.add_message(
                     f"❌ Session `{session_id}` not found.\n\nUse `/sessions` to see available sessions.",
-                    "assistant"
+                    "assistant",
                 )
                 return
-            
+
             # Load conversation history
             messages = self._session_manager.load_conversation(session_id)
-            
+
             # Clear current state
             conversation.clear_messages()
             self._agent.memory.clear()
-            
+
             # Add loaded messages to memory and UI
             for msg in messages:
                 self._agent.memory.add_message(msg)
@@ -492,11 +497,11 @@ class KaderApp(App):
                 content = msg.get("content", "")
                 if role in ["user", "assistant"] and content:
                     conversation.add_message(content, role)
-            
+
             self._current_session_id = session_id
             conversation.add_message(
                 f"✅ Session `{session_id}` loaded with {len(messages)} messages.",
-                "assistant"
+                "assistant",
             )
             self.notify("Session loaded!", severity="information")
         except Exception as e:
@@ -507,21 +512,25 @@ class KaderApp(App):
         """List all saved sessions."""
         try:
             sessions = self._session_manager.list_sessions()
-            
+
             if not sessions:
                 conversation.add_message(
                     "📭 No saved sessions found.\n\nUse `/save` to save the current session.",
-                    "assistant"
+                    "assistant",
                 )
                 return
-            
-            lines = ["## Saved Sessions 📂\n", "| Session ID | Created | Updated |", "|------------|---------|---------|"]
+
+            lines = [
+                "## Saved Sessions 📂\n",
+                "| Session ID | Created | Updated |",
+                "|------------|---------|---------|",
+            ]
             for session in sessions:
                 # Shorten UUID for display
                 created = session.created_at[:10]  # Just date
                 updated = session.updated_at[:10]
                 lines.append(f"| `{session.session_id}` | {created} | {updated} |")
-            
+
             lines.append("\n*Use `/load <session_id>` to load a session.*")
             conversation.add_message("\n".join(lines), "assistant")
         except Exception as e:
@@ -537,4 +546,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
