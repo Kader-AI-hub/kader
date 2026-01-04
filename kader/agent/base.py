@@ -53,6 +53,7 @@ class BaseAgent:
         session_id: Optional[str] = None,
         use_persistence: bool = False,
         interrupt_before_tool: bool = True,
+        tool_confirmation_callback: Optional[callable] = None,
     ) -> None:
         """
         Initialize the Base Agent.
@@ -68,11 +69,15 @@ class BaseAgent:
             session_id: Optional session ID to load/resume.
             use_persistence: If True, enables session persistence (auto-enabled if session_id provided).
             interrupt_before_tool: If True, pauses and asks for user confirmation before executing tools.
+            tool_confirmation_callback: Optional callback function for tool confirmation.
+                Signature: (message: str) -> tuple[bool, Optional[str]]
+                Returns (should_execute, user_elaboration_if_declined).
         """
         self.name = name
         self.system_prompt = system_prompt
         self.retry_attempts = retry_attempts
         self.interrupt_before_tool = interrupt_before_tool
+        self.tool_confirmation_callback = tool_confirmation_callback
         
         # Persistence Configuration
         self.session_id = session_id
@@ -311,6 +316,12 @@ class BaseAgent:
             If should_execute is False, user_input contains additional context.
         """
         display_str = self._format_tool_call_for_display(tool_call_dict)
+        
+        # Use callback if provided (e.g., for GUI/TUI)
+        if self.tool_confirmation_callback:
+            return self.tool_confirmation_callback(display_str)
+        
+        # Default: use console input
         print(display_str)
         
         while True:

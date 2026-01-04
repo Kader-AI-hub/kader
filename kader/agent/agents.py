@@ -29,6 +29,7 @@ class ReActAgent(BaseAgent):
         session_id: Optional[str] = None,
         use_persistence: bool = False,
         interrupt_before_tool: bool = True,
+        tool_confirmation_callback: Optional[callable] = None,
     ) -> None:
         
         # Resolve tools for prompt context if necessary
@@ -64,7 +65,8 @@ class ReActAgent(BaseAgent):
             model_name=model_name,
             session_id=session_id,
             use_persistence=use_persistence,
-            interrupt_before_tool=interrupt_before_tool
+            interrupt_before_tool=interrupt_before_tool,
+            tool_confirmation_callback=tool_confirmation_callback,
         )
 
 
@@ -86,6 +88,7 @@ class PlanningAgent(BaseAgent):
         session_id: Optional[str] = None,
         use_persistence: bool = False,
         interrupt_before_tool: bool = True,
+        tool_confirmation_callback: Optional[callable] = None,
     ) -> None:
         
         # Ensure TodoTool is available
@@ -120,5 +123,6 @@ class PlanningAgent(BaseAgent):
             model_name=model_name,
             session_id=session_id,
             use_persistence=use_persistence,
-            interrupt_before_tool=interrupt_before_tool
+            interrupt_before_tool=interrupt_before_tool,
+            tool_confirmation_callback=tool_confirmation_callback,
         )
