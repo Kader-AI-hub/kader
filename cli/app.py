@@ -1,7 +1,9 @@
 """Kader CLI - Modern Vibe Coding CLI with Textual."""
 
 import asyncio
+import threading
 from pathlib import Path
+from typing import Optional
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -25,7 +27,7 @@ from .utils import (
     DEFAULT_MODEL,
     get_models_text,
 )
-from .widgets import ConversationView, LoadingSpinner
+from .widgets import ConversationView, LoadingSpinner, InlineSelector
 
 
 WELCOME_MESSAGE = """# Welcome to Kader CLI! 🚀
@@ -72,6 +74,11 @@ class KaderApp(App):
         self._session_manager = FileSessionManager(
             MemoryConfig(memory_dir=Path.home() / ".kader")
         )
+        # Tool confirmation coordination
+        self._confirmation_event: Optional[threading.Event] = None
+        self._confirmation_result: tuple[bool, Optional[str]] = (True, None)
+        self._inline_selector: Optional[InlineSelector] = None
+        
         self._agent = self._create_agent(self._current_model)
 
     def _create_agent(self, model_name: str) -> ReActAgent:
@@ -83,9 +90,92 @@ class KaderApp(App):
             tools=registry,
             memory=memory,
             model_name=model_name,
-            use_persistence=True
+            use_persistence=True,
+            interrupt_before_tool=True,
+            tool_confirmation_callback=self._tool_confirmation_callback,
         )
 
+    def _tool_confirmation_callback(self, message: str) -> tuple[bool, Optional[str]]:
+        """
+        Callback for tool confirmation - called from agent thread.
+        
+        Shows inline selector with arrow key navigation.
+        """
+        # Set up synchronization
+        self._confirmation_event = threading.Event()
+        self._confirmation_result = (True, None)  # Default
+        
+        # Schedule selector to be shown on main thread
+        # Use call_from_thread to safely call from background thread
+        self.call_from_thread(self._show_inline_selector, message)
+        
+        # Wait for user response (blocking in agent thread)
+        # This is safe because we're in a background thread
+        self._confirmation_event.wait()
+        
+        # Return the result
+        return self._confirmation_result
+
+    def _show_inline_selector(self, message: str) -> None:
+        """Show the inline selector in the conversation view."""
+        # Stop spinner while waiting for confirmation
+        try:
+            spinner = self.query_one(LoadingSpinner)
+            spinner.stop()
+        except Exception:
+            pass
+        
+        conversation = self.query_one("#conversation-view", ConversationView)
+        
+        # Create and mount the selector
+        self._inline_selector = InlineSelector(message, id="tool-selector")
+        conversation.mount(self._inline_selector)
+        conversation.scroll_end()
+        
+        # Disable input and focus selector
+        prompt_input = self.query_one("#prompt-input", Input)
+        prompt_input.disabled = True
+        
+        # Force focus on the selector widget
+        self.set_focus(self._inline_selector)
+        
+        # Force refresh
+        self.refresh()
+
+    def on_inline_selector_confirmed(self, event: InlineSelector.Confirmed) -> None:
+        """Handle confirmation from inline selector."""
+        conversation = self.query_one("#conversation-view", ConversationView)
+        
+        # Set result
+        self._confirmation_result = (event.confirmed, None)
+        
+        # Remove selector and show result message
+        if self._inline_selector:
+            self._inline_selector.remove()
+            self._inline_selector = None
+        
+        if event.confirmed:
+            conversation.add_message("✅ Executing tool...", "assistant")
+            # Restart spinner
+            try:
+                spinner = self.query_one(LoadingSpinner)
+                spinner.start()
+            except Exception:
+                pass
+        else:
+            conversation.add_message("❌ Tool execution skipped.", "assistant")
+        
+        # Re-enable input
+        prompt_input = self.query_one("#prompt-input", Input)
+        prompt_input.disabled = False
+        
+        # Signal the waiting thread BEFORE focusing input
+        # This ensures the agent thread can continue
+        if self._confirmation_event:
+            self._confirmation_event.set()
+        
+        # Now focus input
+        prompt_input.focus()
 
     def compose(self) -> ComposeResult:
         """Create the application layout."""
@@ -198,16 +288,30 @@ class KaderApp(App):
         # Show loading spinner
         spinner.start()
 
+        # Use run_worker to run agent in background without blocking event loop
+        self.run_worker(
+            self._invoke_agent_worker(message),
+            name="agent_worker",
+            exclusive=True,
+        )
+
+    async def _invoke_agent_worker(self, message: str) -> None:
+        """Worker to invoke agent in background."""
+        conversation = self.query_one("#conversation-view", ConversationView)
+        spinner = self.query_one(LoadingSpinner)
+        
         try:
-            # Invoke agent using asyncio.to_thread for sync invoke
-            def invoke_agent():
-                return self._agent.invoke(message)
-                    
-            response = await asyncio.to_thread(invoke_agent)
+            # Run the agent invoke in a thread
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: self._agent.invoke(message)
+            )
             
-            # Hide spinner and show response
+            # Hide spinner and show response (this runs on main thread via await)
             spinner.stop()
-            conversation.add_message(response.content, "assistant")
+            if response and response.content:
+                conversation.add_message(response.content, "assistant")
 
         except Exception as e:
             spinner.stop()
