@@ -562,6 +562,22 @@ class BaseTool(ABC, Generic[T]):
         """
         ...
     
+    @abstractmethod
+    def get_interruption_message(self, **kwargs: Any) -> str:
+        """
+        Get a human-readable message describing the tool action for user confirmation.
+        
+        This method should return a message that clearly describes what the tool
+        is about to do, suitable for displaying to the user before execution.
+        
+        Args:
+            **kwargs: Tool arguments matching the parameter schema
+            
+        Returns:
+            A formatted string describing the action, e.g., "execute read_file: /path/to/file"
+        """
+        ...
+    
     # -------------------------------------------------------------------------
     # Convenience Methods
     # -------------------------------------------------------------------------
@@ -928,3 +944,18 @@ class FunctionTool(BaseTool[T]):
             return await self._func(**kwargs)
         else:
             return await asyncio.to_thread(self._func, **kwargs)
+
+    def get_interruption_message(self, **kwargs: Any) -> str:
+        """
+        Get interruption message for user confirmation.
+        
+        For function-based tools, generates a message using the tool name
+        and the first string argument value (if any).
+        """
+        # Try to find a meaningful argument to display
+        for key, value in kwargs.items():
+            if isinstance(value, str) and value:
+                return f"execute {self.name}: {value}"
+        
+        # Fallback to just the tool name
+        return f"execute {self.name}"

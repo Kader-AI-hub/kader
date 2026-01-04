@@ -154,6 +154,10 @@ class WebSearchTool(BaseTool[list[dict[str, Any]]]):
         import asyncio
         return await asyncio.to_thread(self.execute, query, limit)
 
+    def get_interruption_message(self, query: str, **kwargs) -> str:
+        """Get interruption message for user confirmation."""
+        return f"execute web_search: {query}"
+
 
 class WebFetchTool(BaseTool[str]):
     """
@@ -226,6 +230,10 @@ class WebFetchTool(BaseTool[str]):
         """Async version of execute."""
         import asyncio
         return await asyncio.to_thread(self.execute, url)
+
+    def get_interruption_message(self, url: str, **kwargs) -> str:
+        """Get interruption message for user confirmation."""
+        return f"execute web_fetch: {url}"
 
 
 def get_web_tools() -> list[BaseTool]:

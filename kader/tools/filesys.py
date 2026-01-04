@@ -101,6 +101,10 @@ class ReadFileTool(BaseTool[str]):
         """Async version of execute."""
         return await asyncio.to_thread(self.execute, path, offset, limit)
 
+    def get_interruption_message(self, path: str, **kwargs) -> str:
+        """Get interruption message for user confirmation."""
+        return f"execute read_file: {path}"
+
 
 class ReadDirectoryTool(BaseTool[list[dict[str, Any]]]):
     """
@@ -165,6 +169,10 @@ class ReadDirectoryTool(BaseTool[list[dict[str, Any]]]):
     ) -> list[dict[str, Any]]:
         """Async version of execute."""
         return await asyncio.to_thread(self.execute, path)
+
+    def get_interruption_message(self, path: str = ".", **kwargs) -> str:
+        """Get interruption message for user confirmation."""
+        return f"execute read_dir: {path}"
 
 
 class WriteFileTool(BaseTool[dict[str, Any]]):
@@ -245,6 +253,10 @@ class WriteFileTool(BaseTool[dict[str, Any]]):
     ) -> dict[str, Any]:
         """Async version of execute."""
         return await asyncio.to_thread(self.execute, path, content)
+
+    def get_interruption_message(self, path: str, **kwargs) -> str:
+        """Get interruption message for user confirmation."""
+        return f"execute write_file: {path}"
 
 
 class EditFileTool(BaseTool[dict[str, Any]]):
@@ -345,6 +357,10 @@ class EditFileTool(BaseTool[dict[str, Any]]):
             self.execute, path, old_string, new_string, replace_all
         )
 
+    def get_interruption_message(self, path: str, **kwargs) -> str:
+        """Get interruption message for user confirmation."""
+        return f"execute edit_file: {path}"
+
 
 class GrepTool(BaseTool[list[dict[str, Any]]]):
     """
@@ -433,6 +449,10 @@ class GrepTool(BaseTool[list[dict[str, Any]]]):
         """Async version of execute."""
         return await asyncio.to_thread(self.execute, pattern, path, glob)
 
+    def get_interruption_message(self, **kwargs) -> str:
+        """Get interruption message for user confirmation."""
+        return "execute grep"
+
 
 class GlobTool(BaseTool[list[dict[str, Any]]]):
     """
@@ -505,6 +525,10 @@ class GlobTool(BaseTool[list[dict[str, Any]]]):
     ) -> list[dict[str, Any]]:
         """Async version of execute."""
         return await asyncio.to_thread(self.execute, pattern, path)
+
+    def get_interruption_message(self, **kwargs) -> str:
+        """Get interruption message for user confirmation."""
+        return "execute glob"
 
 
 class SearchInDirectoryTool(BaseTool[list[dict[str, Any]]]):
@@ -593,6 +617,10 @@ class SearchInDirectoryTool(BaseTool[list[dict[str, Any]]]):
     ) -> list[dict[str, Any]]:
         """Async version of execute."""
         return await self._rag_tool.aexecute(query, top_k, rebuild_index)
+
+    def get_interruption_message(self, **kwargs) -> str:
+        """Get interruption message for user confirmation."""
+        return "execute search_in_directory"
 
 
 # Convenience function to get all file system tools

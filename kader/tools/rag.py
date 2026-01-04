@@ -495,3 +495,7 @@ class RAGSearchTool(BaseTool[list[dict[str, Any]]]):
         """Async version of execute."""
         import asyncio
         return await asyncio.to_thread(self.execute, query, top_k, rebuild)
+
+    def get_interruption_message(self, query: str, **kwargs) -> str:
+        """Get interruption message for user confirmation."""
+        return f"execute rag_search: {query}"

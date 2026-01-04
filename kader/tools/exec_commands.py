@@ -193,3 +193,7 @@ class CommandExecutorTool(BaseTool[str]):
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(None, self.execute, command, timeout)
         return result
+
+    def get_interruption_message(self, command: str, **kwargs) -> str:
+        """Get interruption message for user confirmation."""
+        return f"execute {self.name}: {command}"

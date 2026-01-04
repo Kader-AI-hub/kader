@@ -120,6 +120,10 @@ class TodoTool(BaseTool[str]):
         """Asynchronous execution (delegates to synchronous for now)."""
         return self.execute(**kwargs)
 
+    def get_interruption_message(self, action: str, **kwargs) -> str:
+        """Get interruption message for user confirmation."""
+        return f"execute todo_{action}"
+
     def _get_todo_path(self, session_id: str, todo_id: str) -> Path:
         """Get the file path for a todo list."""
         # Hardcoded base path as per requirements: ~/.kader/memory/sessions/
