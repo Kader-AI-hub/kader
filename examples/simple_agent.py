@@ -53,7 +53,8 @@ def main():
         name="kader_helper",
         system_prompt=system_prompt,
         tools=[calculator],
-        retry_attempts=2
+        retry_attempts=2,
+        interrupt_before_tool=True
     )
 
     print(f"Agent '{agent.name}' initialized.")

@@ -23,10 +23,11 @@ async def main():
         print(f"Error loading agent from YAML: {e}")
         return
 
-    # 3. Enable Persistence manually for this example
+    # 3. Enable Persistence and Interrupt manually for this example
     from kader.memory import FileSessionManager
     agent.session_manager = FileSessionManager()
     agent.use_persistence = True
+    agent.interrupt_before_tool = True
     agent._load_session() # Load or create session
     
     print(f"Agent '{agent.name}' loaded from YAML.")

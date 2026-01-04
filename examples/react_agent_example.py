@@ -49,7 +49,8 @@ async def main():
         tools=registry, 
         memory=memory, 
         model_name="gpt-oss:120b-cloud",
-        use_persistence=True # Enable session persistence
+        use_persistence=True, # Enable session persistence
+        interrupt_before_tool=True
     )
     
     print(f"Agent '{agent.name}' initialized with session ID: {agent.session_id}")

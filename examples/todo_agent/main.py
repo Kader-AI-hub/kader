@@ -32,6 +32,7 @@ def main():
         tools=[TodoTool()],
         model_name="gpt-oss:120b-cloud", # Using the user's preferred model
         use_persistence=True, # Enable session persistence
+        interrupt_before_tool=True,
     )
     
     print(f"Agent Session ID: {agent.session_id}")
