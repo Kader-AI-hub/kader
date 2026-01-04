@@ -4,7 +4,7 @@ import os
 import asyncio
 import json
 from pathlib import Path
-from typing import Iterator, AsyncIterator, List, Optional
+from typing import Iterator, AsyncIterator, List, Optional, Any
 
 # Add project root
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -26,12 +26,19 @@ class EchoTool(BaseTool):
                 ParameterSchema(name="text", type="string", description="Text to echo")
             ]
         )
-    
+
     def execute(self, text: str) -> str:
         return f"Echo: {text}"
-        
+
     async def aexecute(self, text: str) -> str:
         return f"Async Echo: {text}"
+
+    def get_interruption_message(self, **kwargs: Any) -> str:
+        """Get interruption message for user confirmation."""
+        text = kwargs.get('text', '')
+        if text:
+            return f"execute echo_tool: {text}"
+        return "execute echo_tool"
 
 class MockLLMProvider(BaseLLMProvider):
     def __init__(self, responses: List[str] = None):
@@ -153,35 +160,44 @@ def test_agent_tool_usage():
     # 1. First response triggers tool.
     # 2. Second response is final answer.
     responses = [
-        'TOOL_CALL:echo_tool:{"text": "hello_tool"}', 
+        'TOOL_CALL:echo_tool:{"text": "hello_tool"}',
         "The tool said hello."
     ]
     mock_provider = MockLLMProvider(responses=responses)
     tool = EchoTool()
-    
+
     agent = BaseAgent(
         name="tool_user",
         system_prompt="Sys",
         tools=[tool],
         provider=mock_provider
     )
-    
-    final_response = agent.invoke("Use the tool")
-    
+
+    # Mock the input function to return 'yes' automatically during testing
+    import builtins
+    original_input = builtins.input
+    builtins.input = lambda prompt: "yes"
+
+    try:
+        final_response = agent.invoke("Use the tool")
+    finally:
+        # Restore the original input function
+        builtins.input = original_input
+
     assert final_response.content == "The tool said hello."
-    
+
     # Verify flow:
     # Call 1: [Sys, User] -> Returns Tool Call
     # Call 2: [Sys, User, Assistant(ToolCall), Tool(Result)] -> Returns Final Answer
     assert len(mock_provider.calls) == 2
-    
+
     last_context = mock_provider.calls[1]
     assert len(last_context) == 4
     assert last_context[2].role == "assistant"
     assert last_context[2].tool_calls is not None
     assert last_context[3].role == "tool"
     assert "Echo: hello_tool" in last_context[3].content
-    
+
     print("[OK] Tool usage loop passed.")
 
 def test_agent_with_prompt_base():

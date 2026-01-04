@@ -19,7 +19,7 @@ from typing import Any
 
 class ConcreteTool(BaseTool[str]):
     """Concrete implementation of BaseTool for testing."""
-    
+
     def __init__(self):
         super().__init__(
             name="test_tool",
@@ -33,12 +33,19 @@ class ConcreteTool(BaseTool[str]):
             ],
             category=ToolCategory.UTILITY
         )
-    
+
     def execute(self, **kwargs: Any) -> str:
         return f"Executed with {kwargs.get('param1', 'default')}"
-    
+
     async def aexecute(self, **kwargs: Any) -> str:
         return self.execute(**kwargs)
+
+    def get_interruption_message(self, **kwargs: Any) -> str:
+        """Get interruption message for user confirmation."""
+        param1 = kwargs.get('param1', '')
+        if param1:
+            return f"execute test_tool: {param1}"
+        return "execute test_tool"
 
 
 class TestParameterSchema:
@@ -623,13 +630,17 @@ class TestBaseTool:
                     description="A failing tool",
                     parameters=[]
                 )
-            
+
             def execute(self, **kwargs: Any) -> str:
                 raise ValueError("Something went wrong")
-            
+
             async def aexecute(self, **kwargs: Any) -> str:
                 raise ValueError("Something went wrong")
-        
+
+            def get_interruption_message(self, **kwargs: Any) -> str:
+                """Get interruption message for user confirmation."""
+                return "execute failing_tool"
+
         tool = FailingTool()
         tool_call = ToolCall(
             id="call_123",
