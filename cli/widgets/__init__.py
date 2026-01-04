@@ -2,7 +2,8 @@
 
 from .conversation import ConversationView, Message
 from .loading import LoadingSpinner
-from .confirmation import InlineSelector
+from .confirmation import InlineSelector, ModelSelector
 
-__all__ = ["ConversationView", "Message", "LoadingSpinner", "InlineSelector"]
+__all__ = ["ConversationView", "Message", "LoadingSpinner", "InlineSelector", "ModelSelector"]
+
 

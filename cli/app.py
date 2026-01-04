@@ -27,7 +27,7 @@ from .utils import (
     DEFAULT_MODEL,
     get_models_text,
 )
-from .widgets import ConversationView, LoadingSpinner, InlineSelector
+from .widgets import ConversationView, LoadingSpinner, InlineSelector, ModelSelector
 
 
 WELCOME_MESSAGE = """# Welcome to Kader CLI! 🚀
@@ -78,6 +78,7 @@ class KaderApp(App):
         self._confirmation_event: Optional[threading.Event] = None
         self._confirmation_result: tuple[bool, Optional[str]] = (True, None)
         self._inline_selector: Optional[InlineSelector] = None
+        self._model_selector: Optional[ModelSelector] = None
         
         self._agent = self._create_agent(self._current_model)
 
@@ -177,6 +178,82 @@ class KaderApp(App):
         # Now focus input
         prompt_input.focus()
 
+    async def _show_model_selector(self, conversation: ConversationView) -> None:
+        """Show the model selector widget."""
+        from kader.providers import OllamaProvider
+        
+        try:
+            models = OllamaProvider.get_supported_models()
+            if not models:
+                conversation.add_message(
+                    "## Models 🤖\n\n*No models found. Is Ollama running?*",
+                    "assistant"
+                )
+                return
+            
+            # Create and mount the model selector
+            self._model_selector = ModelSelector(
+                models=models,
+                current_model=self._current_model,
+                id="model-selector"
+            )
+            conversation.mount(self._model_selector)
+            conversation.scroll_end()
+            
+            # Disable input and focus selector
+            prompt_input = self.query_one("#prompt-input", Input)
+            prompt_input.disabled = True
+            self.set_focus(self._model_selector)
+            
+        except Exception as e:
+            conversation.add_message(
+                f"## Models 🤖\n\n*Error fetching models: {e}*",
+                "assistant"
+            )
+
+    def on_model_selector_model_selected(self, event: ModelSelector.ModelSelected) -> None:
+        """Handle model selection."""
+        conversation = self.query_one("#conversation-view", ConversationView)
+        
+        # Remove selector
+        if self._model_selector:
+            self._model_selector.remove()
+            self._model_selector = None
+        
+        # Update model and recreate agent
+        old_model = self._current_model
+        self._current_model = event.model
+        self._agent = self._create_agent(self._current_model)
+        
+        conversation.add_message(
+            f"✅ Model changed from `{old_model}` to `{self._current_model}`",
+            "assistant"
+        )
+        
+        # Re-enable input
+        prompt_input = self.query_one("#prompt-input", Input)
+        prompt_input.disabled = False
+        prompt_input.focus()
+
+    def on_model_selector_model_cancelled(self, event: ModelSelector.ModelCancelled) -> None:
+        """Handle model selection cancelled."""
+        conversation = self.query_one("#conversation-view", ConversationView)
+        
+        # Remove selector
+        if self._model_selector:
+            self._model_selector.remove()
+            self._model_selector = None
+        
+        conversation.add_message(
+            f"Model selection cancelled. Current model: `{self._current_model}`",
+            "assistant"
+        )
+        
+        # Re-enable input
+        prompt_input = self.query_one("#prompt-input", Input)
+        prompt_input.disabled = False
+        prompt_input.focus()
+
     def compose(self) -> ComposeResult:
         """Create the application layout."""
         yield Header()
@@ -235,8 +312,7 @@ class KaderApp(App):
         if cmd == "/help":
             conversation.add_message(HELP_TEXT, "assistant")
         elif cmd == "/models":
-            models_text = get_models_text()
-            conversation.add_message(models_text, "assistant")
+            await self._show_model_selector(conversation)
         elif cmd == "/theme":
             self._cycle_theme()
             theme_name = THEME_NAMES[self._current_theme_index]
