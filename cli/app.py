@@ -25,7 +25,6 @@ from .utils import (
     HELP_TEXT,
     THEME_NAMES,
     DEFAULT_MODEL,
-    get_models_text,
 )
 from .widgets import ConversationView, LoadingSpinner, InlineSelector, ModelSelector
 
@@ -519,12 +518,11 @@ class KaderApp(App):
             lines = ["## Saved Sessions 📂\n", "| Session ID | Created | Updated |", "|------------|---------|---------|"]
             for session in sessions:
                 # Shorten UUID for display
-                short_id = session.session_id[:8] + "..."
                 created = session.created_at[:10]  # Just date
                 updated = session.updated_at[:10]
                 lines.append(f"| `{session.session_id}` | {created} | {updated} |")
             
-            lines.append(f"\n*Use `/load <session_id>` to load a session.*")
+            lines.append("\n*Use `/load <session_id>` to load a session.*")
             conversation.add_message("\n".join(lines), "assistant")
         except Exception as e:
             conversation.add_message(f"❌ Error listing sessions: {e}", "assistant")
