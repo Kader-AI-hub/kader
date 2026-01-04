@@ -6,7 +6,7 @@ from kader.providers import OllamaProvider
 THEME_NAMES = ["dark", "ocean", "forest", "sunset"]
 
 # Default model
-DEFAULT_MODEL = "gpt-oss:120b-cloud"
+DEFAULT_MODEL = "qwen3-coder:480b-cloud"
 
 HELP_TEXT = """## Kader CLI Commands 📖
 

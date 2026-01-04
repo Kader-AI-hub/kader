@@ -49,7 +49,7 @@ class BaseAgent:
         provider: Optional[BaseLLMProvider] = None,
         memory: Optional[ConversationManager] = None,
         retry_attempts: int = 3,
-        model_name: str = "gpt-oss:120b-cloud",
+        model_name: str = "qwen3-coder:480b-cloud",
         session_id: Optional[str] = None,
         use_persistence: bool = False,
         interrupt_before_tool: bool = True,
@@ -736,7 +736,7 @@ class BaseAgent:
         system_prompt = data.get("system_prompt", "")
         retry_attempts = data.get("retry_attempts", 3)
         provider_config = data.get("provider", {})
-        model_name = provider_config.get("model", "gpt-oss:120b-cloud")
+        model_name = provider_config.get("model", "qwen3-coder:480b-cloud")
         
         # Reconstruct tools
         tools = []
