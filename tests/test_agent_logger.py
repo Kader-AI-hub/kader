@@ -1,10 +1,6 @@
 import pytest
-import os
-import json
-import tempfile
 import threading
-from unittest.mock import patch, MagicMock, mock_open
-from datetime import datetime
+from unittest.mock import patch, MagicMock
 from kader.agent.logger import AgentLogger
 
 

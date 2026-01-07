@@ -3,7 +3,6 @@ Unit tests for the base tool functionality.
 """
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 from kader.tools.base import (
     BaseTool,
     ToolCategory,
@@ -453,7 +452,6 @@ class TestBaseTool:
 
     def test_base_tool_initialization(self):
         """Test BaseTool initialization."""
-        param = ParameterSchema(name="param1", type="string", description="A parameter")
         tool = ConcreteTool()
 
         assert tool.name == "test_tool"

@@ -3,10 +3,7 @@ Unit tests for file system tools in kader.tools.filesys module.
 """
 
 import tempfile
-import os
 from pathlib import Path
-import pytest
-from unittest.mock import patch, MagicMock
 
 from kader.tools.filesys import (
     ReadFileTool,

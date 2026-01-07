@@ -5,7 +5,7 @@ Unit tests for the Ollama provider functionality.
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from kader.providers.ollama import OllamaProvider
-from kader.providers.base import Message, ModelConfig, Usage, LLMResponse
+from kader.providers.base import Message, ModelConfig, Usage
 
 
 class TestOllamaProvider:
@@ -348,8 +348,9 @@ class TestOllamaProvider:
     @patch("kader.providers.ollama.Client")
     def test_get_supported_models(self, mock_client_class):
         """Test getting supported models."""
+        # Mock the client class to handle host argument
         mock_client_instance = Mock()
-        mock_client_class.return_value = mock_client_instance
+        mock_client_class.side_effect = lambda **kwargs: mock_client_instance
 
         # Mock the list response
         mock_list_response = Mock()
@@ -359,6 +360,10 @@ class TestOllamaProvider:
             Mock(model="phi3"),
         ]
         mock_client_instance.list.return_value = mock_list_response
+        # Mock the show response for each model
+        mock_client_instance.show.return_value = Mock(
+            capabilities=["completion", "tools"]
+        )
 
         models = OllamaProvider.get_supported_models()
 
@@ -368,9 +373,8 @@ class TestOllamaProvider:
     def test_get_supported_models_exception(self, mock_client_class):
         """Test getting supported models when exception occurs."""
         mock_client_instance = Mock()
-        mock_client_class.return_value = mock_client_instance
+        mock_client_class.side_effect = lambda **kwargs: mock_client_instance
 
-        # Mock an exception
         mock_client_instance.list.side_effect = Exception("API Error")
 
         models = OllamaProvider.get_supported_models()
@@ -381,12 +385,16 @@ class TestOllamaProvider:
     def test_list_models(self, mock_client_class):
         """Test listing models."""
         mock_client_instance = Mock()
-        mock_client_class.return_value = mock_client_instance
+        mock_client_class.side_effect = lambda **kwargs: mock_client_instance
 
         # Mock the list response
         mock_list_response = Mock()
         mock_list_response.models = [Mock(model="llama3.2")]
         mock_client_instance.list.return_value = mock_list_response
+        # Mock the show response for each model
+        mock_client_instance.show.return_value = Mock(
+            capabilities=["completion", "tools"]
+        )
 
         provider = OllamaProvider(model="llama3.2")
         models = provider.list_models()

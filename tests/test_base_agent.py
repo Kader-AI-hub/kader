@@ -1,15 +1,14 @@
 import sys
 import os
-import asyncio
 import json
 from pathlib import Path
-from typing import Iterator, AsyncIterator, List, Optional, Any
+from typing import Iterator, AsyncIterator, List, Any
 
 # Add project root
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from kader.agent.base import BaseAgent
-from kader.tools import BaseTool, ParameterSchema, ToolResult, ToolRegistry
+from kader.tools import BaseTool, ParameterSchema, ToolRegistry
 from kader.providers.base import (
     BaseLLMProvider,
     Message,

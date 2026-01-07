@@ -12,7 +12,6 @@ from pathlib import Path
 from kader.memory import (
     AgentState,
     RequestState,
-    Session,
     FileSessionManager,
     ConversationMessage,
     SlidingWindowConversationManager,

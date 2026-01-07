@@ -3,10 +3,9 @@ Unit tests for the RAG tools functionality.
 """
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from pathlib import Path
 import tempfile
-import os
 from kader.tools.rag import (
     RAGIndex,
     RAGSearchTool,
@@ -138,7 +137,7 @@ class TestRAGIndex:
         """Test getting Ollama client."""
         with tempfile.TemporaryDirectory() as temp_dir:
             index = RAGIndex(base_path=Path(temp_dir))
-            client = index._get_ollama_client()
+            _ = index._get_ollama_client()
 
             # Verify Client was instantiated
             mock_client_class.assert_called_once()

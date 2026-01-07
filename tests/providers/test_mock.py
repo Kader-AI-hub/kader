@@ -2,8 +2,6 @@
 Unit tests for the mock provider functionality.
 """
 
-import pytest
-from unittest.mock import Mock
 from kader.providers.mock import MockLLM
 from kader.providers.base import Message, ModelConfig, Usage
 

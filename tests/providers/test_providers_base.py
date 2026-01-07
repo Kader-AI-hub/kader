@@ -3,7 +3,6 @@ Unit tests for the base provider functionality.
 """
 
 import pytest
-from unittest.mock import Mock
 from kader.providers.base import (
     BaseLLMProvider,
     Message,
