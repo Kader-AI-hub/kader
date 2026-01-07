@@ -871,6 +871,12 @@ class BaseAgent:
         provider_config = data.get("provider", {})
         model_name = provider_config.get("model", "qwen3-coder:480b-cloud")
 
+        # Handle persistence parameter
+        # If persistence key exists and is True, use_persistence is True
+        # If persistence key exists and is False, use_persistence is False
+        # If persistence key doesn't exist, use_persistence defaults to True
+        use_persistence = data.get("persistence", True)
+
         # Reconstruct tools
         tools = []
         tool_names = data.get("tools", [])
@@ -898,4 +904,5 @@ class BaseAgent:
             tools=tools,
             retry_attempts=retry_attempts,
             model_name=model_name,
+            use_persistence=use_persistence,
         )
