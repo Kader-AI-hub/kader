@@ -25,6 +25,7 @@ from kader.memory import (
     FileSessionManager,
 )
 from kader.prompts.base import PromptBase
+from .logger import agent_logger
 
 
 class BaseAgent:
@@ -80,6 +81,17 @@ class BaseAgent:
         self.use_persistence = use_persistence or (session_id is not None)
         self.session_manager = FileSessionManager() if self.use_persistence else None
 
+        # Initialize Logger if agent uses persistence (logs only if there's a session)
+        self.logger_id = None
+        if self.use_persistence:
+            # Only create logger if we have a session_id or if the session manager will create one
+            session_id_for_logger = self.session_id
+            if not session_id_for_logger and self.session_manager:
+                # If no session_id yet but persistence is enabled, we'll get one during _load_session
+                pass  # We'll set up the logger in _load_session if needed
+            if session_id_for_logger:
+                self.logger_id = agent_logger.setup_logger(self.name, session_id_for_logger)
+
         # Initialize Provider
         if provider:
             self.provider = provider
@@ -118,6 +130,10 @@ class BaseAgent:
         if not self.session_id:
             session = self.session_manager.create_session(self.name)
             self.session_id = session.session_id
+
+        # Initialize logger if we now have a session_id and logging hasn't been set up yet
+        if self.use_persistence and not self.logger_id and self.session_id:
+            self.logger_id = agent_logger.setup_logger(self.name, self.session_id)
 
         # Propagate session to tools
         self._propagate_session_to_tools()
@@ -514,6 +530,37 @@ class BaseAgent:
             # Add assistant response to memory
             self.memory.add_message(response.to_message())
 
+            # Log the interaction if logger is active
+            if self.logger_id:
+                # Extract token usage info if available
+                token_usage = None
+                if hasattr(response, 'usage'):
+                    token_usage = {
+                        'prompt_tokens': getattr(response.usage, 'prompt_tokens', 0),
+                        'completion_tokens': getattr(response.usage, 'completion_tokens', 0),
+                        'total_tokens': getattr(response.usage, 'total_tokens', 0)
+                    }
+
+                # Log the LLM response
+                agent_logger.log_llm_response(self.logger_id, str(response.content))
+
+                # Log token usage and calculate cost
+                if token_usage:
+                    agent_logger.log_token_usage(
+                        self.logger_id,
+                        token_usage['prompt_tokens'],
+                        token_usage['completion_tokens'],
+                        token_usage['total_tokens']
+                    )
+
+                    # Calculate and log cost
+                    agent_logger.calculate_cost(
+                        self.logger_id,
+                        token_usage['prompt_tokens'],
+                        token_usage['completion_tokens'],
+                        getattr(self.provider, 'model', '')
+                    )
+
             # Save session update
             if self.use_persistence:
                 self._save_session()
@@ -539,6 +586,22 @@ class BaseAgent:
                 # Add tool outputs to memory
                 for tm in tool_msgs:
                     self.memory.add_message(tm)
+
+                    # Log tool usage
+                    if self.logger_id:
+                        # Extract tool name and arguments
+                        tool_name = "unknown"
+                        arguments = {}
+                        if hasattr(tm, 'tool_call_id'):
+                            # This is a tool message, need to find the tool name
+                            # We'll check the original response to find the tool
+                            for tool_call in response.tool_calls:
+                                fn_info = tool_call.get("function", {})
+                                if fn_info.get("name"):
+                                    tool_name = fn_info.get("name", "unknown")
+                                    arguments = fn_info.get("arguments", {})
+                                    agent_logger.log_tool_usage(self.logger_id, tool_name, arguments)
+                                    break
 
                 # Save session update after tool results
                 if self.use_persistence:
@@ -630,6 +693,37 @@ class BaseAgent:
 
             self.memory.add_message(response.to_message())
 
+            # Log the interaction if logger is active
+            if self.logger_id:
+                # Extract token usage info if available
+                token_usage = None
+                if hasattr(response, 'usage'):
+                    token_usage = {
+                        'prompt_tokens': getattr(response.usage, 'prompt_tokens', 0),
+                        'completion_tokens': getattr(response.usage, 'completion_tokens', 0),
+                        'total_tokens': getattr(response.usage, 'total_tokens', 0)
+                    }
+
+                # Log the LLM response
+                agent_logger.log_llm_response(self.logger_id, str(response.content))
+
+                # Log token usage and calculate cost
+                if token_usage:
+                    agent_logger.log_token_usage(
+                        self.logger_id,
+                        token_usage['prompt_tokens'],
+                        token_usage['completion_tokens'],
+                        token_usage['total_tokens']
+                    )
+
+                    # Calculate and log cost
+                    agent_logger.calculate_cost(
+                        self.logger_id,
+                        token_usage['prompt_tokens'],
+                        token_usage['completion_tokens'],
+                        getattr(self.provider, 'model', '')
+                    )
+
             # Save session update
             if self.use_persistence:
                 self._save_session()
@@ -652,6 +746,22 @@ class BaseAgent:
 
                 for tm in tool_msgs:
                     self.memory.add_message(tm)
+
+                    # Log tool usage
+                    if self.logger_id:
+                        # Extract tool name and arguments
+                        tool_name = "unknown"
+                        arguments = {}
+                        if hasattr(tm, 'tool_call_id'):
+                            # This is a tool message, need to find the tool name
+                            # We'll check the original response to find the tool
+                            for tool_call in response.tool_calls:
+                                fn_info = tool_call.get("function", {})
+                                if fn_info.get("name"):
+                                    tool_name = fn_info.get("name", "unknown")
+                                    arguments = fn_info.get("arguments", {})
+                                    agent_logger.log_tool_usage(self.logger_id, tool_name, arguments)
+                                    break
 
                 # Save session update
                 if self.use_persistence:
