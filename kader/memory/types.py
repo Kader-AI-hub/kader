@@ -4,12 +4,12 @@ Core types and dataclasses for the Memory module.
 Provides common types used across state, session, and conversation management.
 """
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any
-import json
 
 
 class SessionType(str, Enum):

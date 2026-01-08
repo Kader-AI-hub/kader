@@ -5,58 +5,53 @@ This module provides a provider-agnostic base class for defining tools
 that can be used with any LLM provider.
 """
 
-from .base import (
-    # Core classes
-    BaseTool,
-    FunctionTool,
-    ToolRegistry,
-    # Schemas and data classes
-    ToolSchema,
-    ParameterSchema,
-    ToolCall,
-    ToolResult,
-    # Enums
-    ToolCategory,
-    # Decorator
-    tool,
-    # Type aliases
-    ParameterType,
-    ToolResultStatus,
-)
-
-from .rag import (
-    RAGIndex,
-    RAGSearchTool,
-    DocumentChunk,
-    SearchResult,
-    DEFAULT_EMBEDDING_MODEL,
-)
-
-from .filesys import (
-    ReadFileTool,
-    ReadDirectoryTool,
-    WriteFileTool,
-    EditFileTool,
-    GrepTool,
-    GlobTool,
-    SearchInDirectoryTool,
-    get_filesystem_tools,
-)
-
-from .filesystem import (
-    FilesystemBackend,
-)
-
-from .web import (
-    WebSearchTool,
-    WebFetchTool,
-)
-
 from kader.tools.exec_commands import (
     CommandExecutorTool,
 )
 
+from .base import (
+    # Core classes
+    BaseTool,
+    FunctionTool,
+    ParameterSchema,
+    # Type aliases
+    ParameterType,
+    ToolCall,
+    # Enums
+    ToolCategory,
+    ToolRegistry,
+    ToolResult,
+    ToolResultStatus,
+    # Schemas and data classes
+    ToolSchema,
+    # Decorator
+    tool,
+)
+from .filesys import (
+    EditFileTool,
+    GlobTool,
+    GrepTool,
+    ReadDirectoryTool,
+    ReadFileTool,
+    SearchInDirectoryTool,
+    WriteFileTool,
+    get_filesystem_tools,
+)
+from .filesystem import (
+    FilesystemBackend,
+)
+from .rag import (
+    DEFAULT_EMBEDDING_MODEL,
+    DocumentChunk,
+    RAGIndex,
+    RAGSearchTool,
+    SearchResult,
+)
 from .todo import TodoTool
+from .web import (
+    WebFetchTool,
+    WebSearchTool,
+)
 
 
 def get_default_registry() -> ToolRegistry:

@@ -11,7 +11,6 @@ from typing import Any
 
 from .types import get_timestamp
 
-
 # Import Message from providers for compatibility
 # This allows the conversation module to work with the existing Message type
 try:

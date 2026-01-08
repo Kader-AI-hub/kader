@@ -6,12 +6,12 @@ Logs are written to files in ~/.kader/logs without affecting agent performance.
 Only agents with memory sessions will generate logs.
 """
 
-import os
 import json
 from pathlib import Path
-from typing import Optional, Dict, Any
-from loguru import logger
 from threading import Lock
+from typing import Any, Dict, Optional
+
+from loguru import logger
 
 
 class AgentLogger:
@@ -24,7 +24,9 @@ class AgentLogger:
         self._loggers = {}
         self._lock = Lock()
 
-    def setup_logger(self, agent_name: str, session_id: Optional[str] = None) -> Optional[str]:
+    def setup_logger(
+        self, agent_name: str, session_id: Optional[str] = None
+    ) -> Optional[str]:
         """
         Set up logger for an agent with memory session.
 
@@ -78,7 +80,13 @@ class AgentLogger:
 
         return logger_id
 
-    def log_token_usage(self, logger_id: str, prompt_tokens: int, completion_tokens: int, total_tokens: int):
+    def log_token_usage(
+        self,
+        logger_id: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        total_tokens: int,
+    ):
         """Log token usage information."""
         if logger_id in self._loggers:
             logger_instance, _ = self._loggers[logger_id]
@@ -88,19 +96,29 @@ class AgentLogger:
                 f"Total tokens: {total_tokens}"
             )
 
-    def calculate_cost(self, logger_id: str, prompt_tokens: int, completion_tokens: int,
-                      model_name: str = "", pricing_data: Optional[Dict[str, float]] = None):
+    def calculate_cost(
+        self,
+        logger_id: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        model_name: str = "",
+        pricing_data: Optional[Dict[str, float]] = None,
+    ):
         """Calculate and log cost based on token usage."""
         # Use provided pricing data or defaults
         if pricing_data is None:
             # Default pricing (these would come from a model registry in practice)
             pricing_data = {
-                'input_cost_per_million': 0.5,   # $0.50 per million input tokens
-                'output_cost_per_million': 1.5   # $1.50 per million output tokens
+                "input_cost_per_million": 0.5,  # $0.50 per million input tokens
+                "output_cost_per_million": 1.5,  # $1.50 per million output tokens
             }
 
-        input_cost = (prompt_tokens / 1_000_000) * pricing_data.get('input_cost_per_million', 0.5)
-        output_cost = (completion_tokens / 1_000_000) * pricing_data.get('output_cost_per_million', 1.5)
+        input_cost = (prompt_tokens / 1_000_000) * pricing_data.get(
+            "input_cost_per_million", 0.5
+        )
+        output_cost = (completion_tokens / 1_000_000) * pricing_data.get(
+            "output_cost_per_million", 1.5
+        )
         total_cost = input_cost + output_cost
 
         self.log_cost(logger_id, total_cost)
@@ -116,7 +134,9 @@ class AgentLogger:
         """Log tool usage with arguments."""
         if logger_id in self._loggers:
             logger_instance, _ = self._loggers[logger_id]
-            logger_instance.info(f"TOOL_USAGE | Tool: {tool_name}, Arguments: {json.dumps(arguments)}")
+            logger_instance.info(
+                f"TOOL_USAGE | Tool: {tool_name}, Arguments: {json.dumps(arguments)}"
+            )
 
     def log_cost(self, logger_id: str, cost: float):
         """Log cost information."""
@@ -124,10 +144,15 @@ class AgentLogger:
             logger_instance, _ = self._loggers[logger_id]
             logger_instance.info(f"COST | Cost: ${cost:.6f}")
 
-    def log_interaction(self, logger_id: str, input_msg: str, output_msg: str,
-                       token_usage: Optional[Dict[str, int]] = None,
-                       cost: Optional[float] = None,
-                       tools_used: Optional[Dict[str, Any]] = None):
+    def log_interaction(
+        self,
+        logger_id: str,
+        input_msg: str,
+        output_msg: str,
+        token_usage: Optional[Dict[str, int]] = None,
+        cost: Optional[float] = None,
+        tools_used: Optional[Dict[str, Any]] = None,
+    ):
         """Log a complete agent interaction with all relevant information."""
         if logger_id in self._loggers:
             logger_instance, _ = self._loggers[logger_id]

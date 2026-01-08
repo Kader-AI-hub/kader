@@ -4,11 +4,10 @@ ReAct Agent Interactive Example.
 Demonstrates using ReActAgent with tools and memory in an interactive loop.
 """
 
-import sys
-import os
-import io
 import asyncio
-from pathlib import Path
+import io
+import os
+import sys
 
 # Force utf-8 output for Windows consoles
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
@@ -18,14 +17,14 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from kader.agent.agents import ReActAgent
-from kader.tools import (
-    ToolRegistry,
-    get_filesystem_tools,
-    CommandExecutorTool,
-    WebSearchTool,
-    WebFetchTool,
-)
 from kader.memory import SlidingWindowConversationManager
+from kader.tools import (
+    CommandExecutorTool,
+    ToolRegistry,
+    WebFetchTool,
+    WebSearchTool,
+    get_filesystem_tools,
+)
 
 
 async def main():

@@ -10,35 +10,28 @@ Demonstrates how to use the Kader tools for various agentic operations:
 """
 
 import asyncio
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add project root to path for direct execution
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from kader.tools import (
-    # File system tools
-    ReadFileTool,
-    ReadDirectoryTool,
-    WriteFileTool,
-    EditFileTool,
-    GrepTool,
-    GlobTool,
-    SearchInDirectoryTool,
-    get_filesystem_tools,
-    # Web tools
-    WebSearchTool,
-    WebFetchTool,
     # Command execution
     CommandExecutorTool,
+    GrepTool,
     # RAG tools
     RAGIndex,
     RAGSearchTool,
+    ReadDirectoryTool,
+    # File system tools
+    ReadFileTool,
     # Core components
     ToolRegistry,
-    BaseTool,
-    ToolResult,
+    WebFetchTool,
+    WebSearchTool,
+    WriteFileTool,
     tool,
 )
 
@@ -348,7 +341,6 @@ def demo_async_operations():
         print(f"Async read result preview: {read_result[:50]}...")
 
         # Clean up
-        import asyncio
         import os
 
         if os.path.exists("async_test.txt"):

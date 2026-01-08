@@ -1,6 +1,8 @@
-import pytest
 import threading
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
+
 from kader.agent.logger import AgentLogger
 
 
@@ -19,6 +21,7 @@ class TestAgentLogger:
         """Test that AgentLogger follows the singleton pattern."""
         # Get the global instance
         from kader.agent.logger import agent_logger
+
         logger1 = agent_logger
         logger2 = agent_logger
         assert logger1 is logger2
@@ -33,7 +36,7 @@ class TestAgentLogger:
 
     def test_setup_logger_with_session_id(self):
         """Test that setup_logger creates and returns a logger when session_id is provided."""
-        with patch('kader.agent.logger.Path') as mock_path:
+        with patch("kader.agent.logger.Path") as mock_path:
             # Mock the Path operations
             mock_logs_dir = MagicMock()
             mock_path.return_value = mock_logs_dir
@@ -43,12 +46,14 @@ class TestAgentLogger:
             mock_logs_dir.__truediv__.return_value = mock_log_file_path
 
             # Mock the loguru logger
-            with patch('kader.agent.logger.logger') as mock_logger:
+            with patch("kader.agent.logger.logger") as mock_logger:
                 mock_bound_logger = MagicMock()
                 mock_logger.bind.return_value = mock_bound_logger
                 mock_bound_logger.add.return_value = 1  # handler ID
 
-                result = self.agent_logger.setup_logger("test_agent", "test_session_123")
+                result = self.agent_logger.setup_logger(
+                    "test_agent", "test_session_123"
+                )
 
                 assert result == "test_agent_test_session_123"
                 # Verify the logger was set up properly
@@ -79,7 +84,7 @@ class TestAgentLogger:
         logger_id = "test_agent_test_session"
 
         # Setup logger first
-        with patch('kader.agent.logger.Path') as mock_path:
+        with patch("kader.agent.logger.Path") as mock_path:
             mock_logs_dir = MagicMock()
             mock_path.return_value = mock_logs_dir
             mock_logs_dir.__truediv__.return_value = mock_logs_dir
@@ -87,7 +92,7 @@ class TestAgentLogger:
             mock_log_file_path = MagicMock()
             mock_logs_dir.__truediv__.return_value = mock_log_file_path
 
-            with patch('kader.agent.logger.logger') as mock_logger:
+            with patch("kader.agent.logger.logger") as mock_logger:
                 mock_bound_logger = MagicMock()
                 mock_logger.bind.return_value = mock_bound_logger
                 mock_bound_logger.add.return_value = 1  # handler ID
@@ -100,7 +105,7 @@ class TestAgentLogger:
                     logger_id,
                     prompt_tokens=100,
                     completion_tokens=200,
-                    total_tokens=300
+                    total_tokens=300,
                 )
 
                 # Verify info was called with the correct message
@@ -121,7 +126,7 @@ class TestAgentLogger:
             "nonexistent_logger",
             prompt_tokens=100,
             completion_tokens=200,
-            total_tokens=300
+            total_tokens=300,
         )
         # No exception means the test passes
 
@@ -130,7 +135,7 @@ class TestAgentLogger:
         logger_id = "test_agent_test_session"
 
         # Setup logger first
-        with patch('kader.agent.logger.Path') as mock_path:
+        with patch("kader.agent.logger.Path") as mock_path:
             mock_logs_dir = MagicMock()
             mock_path.return_value = mock_logs_dir
             mock_logs_dir.__truediv__.return_value = mock_logs_dir
@@ -138,7 +143,7 @@ class TestAgentLogger:
             mock_log_file_path = MagicMock()
             mock_logs_dir.__truediv__.return_value = mock_log_file_path
 
-            with patch('kader.agent.logger.logger') as mock_logger:
+            with patch("kader.agent.logger.logger") as mock_logger:
                 mock_bound_logger = MagicMock()
                 mock_logger.bind.return_value = mock_bound_logger
                 mock_bound_logger.add.return_value = 1  # handler ID
@@ -151,7 +156,7 @@ class TestAgentLogger:
                     logger_id,
                     prompt_tokens=-100,
                     completion_tokens=-200,
-                    total_tokens=-300
+                    total_tokens=-300,
                 )
 
                 mock_bound_logger.info.assert_called_once()
@@ -161,7 +166,7 @@ class TestAgentLogger:
         logger_id = "test_agent_test_session"
 
         # Setup logger first
-        with patch('kader.agent.logger.Path') as mock_path:
+        with patch("kader.agent.logger.Path") as mock_path:
             mock_logs_dir = MagicMock()
             mock_path.return_value = mock_logs_dir
             mock_logs_dir.__truediv__.return_value = mock_logs_dir
@@ -169,7 +174,7 @@ class TestAgentLogger:
             mock_log_file_path = MagicMock()
             mock_logs_dir.__truediv__.return_value = mock_log_file_path
 
-            with patch('kader.agent.logger.logger') as mock_logger:
+            with patch("kader.agent.logger.logger") as mock_logger:
                 mock_bound_logger = MagicMock()
                 mock_logger.bind.return_value = mock_bound_logger
                 mock_bound_logger.add.return_value = 1  # handler ID
@@ -183,7 +188,7 @@ class TestAgentLogger:
                     prompt_tokens=1_000_000,  # 1 million tokens
                     completion_tokens=500_000,  # 0.5 million tokens
                     model_name="",
-                    pricing_data=None
+                    pricing_data=None,
                 )
 
                 # Default pricing: input_cost_per_million = 0.5, output_cost_per_million = 1.5
@@ -195,7 +200,7 @@ class TestAgentLogger:
         logger_id = "test_agent_test_session"
 
         # Setup logger first
-        with patch('kader.agent.logger.Path') as mock_path:
+        with patch("kader.agent.logger.Path") as mock_path:
             mock_logs_dir = MagicMock()
             mock_path.return_value = mock_logs_dir
             mock_logs_dir.__truediv__.return_value = mock_logs_dir
@@ -203,7 +208,7 @@ class TestAgentLogger:
             mock_log_file_path = MagicMock()
             mock_logs_dir.__truediv__.return_value = mock_log_file_path
 
-            with patch('kader.agent.logger.logger') as mock_logger:
+            with patch("kader.agent.logger.logger") as mock_logger:
                 mock_bound_logger = MagicMock()
                 mock_logger.bind.return_value = mock_bound_logger
                 mock_bound_logger.add.return_value = 1  # handler ID
@@ -213,15 +218,15 @@ class TestAgentLogger:
 
                 # Test with custom pricing
                 custom_pricing = {
-                    'input_cost_per_million': 0.1,   # $0.10 per million input tokens
-                    'output_cost_per_million': 0.2   # $0.20 per million output tokens
+                    "input_cost_per_million": 0.1,  # $0.10 per million input tokens
+                    "output_cost_per_million": 0.2,  # $0.20 per million output tokens
                 }
                 cost = self.agent_logger.calculate_cost(
                     logger_id,
                     prompt_tokens=1_000_000,
                     completion_tokens=1_000_000,
                     model_name="",
-                    pricing_data=custom_pricing
+                    pricing_data=custom_pricing,
                 )
 
                 expected_cost = (1.0 * 0.1) + (1.0 * 0.2)  # 0.1 + 0.2 = 0.3
@@ -232,7 +237,7 @@ class TestAgentLogger:
         logger_id = "test_agent_test_session"
 
         # Setup logger first
-        with patch('kader.agent.logger.Path') as mock_path:
+        with patch("kader.agent.logger.Path") as mock_path:
             mock_logs_dir = MagicMock()
             mock_path.return_value = mock_logs_dir
             mock_logs_dir.__truediv__.return_value = mock_logs_dir
@@ -240,7 +245,7 @@ class TestAgentLogger:
             mock_log_file_path = MagicMock()
             mock_logs_dir.__truediv__.return_value = mock_log_file_path
 
-            with patch('kader.agent.logger.logger') as mock_logger:
+            with patch("kader.agent.logger.logger") as mock_logger:
                 mock_bound_logger = MagicMock()
                 mock_logger.bind.return_value = mock_bound_logger
                 mock_bound_logger.add.return_value = 1  # handler ID
@@ -254,7 +259,7 @@ class TestAgentLogger:
                     prompt_tokens=0,
                     completion_tokens=0,
                     model_name="",
-                    pricing_data=None
+                    pricing_data=None,
                 )
                 assert cost == 0.0
 
@@ -264,7 +269,7 @@ class TestAgentLogger:
                     prompt_tokens=1_000_000_000,  # 1B tokens
                     completion_tokens=500_000_000,  # 500M tokens
                     model_name="",
-                    pricing_data=None
+                    pricing_data=None,
                 )
                 expected_cost = (1000.0 * 0.5) + (500.0 * 1.5)  # 500 + 750 = 1250.0
                 assert cost == expected_cost
@@ -275,7 +280,7 @@ class TestAgentLogger:
                     prompt_tokens=-100_000,
                     completion_tokens=-50_000,
                     model_name="",
-                    pricing_data=None
+                    pricing_data=None,
                 )
                 # For negative values, the calculation would give negative cost
                 expected_cost = (-0.1 * 0.5) + (-0.05 * 1.5)  # -0.05 + -0.075 = -0.125
@@ -286,7 +291,7 @@ class TestAgentLogger:
         logger_id = "test_agent_test_session"
 
         # Setup logger first
-        with patch('kader.agent.logger.Path') as mock_path:
+        with patch("kader.agent.logger.Path") as mock_path:
             mock_logs_dir = MagicMock()
             mock_path.return_value = mock_logs_dir
             mock_logs_dir.__truediv__.return_value = mock_logs_dir
@@ -294,7 +299,7 @@ class TestAgentLogger:
             mock_log_file_path = MagicMock()
             mock_logs_dir.__truediv__.return_value = mock_log_file_path
 
-            with patch('kader.agent.logger.logger') as mock_logger:
+            with patch("kader.agent.logger.logger") as mock_logger:
                 mock_bound_logger = MagicMock()
                 mock_logger.bind.return_value = mock_bound_logger
                 mock_bound_logger.add.return_value = 1  # handler ID
@@ -325,7 +330,7 @@ class TestAgentLogger:
         logger_id = "test_agent_test_session"
 
         # Setup logger first
-        with patch('kader.agent.logger.Path') as mock_path:
+        with patch("kader.agent.logger.Path") as mock_path:
             mock_logs_dir = MagicMock()
             mock_path.return_value = mock_logs_dir
             mock_logs_dir.__truediv__.return_value = mock_logs_dir
@@ -333,7 +338,7 @@ class TestAgentLogger:
             mock_log_file_path = MagicMock()
             mock_logs_dir.__truediv__.return_value = mock_log_file_path
 
-            with patch('kader.agent.logger.logger') as mock_logger:
+            with patch("kader.agent.logger.logger") as mock_logger:
                 mock_bound_logger = MagicMock()
                 mock_logger.bind.return_value = mock_bound_logger
                 mock_bound_logger.add.return_value = 1  # handler ID
@@ -356,7 +361,7 @@ class TestAgentLogger:
         logger_id = "test_agent_test_session"
 
         # Setup logger first
-        with patch('kader.agent.logger.Path') as mock_path:
+        with patch("kader.agent.logger.Path") as mock_path:
             mock_logs_dir = MagicMock()
             mock_path.return_value = mock_logs_dir
             mock_logs_dir.__truediv__.return_value = mock_logs_dir
@@ -364,7 +369,7 @@ class TestAgentLogger:
             mock_log_file_path = MagicMock()
             mock_logs_dir.__truediv__.return_value = mock_log_file_path
 
-            with patch('kader.agent.logger.logger') as mock_logger:
+            with patch("kader.agent.logger.logger") as mock_logger:
                 mock_bound_logger = MagicMock()
                 mock_logger.bind.return_value = mock_bound_logger
                 mock_bound_logger.add.return_value = 1  # handler ID
@@ -372,7 +377,9 @@ class TestAgentLogger:
                 # Setup the logger
                 self.agent_logger.setup_logger("test_agent", "test_session")
 
-                self.agent_logger.log_tool_usage(logger_id, "test_tool", {"param": "value"})
+                self.agent_logger.log_tool_usage(
+                    logger_id, "test_tool", {"param": "value"}
+                )
 
                 # Verify info was called with the correct message
                 mock_bound_logger.info.assert_called_once()
@@ -388,7 +395,9 @@ class TestAgentLogger:
         """Test logging tool usage with invalid logger_id."""
         # Test with logger_id not in _loggers
         # This should not raise an exception
-        self.agent_logger.log_tool_usage("nonexistent_logger", "test_tool", {"param": "value"})
+        self.agent_logger.log_tool_usage(
+            "nonexistent_logger", "test_tool", {"param": "value"}
+        )
         # No exception means the test passes
 
     def test_log_tool_usage_without_arguments(self):
@@ -396,7 +405,7 @@ class TestAgentLogger:
         logger_id = "test_agent_test_session"
 
         # Setup logger first
-        with patch('kader.agent.logger.Path') as mock_path:
+        with patch("kader.agent.logger.Path") as mock_path:
             mock_logs_dir = MagicMock()
             mock_path.return_value = mock_logs_dir
             mock_logs_dir.__truediv__.return_value = mock_logs_dir
@@ -404,7 +413,7 @@ class TestAgentLogger:
             mock_log_file_path = MagicMock()
             mock_logs_dir.__truediv__.return_value = mock_log_file_path
 
-            with patch('kader.agent.logger.logger') as mock_logger:
+            with patch("kader.agent.logger.logger") as mock_logger:
                 mock_bound_logger = MagicMock()
                 mock_logger.bind.return_value = mock_bound_logger
                 mock_bound_logger.add.return_value = 1  # handler ID
@@ -426,7 +435,7 @@ class TestAgentLogger:
         logger_id = "test_agent_test_session"
 
         # Setup logger first
-        with patch('kader.agent.logger.Path') as mock_path:
+        with patch("kader.agent.logger.Path") as mock_path:
             mock_logs_dir = MagicMock()
             mock_path.return_value = mock_logs_dir
             mock_logs_dir.__truediv__.return_value = mock_logs_dir
@@ -434,7 +443,7 @@ class TestAgentLogger:
             mock_log_file_path = MagicMock()
             mock_logs_dir.__truediv__.return_value = mock_log_file_path
 
-            with patch('kader.agent.logger.logger') as mock_logger:
+            with patch("kader.agent.logger.logger") as mock_logger:
                 mock_bound_logger = MagicMock()
                 mock_logger.bind.return_value = mock_bound_logger
                 mock_bound_logger.add.return_value = 1  # handler ID
@@ -464,7 +473,7 @@ class TestAgentLogger:
         logger_id = "test_agent_test_session"
 
         # Setup logger first
-        with patch('kader.agent.logger.Path') as mock_path:
+        with patch("kader.agent.logger.Path") as mock_path:
             mock_logs_dir = MagicMock()
             mock_path.return_value = mock_logs_dir
             mock_logs_dir.__truediv__.return_value = mock_logs_dir
@@ -472,7 +481,7 @@ class TestAgentLogger:
             mock_log_file_path = MagicMock()
             mock_logs_dir.__truediv__.return_value = mock_log_file_path
 
-            with patch('kader.agent.logger.logger') as mock_logger:
+            with patch("kader.agent.logger.logger") as mock_logger:
                 mock_bound_logger = MagicMock()
                 mock_logger.bind.return_value = mock_bound_logger
                 mock_bound_logger.add.return_value = 1  # handler ID
@@ -484,9 +493,13 @@ class TestAgentLogger:
                     logger_id,
                     input_msg="Test input",
                     output_msg="Test output",
-                    token_usage={"prompt_tokens": 100, "completion_tokens": 200, "total_tokens": 300},
+                    token_usage={
+                        "prompt_tokens": 100,
+                        "completion_tokens": 200,
+                        "total_tokens": 300,
+                    },
                     cost=1.23,
-                    tools_used=[{"name": "test_tool", "arguments": {"param": "value"}}]
+                    tools_used=[{"name": "test_tool", "arguments": {"param": "value"}}],
                 )
 
                 # Verify info was called with the correct message
@@ -510,7 +523,7 @@ class TestAgentLogger:
         logger_id = "test_agent_test_session"
 
         # Setup logger first
-        with patch('kader.agent.logger.Path') as mock_path:
+        with patch("kader.agent.logger.Path") as mock_path:
             mock_logs_dir = MagicMock()
             mock_path.return_value = mock_logs_dir
             mock_logs_dir.__truediv__.return_value = mock_logs_dir
@@ -518,7 +531,7 @@ class TestAgentLogger:
             mock_log_file_path = MagicMock()
             mock_logs_dir.__truediv__.return_value = mock_log_file_path
 
-            with patch('kader.agent.logger.logger') as mock_logger:
+            with patch("kader.agent.logger.logger") as mock_logger:
                 mock_bound_logger = MagicMock()
                 mock_logger.bind.return_value = mock_bound_logger
                 mock_bound_logger.add.return_value = 1  # handler ID
@@ -533,7 +546,7 @@ class TestAgentLogger:
                     output_msg="Test output",
                     token_usage=None,
                     cost=None,
-                    tools_used=None
+                    tools_used=None,
                 )
 
                 # Should still log but without the optional components
@@ -548,9 +561,13 @@ class TestAgentLogger:
             "nonexistent_logger",
             input_msg="Test input",
             output_msg="Test output",
-            token_usage={"prompt_tokens": 100, "completion_tokens": 200, "total_tokens": 300},
+            token_usage={
+                "prompt_tokens": 100,
+                "completion_tokens": 200,
+                "total_tokens": 300,
+            },
             cost=1.23,
-            tools_used=[{"name": "test_tool", "arguments": {"param": "value"}}]
+            tools_used=[{"name": "test_tool", "arguments": {"param": "value"}}],
         )
         # No exception means the test passes
 
@@ -559,7 +576,7 @@ class TestAgentLogger:
         logger_id = "test_agent_test_session"
 
         # Setup logger first
-        with patch('kader.agent.logger.Path') as mock_path:
+        with patch("kader.agent.logger.Path") as mock_path:
             mock_logs_dir = MagicMock()
             mock_path.return_value = mock_logs_dir
             mock_logs_dir.__truediv__.return_value = mock_logs_dir
@@ -567,7 +584,7 @@ class TestAgentLogger:
             mock_log_file_path = MagicMock()
             mock_logs_dir.__truediv__.return_value = mock_log_file_path
 
-            with patch('kader.agent.logger.logger') as mock_logger:
+            with patch("kader.agent.logger.logger") as mock_logger:
                 mock_bound_logger = MagicMock()
                 mock_logger.bind.return_value = mock_bound_logger
                 mock_bound_logger.add.return_value = 1  # handler ID
@@ -590,7 +607,9 @@ class TestAgentLogger:
         """Test logging event with invalid logger_id."""
         # Test with logger_id not in _loggers
         # This should not raise an exception
-        self.agent_logger.log_event("nonexistent_logger", "test_event", {"data": "value"})
+        self.agent_logger.log_event(
+            "nonexistent_logger", "test_event", {"data": "value"}
+        )
         # No exception means the test passes
 
     def test_log_event_empty_data(self):
@@ -598,7 +617,7 @@ class TestAgentLogger:
         logger_id = "test_agent_test_session"
 
         # Setup logger first
-        with patch('kader.agent.logger.Path') as mock_path:
+        with patch("kader.agent.logger.Path") as mock_path:
             mock_logs_dir = MagicMock()
             mock_path.return_value = mock_logs_dir
             mock_logs_dir.__truediv__.return_value = mock_logs_dir
@@ -606,7 +625,7 @@ class TestAgentLogger:
             mock_log_file_path = MagicMock()
             mock_logs_dir.__truediv__.return_value = mock_log_file_path
 
-            with patch('kader.agent.logger.logger') as mock_logger:
+            with patch("kader.agent.logger.logger") as mock_logger:
                 mock_bound_logger = MagicMock()
                 mock_logger.bind.return_value = mock_bound_logger
                 mock_bound_logger.add.return_value = 1  # handler ID
@@ -626,9 +645,10 @@ class TestAgentLogger:
     def test_thread_safety_for_setup(self):
         """Test that setup_logger is thread-safe."""
         results = []
+
         # Create multiple threads that try to setup the same logger
         def setup_logger():
-            with patch('kader.agent.logger.Path') as mock_path:
+            with patch("kader.agent.logger.Path") as mock_path:
                 mock_logs_dir = MagicMock()
                 mock_path.return_value = mock_logs_dir
                 mock_logs_dir.__truediv__.return_value = mock_logs_dir
@@ -636,12 +656,14 @@ class TestAgentLogger:
                 mock_log_file_path = MagicMock()
                 mock_logs_dir.__truediv__.return_value = mock_log_file_path
 
-                with patch('kader.agent.logger.logger') as mock_logger:
+                with patch("kader.agent.logger.logger") as mock_logger:
                     mock_bound_logger = MagicMock()
                     mock_logger.bind.return_value = mock_bound_logger
                     mock_bound_logger.add.return_value = 1  # handler ID
 
-                    result = self.agent_logger.setup_logger("test_agent", "test_session")
+                    result = self.agent_logger.setup_logger(
+                        "test_agent", "test_session"
+                    )
                     results.append(result)
 
         threads = []
@@ -664,7 +686,7 @@ class TestAgentLogger:
         logger_id = "test_agent_test_session"
 
         # Setup logger first
-        with patch('kader.agent.logger.Path') as mock_path:
+        with patch("kader.agent.logger.Path") as mock_path:
             mock_logs_dir = MagicMock()
             mock_path.return_value = mock_logs_dir
             mock_logs_dir.__truediv__.return_value = mock_logs_dir
@@ -672,7 +694,7 @@ class TestAgentLogger:
             mock_log_file_path = MagicMock()
             mock_logs_dir.__truediv__.return_value = mock_log_file_path
 
-            with patch('kader.agent.logger.logger') as mock_logger:
+            with patch("kader.agent.logger.logger") as mock_logger:
                 mock_bound_logger = MagicMock()
                 mock_logger.bind.return_value = mock_bound_logger
                 mock_bound_logger.add.return_value = 1  # handler ID
@@ -683,16 +705,20 @@ class TestAgentLogger:
                 # The actual implementation doesn't currently handle JSON serialization errors
                 # So we expect this to raise an exception in the real implementation
                 # The improved implementation should handle this gracefully
-                problematic_arg = {"function": lambda x: x}  # Functions are not JSON serializable
+                problematic_arg = {
+                    "function": lambda x: x
+                }  # Functions are not JSON serializable
 
                 # The real implementation will raise an exception, so we test this explicitly
                 with pytest.raises(TypeError):
-                    self.agent_logger.log_tool_usage(logger_id, "test_tool", problematic_arg)
+                    self.agent_logger.log_tool_usage(
+                        logger_id, "test_tool", problematic_arg
+                    )
 
     def test_multiple_loggers_different_sessions(self):
         """Test that different logger IDs create separate logger instances."""
         # Setup two different loggers
-        with patch('kader.agent.logger.Path') as mock_path:
+        with patch("kader.agent.logger.Path") as mock_path:
             mock_logs_dir = MagicMock()
             mock_path.return_value = mock_logs_dir
             mock_logs_dir.__truediv__.return_value = mock_logs_dir
@@ -700,7 +726,7 @@ class TestAgentLogger:
             mock_log_file_path = MagicMock()
             mock_logs_dir.__truediv__.return_value = mock_log_file_path
 
-            with patch('kader.agent.logger.logger') as mock_logger:
+            with patch("kader.agent.logger.logger") as mock_logger:
                 mock_bound_logger1 = MagicMock()
                 mock_bound_logger2 = MagicMock()
 

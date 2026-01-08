@@ -2,18 +2,20 @@
 Unit tests for the base tool functionality.
 """
 
+from typing import Any
+
 import pytest
+
 from kader.tools.base import (
     BaseTool,
-    ToolCategory,
     ParameterSchema,
-    ToolSchema,
     ToolCall,
-    ToolResult,
+    ToolCategory,
     ToolRegistry,
+    ToolResult,
+    ToolSchema,
     tool,
 )
-from typing import Any
 
 
 class ConcreteTool(BaseTool[str]):

@@ -9,20 +9,17 @@ Demonstrates how to use the Kader memory module for:
 Memory is persisted in $HOME/.kader/memory/sessions/
 """
 
-import sys
 import os
+import sys
 
 # Add project root to path for direct execution
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from kader.memory import (
     AgentState,
-    RequestState,
-    Session,
     FileSessionManager,
+    RequestState,
     SlidingWindowConversationManager,
-    NullConversationManager,
-    MemoryConfig,
 )
 from kader.providers.base import Message
 

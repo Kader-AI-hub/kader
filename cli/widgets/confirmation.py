@@ -34,42 +34,42 @@ class InlineSelector(Widget, can_focus=True):
         border: solid $primary;
         background: $surface;
     }
-    
+
     InlineSelector:focus {
         border: double $primary;
     }
-    
+
     InlineSelector .selector-container {
         width: 100%;
         height: auto;
         align: center middle;
     }
-    
+
     InlineSelector .option {
         padding: 0 3;
         margin: 0 2;
         min-width: 12;
         text-align: center;
     }
-    
+
     InlineSelector .option.selected {
         background: $primary;
         color: $text;
         text-style: bold reverse;
     }
-    
+
     InlineSelector .option.not-selected {
         background: $surface-darken-1;
         color: $text-muted;
     }
-    
+
     InlineSelector .prompt-text {
         margin-bottom: 1;
         text-align: center;
         width: 100%;
         color: $text-muted;
     }
-    
+
     InlineSelector .message-text {
         margin-bottom: 1;
         text-align: center;
@@ -172,11 +172,11 @@ class ModelSelector(Widget, can_focus=True):
         border: solid $primary;
         background: $surface;
     }
-    
+
     ModelSelector:focus {
         border: double $primary;
     }
-    
+
     ModelSelector .title-text {
         margin-bottom: 1;
         text-align: center;
@@ -184,36 +184,36 @@ class ModelSelector(Widget, can_focus=True):
         color: $warning;
         text-style: bold;
     }
-    
+
     ModelSelector .prompt-text {
         margin-bottom: 1;
         text-align: center;
         width: 100%;
         color: $text-muted;
     }
-    
+
     ModelSelector .model-list {
         width: 100%;
         height: auto;
         max-height: 15;
     }
-    
+
     ModelSelector .model-option {
         padding: 0 2;
         width: 100%;
     }
-    
+
     ModelSelector .model-option.selected {
         background: $primary;
         color: $text;
         text-style: bold;
     }
-    
+
     ModelSelector .model-option.not-selected {
         background: $surface;
         color: $text-muted;
     }
-    
+
     ModelSelector .model-option.current {
         color: $success;
     }

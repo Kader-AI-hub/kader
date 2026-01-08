@@ -6,18 +6,18 @@ Provides synchronous and asynchronous access to Ollama models.
 
 from typing import AsyncIterator, Iterator
 
-from ollama import Client, AsyncClient
+from ollama import AsyncClient, Client
 from ollama._types import Options
 
 from .base import (
     BaseLLMProvider,
+    CostInfo,
+    LLMResponse,
     Message,
     ModelConfig,
-    LLMResponse,
+    ModelInfo,
     StreamChunk,
     Usage,
-    CostInfo,
-    ModelInfo,
 )
 
 

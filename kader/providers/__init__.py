@@ -1,6 +1,6 @@
 from .base import Message
-from .ollama import OllamaProvider
 from .mock import MockLLM
+from .ollama import OllamaProvider
 
 __all__ = [
     "Message",

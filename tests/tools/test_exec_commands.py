@@ -2,9 +2,11 @@
 Unit tests for the command execution tools functionality.
 """
 
-import pytest
 import subprocess
 from unittest.mock import Mock, patch
+
+import pytest
+
 from kader.tools.exec_commands import CommandExecutorTool
 
 

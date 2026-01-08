@@ -2,9 +2,11 @@
 Unit tests for the web tools functionality.
 """
 
-import pytest
 from unittest.mock import Mock, patch
-from kader.tools.web import WebSearchTool, WebFetchTool, get_web_tools
+
+import pytest
+
+from kader.tools.web import WebFetchTool, WebSearchTool, get_web_tools
 
 
 class TestWebSearchTool:

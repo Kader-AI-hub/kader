@@ -18,20 +18,19 @@ from textual.widgets import (
 )
 
 from kader.agent.agents import ReActAgent
-from kader.tools import get_default_registry
 from kader.memory import (
-    SlidingWindowConversationManager,
     FileSessionManager,
     MemoryConfig,
+    SlidingWindowConversationManager,
 )
+from kader.tools import get_default_registry
 
 from .utils import (
+    DEFAULT_MODEL,
     HELP_TEXT,
     THEME_NAMES,
-    DEFAULT_MODEL,
 )
-from .widgets import ConversationView, LoadingSpinner, InlineSelector, ModelSelector
-
+from .widgets import ConversationView, InlineSelector, LoadingSpinner, ModelSelector
 
 WELCOME_MESSAGE = """# Welcome to Kader CLI! 🚀
 
@@ -40,7 +39,7 @@ Your **modern AI-powered coding assistant**.
 Type a message below to start chatting, or use one of the commands:
 
 - `/help` - Show available commands
-- `/models` - View available LLM models  
+- `/models` - View available LLM models
 - `/theme` - Change the color theme
 - `/clear` - Clear the conversation
 - `/save` - Save current session

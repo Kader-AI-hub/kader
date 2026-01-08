@@ -4,20 +4,20 @@ Unit tests for the file-based Memory module.
 Tests state management, session management, and conversation management.
 """
 
-import unittest
-import tempfile
 import shutil
+import tempfile
+import unittest
 from pathlib import Path
 
 from kader.memory import (
     AgentState,
-    RequestState,
-    FileSessionManager,
     ConversationMessage,
-    SlidingWindowConversationManager,
-    NullConversationManager,
-    SessionType,
+    FileSessionManager,
     MemoryConfig,
+    NullConversationManager,
+    RequestState,
+    SessionType,
+    SlidingWindowConversationManager,
 )
 from kader.providers.base import Message
 

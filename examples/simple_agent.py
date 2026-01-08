@@ -8,9 +8,9 @@ Demonstrates how to use the BaseAgent with:
 - Execution
 """
 
-import sys
-import os
 import io
+import os
+import sys
 from pathlib import Path
 
 # Force utf-8 output for Windows consoles
@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from kader.agent.base import BaseAgent
 from kader.prompts import PromptBase
-from kader.tools import BaseTool, ParameterSchema, tool
+from kader.tools import ParameterSchema, tool
 
 
 # 1. Define a simple tool using the decorator
