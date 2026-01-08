@@ -414,10 +414,11 @@ wheels = [
 
 [[package]]
 name = "kader"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "faiss-cpu" },
+    { name = "jinja2" },
     { name = "loguru" },
     { name = "ollama" },
     { name = "pyyaml" },
@@ -438,6 +439,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "faiss-cpu", specifier = ">=1.9.0" },
+    { name = "jinja2", specifier = ">=3.1.6" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "ollama", specifier = ">=0.6.1" },
     { name = "pyyaml", specifier = ">=6.0.3" },
