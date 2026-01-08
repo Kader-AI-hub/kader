@@ -5,26 +5,28 @@ Defines the BaseAgent class which serves as the foundation for creating specific
 with tools, memory, and LLM provider integration.
 """
 
-import yaml
 from pathlib import Path
-from typing import AsyncIterator, Iterator, Union, Optional
-from tenacity import stop_after_attempt, wait_exponential, RetryError
+from typing import AsyncIterator, Iterator, Optional, Union
 
+import yaml
+from tenacity import RetryError, stop_after_attempt, wait_exponential
+
+from kader.memory import (
+    ConversationManager,
+    FileSessionManager,
+    SlidingWindowConversationManager,
+)
+from kader.prompts.base import PromptBase
 from kader.providers.base import (
     BaseLLMProvider,
+    LLMResponse,
     Message,
     ModelConfig,
-    LLMResponse,
     StreamChunk,
 )
 from kader.providers.ollama import OllamaProvider
 from kader.tools import BaseTool, ToolRegistry
-from kader.memory import (
-    ConversationManager,
-    SlidingWindowConversationManager,
-    FileSessionManager,
-)
-from kader.prompts.base import PromptBase
+
 from .logger import agent_logger
 
 
@@ -90,7 +92,9 @@ class BaseAgent:
                 # If no session_id yet but persistence is enabled, we'll get one during _load_session
                 pass  # We'll set up the logger in _load_session if needed
             if session_id_for_logger:
-                self.logger_id = agent_logger.setup_logger(self.name, session_id_for_logger)
+                self.logger_id = agent_logger.setup_logger(
+                    self.name, session_id_for_logger
+                )
 
         # Initialize Provider
         if provider:
@@ -534,11 +538,13 @@ class BaseAgent:
             if self.logger_id:
                 # Extract token usage info if available
                 token_usage = None
-                if hasattr(response, 'usage'):
+                if hasattr(response, "usage"):
                     token_usage = {
-                        'prompt_tokens': getattr(response.usage, 'prompt_tokens', 0),
-                        'completion_tokens': getattr(response.usage, 'completion_tokens', 0),
-                        'total_tokens': getattr(response.usage, 'total_tokens', 0)
+                        "prompt_tokens": getattr(response.usage, "prompt_tokens", 0),
+                        "completion_tokens": getattr(
+                            response.usage, "completion_tokens", 0
+                        ),
+                        "total_tokens": getattr(response.usage, "total_tokens", 0),
                     }
 
                 # Log the LLM response
@@ -548,17 +554,17 @@ class BaseAgent:
                 if token_usage:
                     agent_logger.log_token_usage(
                         self.logger_id,
-                        token_usage['prompt_tokens'],
-                        token_usage['completion_tokens'],
-                        token_usage['total_tokens']
+                        token_usage["prompt_tokens"],
+                        token_usage["completion_tokens"],
+                        token_usage["total_tokens"],
                     )
 
                     # Calculate and log cost
                     agent_logger.calculate_cost(
                         self.logger_id,
-                        token_usage['prompt_tokens'],
-                        token_usage['completion_tokens'],
-                        getattr(self.provider, 'model', '')
+                        token_usage["prompt_tokens"],
+                        token_usage["completion_tokens"],
+                        getattr(self.provider, "model", ""),
                     )
 
             # Save session update
@@ -592,7 +598,7 @@ class BaseAgent:
                         # Extract tool name and arguments
                         tool_name = "unknown"
                         arguments = {}
-                        if hasattr(tm, 'tool_call_id'):
+                        if hasattr(tm, "tool_call_id"):
                             # This is a tool message, need to find the tool name
                             # We'll check the original response to find the tool
                             for tool_call in response.tool_calls:
@@ -600,7 +606,9 @@ class BaseAgent:
                                 if fn_info.get("name"):
                                     tool_name = fn_info.get("name", "unknown")
                                     arguments = fn_info.get("arguments", {})
-                                    agent_logger.log_tool_usage(self.logger_id, tool_name, arguments)
+                                    agent_logger.log_tool_usage(
+                                        self.logger_id, tool_name, arguments
+                                    )
                                     break
 
                 # Save session update after tool results
@@ -697,11 +705,13 @@ class BaseAgent:
             if self.logger_id:
                 # Extract token usage info if available
                 token_usage = None
-                if hasattr(response, 'usage'):
+                if hasattr(response, "usage"):
                     token_usage = {
-                        'prompt_tokens': getattr(response.usage, 'prompt_tokens', 0),
-                        'completion_tokens': getattr(response.usage, 'completion_tokens', 0),
-                        'total_tokens': getattr(response.usage, 'total_tokens', 0)
+                        "prompt_tokens": getattr(response.usage, "prompt_tokens", 0),
+                        "completion_tokens": getattr(
+                            response.usage, "completion_tokens", 0
+                        ),
+                        "total_tokens": getattr(response.usage, "total_tokens", 0),
                     }
 
                 # Log the LLM response
@@ -711,17 +721,17 @@ class BaseAgent:
                 if token_usage:
                     agent_logger.log_token_usage(
                         self.logger_id,
-                        token_usage['prompt_tokens'],
-                        token_usage['completion_tokens'],
-                        token_usage['total_tokens']
+                        token_usage["prompt_tokens"],
+                        token_usage["completion_tokens"],
+                        token_usage["total_tokens"],
                     )
 
                     # Calculate and log cost
                     agent_logger.calculate_cost(
                         self.logger_id,
-                        token_usage['prompt_tokens'],
-                        token_usage['completion_tokens'],
-                        getattr(self.provider, 'model', '')
+                        token_usage["prompt_tokens"],
+                        token_usage["completion_tokens"],
+                        getattr(self.provider, "model", ""),
                     )
 
             # Save session update
@@ -752,7 +762,7 @@ class BaseAgent:
                         # Extract tool name and arguments
                         tool_name = "unknown"
                         arguments = {}
-                        if hasattr(tm, 'tool_call_id'):
+                        if hasattr(tm, "tool_call_id"):
                             # This is a tool message, need to find the tool name
                             # We'll check the original response to find the tool
                             for tool_call in response.tool_calls:
@@ -760,7 +770,9 @@ class BaseAgent:
                                 if fn_info.get("name"):
                                     tool_name = fn_info.get("name", "unknown")
                                     arguments = fn_info.get("arguments", {})
-                                    agent_logger.log_tool_usage(self.logger_id, tool_name, arguments)
+                                    agent_logger.log_tool_usage(
+                                        self.logger_id, tool_name, arguments
+                                    )
                                     break
 
                 # Save session update

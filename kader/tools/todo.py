@@ -1,7 +1,7 @@
 import json
 from enum import Enum
 from pathlib import Path
-from typing import Literal, Optional, Any
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field, ValidationError
 

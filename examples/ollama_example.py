@@ -10,14 +10,14 @@ Demonstrates how to use the Kader Ollama provider for:
 """
 
 import asyncio
-import sys
 import os
+import sys
 
 # Add project root to path for direct execution
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from kader.providers.ollama import OllamaProvider
 from kader.providers.base import Message, ModelConfig
+from kader.providers.ollama import OllamaProvider
 
 
 def demo_basic_invocation():

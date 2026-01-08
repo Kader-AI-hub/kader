@@ -1,8 +1,8 @@
 """Conversation display widget for Kader CLI."""
 
-from textual.widgets import Markdown, Static
-from textual.containers import VerticalScroll
 from textual.app import ComposeResult
+from textual.containers import VerticalScroll
+from textual.widgets import Markdown, Static
 
 
 class Message(Static):
@@ -26,17 +26,17 @@ class ConversationView(VerticalScroll):
     ConversationView {
         padding: 1 2;
     }
-    
+
     ConversationView Message {
         margin-bottom: 1;
         padding: 1;
     }
-    
+
     ConversationView .message-user {
         background: $surface;
         border-left: thick $primary;
     }
-    
+
     ConversationView .message-assistant {
         background: $surface-darken-1;
         border-left: thick $success;

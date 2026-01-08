@@ -5,7 +5,7 @@ This module sets up the required configuration when imported, including
 creating the .kader directory in the user's home directory.
 """
 
-from .config import initialize_kader_config, KADER_DIR, ENV_FILE_PATH
+from .config import ENV_FILE_PATH, KADER_DIR, initialize_kader_config
 from .providers import *  # noqa: F401, F403
 from .tools import *  # noqa: F401, F403
 

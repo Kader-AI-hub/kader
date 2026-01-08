@@ -7,6 +7,7 @@ OpenAI, Google, Anthropic, Mistral, and other providers.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import (
     Any,
     AsyncIterator,
@@ -14,8 +15,6 @@ from typing import (
     Literal,
     TypeAlias,
 )
-from enum import Enum
-
 
 # Type Aliases
 Role: TypeAlias = Literal["system", "user", "assistant", "tool"]

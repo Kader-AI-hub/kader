@@ -2,10 +2,12 @@
 Unit tests for the Ollama provider functionality.
 """
 
+from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
-from kader.providers.ollama import OllamaProvider
+
 from kader.providers.base import Message, ModelConfig, Usage
+from kader.providers.ollama import OllamaProvider
 
 
 class TestOllamaProvider:

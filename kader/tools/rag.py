@@ -4,10 +4,10 @@ RAG (Retrieval Augmented Generation) Tool.
 Provides semantic search capabilities using Ollama embeddings and FAISS indexing.
 """
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-import os
 
 try:
     import ollama
@@ -31,7 +31,6 @@ from .base import (
     ParameterSchema,
     ToolCategory,
 )
-
 
 # Default embedding model
 DEFAULT_EMBEDDING_MODEL = "all-minilm:22m"

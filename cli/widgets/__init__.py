@@ -1,8 +1,8 @@
 """Widget exports for Kader CLI."""
 
+from .confirmation import InlineSelector, ModelSelector
 from .conversation import ConversationView, Message
 from .loading import LoadingSpinner
-from .confirmation import InlineSelector, ModelSelector
 
 __all__ = [
     "ConversationView",

@@ -1,7 +1,7 @@
 """Loading spinner widget for Kader CLI."""
 
-from textual.widgets import Static
 from textual.reactive import reactive
+from textual.widgets import Static
 
 
 class LoadingSpinner(Static):
@@ -15,7 +15,7 @@ class LoadingSpinner(Static):
         color: $text-muted;
         text-style: italic;
     }
-    
+
     LoadingSpinner.hidden {
         display: none;
     }

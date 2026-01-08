@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
+
 import pytest
+
 from kader.tools.todo import TodoTool
 
 

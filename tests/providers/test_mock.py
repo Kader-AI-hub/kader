@@ -2,8 +2,8 @@
 Unit tests for the mock provider functionality.
 """
 
-from kader.providers.mock import MockLLM
 from kader.providers.base import Message, ModelConfig, Usage
+from kader.providers.mock import MockLLM
 
 
 class TestMockLLM:

@@ -16,7 +16,6 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 from kader.agent.base import BaseAgent
 from kader.tools.todo import TodoTool
-from kader.providers.ollama import OllamaProvider
 
 
 def main():

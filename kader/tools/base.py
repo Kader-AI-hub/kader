@@ -5,19 +5,18 @@ A versatile, provider-agnostic base class for defining tools that can be used
 with any LLM provider (OpenAI, Google, Anthropic, Mistral, and others).
 """
 
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import (
     Any,
     Callable,
+    Generic,
     Literal,
     TypeAlias,
     TypeVar,
-    Generic,
 )
-from enum import Enum
-import json
-
 
 # Type Aliases
 ParameterType: TypeAlias = Literal[

@@ -1,18 +1,17 @@
 import asyncio
-import sys
 import os
-from typing import Optional
+import sys
 
 # Add project root to path for direct execution
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from kader.agent.agents import PlanningAgent
-from kader.tools import ToolRegistry, get_filesystem_tools, CommandExecutorTool
 from kader.memory import SlidingWindowConversationManager
+from kader.tools import CommandExecutorTool, ToolRegistry, get_filesystem_tools
 
 # Try importing web tools if available
 try:
-    from kader.tools import WebSearchTool, WebFetchTool
+    from kader.tools import WebFetchTool, WebSearchTool
 
     HAS_WEB_TOOLS = True
 except ImportError:
