@@ -99,27 +99,9 @@ class AgentLogger:
     def calculate_cost(
         self,
         logger_id: str,
-        prompt_tokens: int,
-        completion_tokens: int,
-        model_name: str = "",
-        pricing_data: Optional[Dict[str, float]] = None,
+        total_cost: float,
     ):
         """Calculate and log cost based on token usage."""
-        # Use provided pricing data or defaults
-        if pricing_data is None:
-            # Default pricing (these would come from a model registry in practice)
-            pricing_data = {
-                "input_cost_per_million": 0.5,  # $0.50 per million input tokens
-                "output_cost_per_million": 1.5,  # $1.50 per million output tokens
-            }
-
-        input_cost = (prompt_tokens / 1_000_000) * pricing_data.get(
-            "input_cost_per_million", 0.5
-        )
-        output_cost = (completion_tokens / 1_000_000) * pricing_data.get(
-            "output_cost_per_million", 1.5
-        )
-        total_cost = input_cost + output_cost
 
         self.log_cost(logger_id, total_cost)
         return total_cost

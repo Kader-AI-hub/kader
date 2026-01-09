@@ -559,12 +559,13 @@ class BaseAgent:
                         token_usage["total_tokens"],
                     )
 
+                    # estimate the cost...
+                    estimated_cost = self.provider.estimate_cost(token_usage)
+
                     # Calculate and log cost
                     agent_logger.calculate_cost(
                         self.logger_id,
-                        token_usage["prompt_tokens"],
-                        token_usage["completion_tokens"],
-                        getattr(self.provider, "model", ""),
+                        estimated_cost.total_cost,
                     )
 
             # Save session update
@@ -726,12 +727,13 @@ class BaseAgent:
                         token_usage["total_tokens"],
                     )
 
+                    # estimate the cost...
+                    estimated_cost = self.provider.estimate_cost(token_usage)
+
                     # Calculate and log cost
                     agent_logger.calculate_cost(
                         self.logger_id,
-                        token_usage["prompt_tokens"],
-                        token_usage["completion_tokens"],
-                        getattr(self.provider, "model", ""),
+                        estimated_cost.total_cost,
                     )
 
             # Save session update
