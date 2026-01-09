@@ -183,10 +183,7 @@ class TestAgentLogger:
                 self.agent_logger.setup_logger("test_agent", "test_session")
 
                 # Test with default pricing
-                cost = self.agent_logger.calculate_cost(
-                    logger_id,
-                    total_cost=0.5
-                )
+                cost = self.agent_logger.calculate_cost(logger_id, total_cost=0.5)
 
                 # Default pricing: input_cost_per_million = 0.5, output_cost_per_million = 1.5
                 expected_cost = 0.5
