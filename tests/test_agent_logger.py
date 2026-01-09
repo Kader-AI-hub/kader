@@ -183,107 +183,10 @@ class TestAgentLogger:
                 self.agent_logger.setup_logger("test_agent", "test_session")
 
                 # Test with default pricing
-                cost = self.agent_logger.calculate_cost(
-                    logger_id,
-                    prompt_tokens=1_000_000,  # 1 million tokens
-                    completion_tokens=500_000,  # 0.5 million tokens
-                    model_name="",
-                    pricing_data=None,
-                )
+                cost = self.agent_logger.calculate_cost(logger_id, total_cost=0.5)
 
                 # Default pricing: input_cost_per_million = 0.5, output_cost_per_million = 1.5
-                expected_cost = (1.0 * 0.5) + (0.5 * 1.5)  # 0.5 + 0.75 = 1.25
-                assert cost == expected_cost
-
-    def test_calculate_cost_with_custom_pricing(self):
-        """Test cost calculation with custom pricing data."""
-        logger_id = "test_agent_test_session"
-
-        # Setup logger first
-        with patch("kader.agent.logger.Path") as mock_path:
-            mock_logs_dir = MagicMock()
-            mock_path.return_value = mock_logs_dir
-            mock_logs_dir.__truediv__.return_value = mock_logs_dir
-            mock_logs_dir.mkdir.return_value = None
-            mock_log_file_path = MagicMock()
-            mock_logs_dir.__truediv__.return_value = mock_log_file_path
-
-            with patch("kader.agent.logger.logger") as mock_logger:
-                mock_bound_logger = MagicMock()
-                mock_logger.bind.return_value = mock_bound_logger
-                mock_bound_logger.add.return_value = 1  # handler ID
-
-                # Setup the logger
-                self.agent_logger.setup_logger("test_agent", "test_session")
-
-                # Test with custom pricing
-                custom_pricing = {
-                    "input_cost_per_million": 0.1,  # $0.10 per million input tokens
-                    "output_cost_per_million": 0.2,  # $0.20 per million output tokens
-                }
-                cost = self.agent_logger.calculate_cost(
-                    logger_id,
-                    prompt_tokens=1_000_000,
-                    completion_tokens=1_000_000,
-                    model_name="",
-                    pricing_data=custom_pricing,
-                )
-
-                expected_cost = (1.0 * 0.1) + (1.0 * 0.2)  # 0.1 + 0.2 = 0.3
-                assert cost == expected_cost
-
-    def test_calculate_cost_edge_cases(self):
-        """Test cost calculation with edge cases."""
-        logger_id = "test_agent_test_session"
-
-        # Setup logger first
-        with patch("kader.agent.logger.Path") as mock_path:
-            mock_logs_dir = MagicMock()
-            mock_path.return_value = mock_logs_dir
-            mock_logs_dir.__truediv__.return_value = mock_logs_dir
-            mock_logs_dir.mkdir.return_value = None
-            mock_log_file_path = MagicMock()
-            mock_logs_dir.__truediv__.return_value = mock_log_file_path
-
-            with patch("kader.agent.logger.logger") as mock_logger:
-                mock_bound_logger = MagicMock()
-                mock_logger.bind.return_value = mock_bound_logger
-                mock_bound_logger.add.return_value = 1  # handler ID
-
-                # Setup the logger
-                self.agent_logger.setup_logger("test_agent", "test_session")
-
-                # Test with zero tokens
-                cost = self.agent_logger.calculate_cost(
-                    logger_id,
-                    prompt_tokens=0,
-                    completion_tokens=0,
-                    model_name="",
-                    pricing_data=None,
-                )
-                assert cost == 0.0
-
-                # Test with very large token counts
-                cost = self.agent_logger.calculate_cost(
-                    logger_id,
-                    prompt_tokens=1_000_000_000,  # 1B tokens
-                    completion_tokens=500_000_000,  # 500M tokens
-                    model_name="",
-                    pricing_data=None,
-                )
-                expected_cost = (1000.0 * 0.5) + (500.0 * 1.5)  # 500 + 750 = 1250.0
-                assert cost == expected_cost
-
-                # Test with negative tokens (should be treated as negative cost)
-                cost = self.agent_logger.calculate_cost(
-                    logger_id,
-                    prompt_tokens=-100_000,
-                    completion_tokens=-50_000,
-                    model_name="",
-                    pricing_data=None,
-                )
-                # For negative values, the calculation would give negative cost
-                expected_cost = (-0.1 * 0.5) + (-0.05 * 1.5)  # -0.05 + -0.075 = -0.125
+                expected_cost = 0.5
                 assert cost == expected_cost
 
     def test_log_llm_response(self):
