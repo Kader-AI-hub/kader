@@ -371,6 +371,7 @@ Please resize your terminal."""
         elif cmd == "/clear":
             conversation.clear_messages()
             self._agent.memory.clear()
+            self._agent.provider.reset_tracking()  # Reset usage/cost tracking
             self._current_session_id = None
             self.notify("Conversation cleared!", severity="information")
         elif cmd == "/save":
