@@ -2,6 +2,7 @@
 
 import asyncio
 import threading
+from importlib.metadata import version as get_version
 from pathlib import Path
 from typing import Optional
 
@@ -97,6 +98,7 @@ class KaderApp(App):
         self._confirmation_result: tuple[bool, Optional[str]] = (True, None)
         self._inline_selector: Optional[InlineSelector] = None
         self._model_selector: Optional[ModelSelector] = None
+        self._update_info: Optional[str] = None  # Latest version if update available
 
         self._agent = self._create_agent(self._current_model)
 
@@ -309,6 +311,42 @@ class KaderApp(App):
 
         # Check initial size
         self._check_terminal_size()
+
+        # Start background update check
+        threading.Thread(target=self._check_for_updates, daemon=True).start()
+
+    def _check_for_updates(self) -> None:
+        """Check for package updates in background thread."""
+        try:
+            from outdated import check_outdated
+
+            current_version = get_version("kader")
+            is_outdated, latest_version = check_outdated("kader", current_version)
+
+            if is_outdated:
+                self._update_info = latest_version
+                # Schedule UI update on main thread
+                self.call_from_thread(self._show_update_notification)
+        except Exception:
+            # Silently ignore update check failures
+            pass
+
+    def _show_update_notification(self) -> None:
+        """Show update notification in conversation view."""
+        if not self._update_info:
+            return
+
+        try:
+            conversation = self.query_one("#conversation-view", ConversationView)
+            current = get_version("kader")
+            message = (
+                f"🆕 **Update available!** "
+                f"v{current} → v{self._update_info}\n\n"
+                f"Run `uv tool upgrade kader` to update."
+            )
+            conversation.add_message(message, "assistant")
+        except Exception:
+            pass
 
     def on_resize(self) -> None:
         """Handle terminal resize events."""
