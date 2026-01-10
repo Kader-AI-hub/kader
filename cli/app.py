@@ -332,19 +332,17 @@ class KaderApp(App):
             pass
 
     def _show_update_notification(self) -> None:
-        """Show update notification in conversation view."""
+        """Show update notification as a toast."""
         if not self._update_info:
             return
 
         try:
-            conversation = self.query_one("#conversation-view", ConversationView)
             current = get_version("kader")
             message = (
-                f"🆕 **Update available!** "
-                f"v{current} → v{self._update_info}\n\n"
-                f"Run `uv tool upgrade kader` to update."
+                f">> Update available! v{current} → v{self._update_info} "
+                f"Run: uv tool upgrade kader"
             )
-            conversation.add_message(message, "assistant")
+            self.notify(message, severity="information", timeout=10)
         except Exception:
             pass
 
