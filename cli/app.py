@@ -32,9 +32,19 @@ from .utils import (
 )
 from .widgets import ConversationView, InlineSelector, LoadingSpinner, ModelSelector
 
-WELCOME_MESSAGE = """# Welcome to Kader CLI! 🚀
+WELCOME_MESSAGE = """
+<div align="center">
 
-Your **modern AI-powered coding assistant**.
+```
+    ██╗ ██╗  ██╗ █████╗ ██████╗ ███████╗██████╗
+   ██╔╝ ██║ ██╔╝██╔══██╗██╔══██╗██╔════╝██╔══██╗
+  ██╔╝  █████╔╝ ███████║██║  ██║█████╗  ██████╔╝
+ ██╔╝   ██╔═██╗ ██╔══██║██║  ██║██╔══╝  ██╔══██╗
+██╔╝    ██║  ██╗██║  ██║██████╔╝███████╗██║  ██║
+╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚══════╝╚═╝  ╚═╝
+```
+
+</div>
 
 Type a message below to start chatting, or use one of the commands:
 
@@ -47,6 +57,11 @@ Type a message below to start chatting, or use one of the commands:
 - `/sessions` - List saved sessions
 - `/exit` - Exit the application
 """
+
+
+# Minimum terminal size to prevent UI breakage
+MIN_WIDTH = 89
+MIN_HEIGHT = 29
 
 
 class KaderApp(App):
@@ -290,6 +305,37 @@ class KaderApp(App):
 
         # Focus the input
         self.query_one("#prompt-input", Input).focus()
+
+        # Check initial size
+        self._check_terminal_size()
+
+    def on_resize(self) -> None:
+        """Handle terminal resize events."""
+        self._check_terminal_size()
+
+    def _check_terminal_size(self) -> None:
+        """Check if terminal is large enough and show warning if not."""
+        width = self.console.size.width
+        height = self.console.size.height
+
+        # Check if we need to show/hide the size warning
+        too_small = width < MIN_WIDTH or height < MIN_HEIGHT
+
+        try:
+            warning = self.query_one("#size-warning", Static)
+            if not too_small:
+                warning.remove()
+        except Exception:
+            if too_small:
+                # Show warning overlay
+                warning_text = f"""⚠️  Terminal Too Small
+
+Current: {width}x{height}
+Minimum: {MIN_WIDTH}x{MIN_HEIGHT}
+
+Please resize your terminal."""
+                warning = Static(warning_text, id="size-warning")
+                self.mount(warning)
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle user input submission."""
