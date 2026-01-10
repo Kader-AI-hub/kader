@@ -2,6 +2,7 @@
 
 import asyncio
 import threading
+from importlib.metadata import version as get_version
 from pathlib import Path
 from typing import Optional
 
@@ -32,9 +33,19 @@ from .utils import (
 )
 from .widgets import ConversationView, InlineSelector, LoadingSpinner, ModelSelector
 
-WELCOME_MESSAGE = """# Welcome to Kader CLI! 🚀
+WELCOME_MESSAGE = """
+<div align="center">
 
-Your **modern AI-powered coding assistant**.
+```
+    ██╗ ██╗  ██╗ █████╗ ██████╗ ███████╗██████╗
+   ██╔╝ ██║ ██╔╝██╔══██╗██╔══██╗██╔════╝██╔══██╗
+  ██╔╝  █████╔╝ ███████║██║  ██║█████╗  ██████╔╝
+ ██╔╝   ██╔═██╗ ██╔══██║██║  ██║██╔══╝  ██╔══██╗
+██╔╝    ██║  ██╗██║  ██║██████╔╝███████╗██║  ██║
+╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚══════╝╚═╝  ╚═╝
+```
+
+</div>
 
 Type a message below to start chatting, or use one of the commands:
 
@@ -45,8 +56,14 @@ Type a message below to start chatting, or use one of the commands:
 - `/save` - Save current session
 - `/load` - Load a saved session
 - `/sessions` - List saved sessions
+- `/cost` - Show the cost of the conversation
 - `/exit` - Exit the application
 """
+
+
+# Minimum terminal size to prevent UI breakage
+MIN_WIDTH = 89
+MIN_HEIGHT = 29
 
 
 class KaderApp(App):
@@ -81,6 +98,7 @@ class KaderApp(App):
         self._confirmation_result: tuple[bool, Optional[str]] = (True, None)
         self._inline_selector: Optional[InlineSelector] = None
         self._model_selector: Optional[ModelSelector] = None
+        self._update_info: Optional[str] = None  # Latest version if update available
 
         self._agent = self._create_agent(self._current_model)
 
@@ -291,6 +309,71 @@ class KaderApp(App):
         # Focus the input
         self.query_one("#prompt-input", Input).focus()
 
+        # Check initial size
+        self._check_terminal_size()
+
+        # Start background update check
+        threading.Thread(target=self._check_for_updates, daemon=True).start()
+
+    def _check_for_updates(self) -> None:
+        """Check for package updates in background thread."""
+        try:
+            from outdated import check_outdated
+
+            current_version = get_version("kader")
+            is_outdated, latest_version = check_outdated("kader", current_version)
+
+            if is_outdated:
+                self._update_info = latest_version
+                # Schedule UI update on main thread
+                self.call_from_thread(self._show_update_notification)
+        except Exception:
+            # Silently ignore update check failures
+            pass
+
+    def _show_update_notification(self) -> None:
+        """Show update notification as a toast."""
+        if not self._update_info:
+            return
+
+        try:
+            current = get_version("kader")
+            message = (
+                f">> Update available! v{current} → v{self._update_info} "
+                f"Run: uv tool upgrade kader"
+            )
+            self.notify(message, severity="information", timeout=10)
+        except Exception:
+            pass
+
+    def on_resize(self) -> None:
+        """Handle terminal resize events."""
+        self._check_terminal_size()
+
+    def _check_terminal_size(self) -> None:
+        """Check if terminal is large enough and show warning if not."""
+        width = self.console.size.width
+        height = self.console.size.height
+
+        # Check if we need to show/hide the size warning
+        too_small = width < MIN_WIDTH or height < MIN_HEIGHT
+
+        try:
+            warning = self.query_one("#size-warning", Static)
+            if not too_small:
+                warning.remove()
+        except Exception:
+            if too_small:
+                # Show warning overlay
+                warning_text = f"""⚠️  Terminal Too Small
+
+Current: {width}x{height}
+Minimum: {MIN_WIDTH}x{MIN_HEIGHT}
+
+Please resize your terminal."""
+                warning = Static(warning_text, id="size-warning")
+                self.mount(warning)
+
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle user input submission."""
         user_input = event.value.strip()
@@ -324,6 +407,7 @@ class KaderApp(App):
         elif cmd == "/clear":
             conversation.clear_messages()
             self._agent.memory.clear()
+            self._agent.provider.reset_tracking()  # Reset usage/cost tracking
             self._current_session_id = None
             self.notify("Conversation cleared!", severity="information")
         elif cmd == "/save":
@@ -342,6 +426,8 @@ class KaderApp(App):
         elif cmd == "/refresh":
             self._refresh_directory_tree()
             self.notify("Directory tree refreshed!", severity="information")
+        elif cmd == "/cost":
+            self._handle_cost(conversation)
         elif cmd == "/exit":
             self.exit()
         else:
@@ -534,6 +620,42 @@ class KaderApp(App):
             conversation.add_message("\n".join(lines), "assistant")
         except Exception as e:
             conversation.add_message(f"❌ Error listing sessions: {e}", "assistant")
+            self.notify(f"Error: {e}", severity="error")
+
+    def _handle_cost(self, conversation: ConversationView) -> None:
+        """Display LLM usage costs."""
+        try:
+            # Get cost and usage from the provider
+            cost = self._agent.provider.total_cost
+            usage = self._agent.provider.total_usage
+            model = self._agent.provider.model
+
+            lines = [
+                "## Usage Costs 💰\n",
+                f"**Model:** `{model}`\n",
+                "### Cost Breakdown",
+                "| Type | Amount |",
+                "|------|--------|",
+                f"| Input Cost | ${cost.input_cost:.6f} |",
+                f"| Output Cost | ${cost.output_cost:.6f} |",
+                f"| **Total Cost** | **${cost.total_cost:.6f}** |",
+                "",
+                "### Token Usage",
+                "| Type | Tokens |",
+                "|------|--------|",
+                f"| Prompt Tokens | {usage.prompt_tokens:,} |",
+                f"| Completion Tokens | {usage.completion_tokens:,} |",
+                f"| **Total Tokens** | **{usage.total_tokens:,}** |",
+            ]
+
+            if cost.total_cost == 0.0:
+                lines.append(
+                    "\n> 💡 *Note: Ollama runs locally, so there are no API costs.*"
+                )
+
+            conversation.add_message("\n".join(lines), "assistant")
+        except Exception as e:
+            conversation.add_message(f"❌ Error getting costs: {e}", "assistant")
             self.notify(f"Error: {e}", severity="error")
 
 
