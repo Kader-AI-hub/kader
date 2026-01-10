@@ -55,6 +55,7 @@ Type a message below to start chatting, or use one of the commands:
 - `/save` - Save current session
 - `/load` - Load a saved session
 - `/sessions` - List saved sessions
+- `/cost` - Show the cost of the conversation
 - `/exit` - Exit the application
 """
 
@@ -388,6 +389,8 @@ Please resize your terminal."""
         elif cmd == "/refresh":
             self._refresh_directory_tree()
             self.notify("Directory tree refreshed!", severity="information")
+        elif cmd == "/cost":
+            self._handle_cost(conversation)
         elif cmd == "/exit":
             self.exit()
         else:
@@ -580,6 +583,42 @@ Please resize your terminal."""
             conversation.add_message("\n".join(lines), "assistant")
         except Exception as e:
             conversation.add_message(f"❌ Error listing sessions: {e}", "assistant")
+            self.notify(f"Error: {e}", severity="error")
+
+    def _handle_cost(self, conversation: ConversationView) -> None:
+        """Display LLM usage costs."""
+        try:
+            # Get cost and usage from the provider
+            cost = self._agent.provider.total_cost
+            usage = self._agent.provider.total_usage
+            model = self._agent.provider.model
+
+            lines = [
+                "## Usage Costs 💰\n",
+                f"**Model:** `{model}`\n",
+                "### Cost Breakdown",
+                "| Type | Amount |",
+                "|------|--------|",
+                f"| Input Cost | ${cost.input_cost:.6f} |",
+                f"| Output Cost | ${cost.output_cost:.6f} |",
+                f"| **Total Cost** | **${cost.total_cost:.6f}** |",
+                "",
+                "### Token Usage",
+                "| Type | Tokens |",
+                "|------|--------|",
+                f"| Prompt Tokens | {usage.prompt_tokens:,} |",
+                f"| Completion Tokens | {usage.completion_tokens:,} |",
+                f"| **Total Tokens** | **{usage.total_tokens:,}** |",
+            ]
+
+            if cost.total_cost == 0.0:
+                lines.append(
+                    "\n> 💡 *Note: Ollama runs locally, so there are no API costs.*"
+                )
+
+            conversation.add_message("\n".join(lines), "assistant")
+        except Exception as e:
+            conversation.add_message(f"❌ Error getting costs: {e}", "assistant")
             self.notify(f"Error: {e}", severity="error")
 
 

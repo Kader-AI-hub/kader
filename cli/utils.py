@@ -19,6 +19,7 @@ HELP_TEXT = """## Kader CLI Commands 📖
 | `/save` | Save current session |
 | `/load <id>` | Load a saved session |
 | `/sessions` | List saved sessions |
+| `/cost` | Show usage costs |
 | `/refresh` | Refresh file tree |
 | `/exit` | Exit the CLI |
 
