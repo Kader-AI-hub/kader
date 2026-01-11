@@ -322,7 +322,7 @@ class BaseAgent:
         return f"execute {tool_name}"
 
     def _confirm_tool_execution(
-        self, tool_call_dict: dict
+        self, tool_call_dict: dict, llm_content: Optional[str] = None
     ) -> tuple[bool, Optional[str]]:
         """
         Ask user for confirmation before executing a tool.
@@ -335,6 +335,9 @@ class BaseAgent:
             If should_execute is False, user_input contains additional context.
         """
         display_str = self._format_tool_call_for_display(tool_call_dict)
+
+        if llm_content and len(llm_content) > 0:
+            display_str = f"{llm_content}\n\n{display_str}"
 
         # Use callback if provided (e.g., for GUI/TUI)
         if self.tool_confirmation_callback:
@@ -357,7 +360,7 @@ class BaseAgent:
                 print("Please enter 'yes' or 'no'.")
 
     async def _aconfirm_tool_execution(
-        self, tool_call_dict: dict
+        self, tool_call_dict: dict, llm_content: Optional[str] = None
     ) -> tuple[bool, Optional[str]]:
         """
         Async version - Ask user for confirmation before executing a tool.
@@ -375,7 +378,9 @@ class BaseAgent:
         # In production, use asyncio.to_thread or aioconsole
         import asyncio
 
-        return await asyncio.to_thread(self._confirm_tool_execution, tool_call_dict)
+        return await asyncio.to_thread(
+            self._confirm_tool_execution, tool_call_dict, llm_content
+        )
 
     def _process_tool_calls(
         self, response: LLMResponse
@@ -396,7 +401,7 @@ class BaseAgent:
                 # Check for interrupt before tool execution
                 if self.interrupt_before_tool:
                     should_execute, user_input = self._confirm_tool_execution(
-                        tool_call_dict
+                        tool_call_dict, response.content
                     )
                     if not should_execute:
                         # Return the user's elaboration to be processed
@@ -455,7 +460,7 @@ class BaseAgent:
                 # Check for interrupt before tool execution
                 if self.interrupt_before_tool:
                     should_execute, user_input = await self._aconfirm_tool_execution(
-                        tool_call_dict
+                        tool_call_dict, response.content
                     )
                     if not should_execute:
                         return (False, user_input)

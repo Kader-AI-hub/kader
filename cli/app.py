@@ -171,11 +171,15 @@ class KaderApp(App):
         self._confirmation_result = (event.confirmed, None)
 
         # Remove selector and show result message
+        tool_message = None
         if self._inline_selector:
+            tool_message = self._inline_selector.message
             self._inline_selector.remove()
             self._inline_selector = None
 
         if event.confirmed:
+            if tool_message:
+                conversation.add_message(tool_message, "assistant")
             conversation.add_message("✅ Executing tool...", "assistant")
             # Restart spinner
             try:
