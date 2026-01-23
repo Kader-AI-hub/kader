@@ -8,7 +8,7 @@ THEME_NAMES = ["dark", "ocean", "forest", "sunset"]
 # Default model
 DEFAULT_MODEL = "qwen3-coder:480b-cloud"
 
-HELP_TEXT = """## Kader CLI Commands 📖
+HELP_TEXT = """## Kader CLI Commands
 
 | Command | Description |
 |---------|-------------|
@@ -23,7 +23,7 @@ HELP_TEXT = """## Kader CLI Commands 📖
 | `/refresh` | Refresh file tree |
 | `/exit` | Exit the CLI |
 
-### Keyboard Shortcuts ⌨️
+### Keyboard Shortcuts
 
 | Shortcut | Action |
 |----------|--------|
@@ -33,7 +33,7 @@ HELP_TEXT = """## Kader CLI Commands 📖
 | `Ctrl+R` | Refresh file tree |
 | `Ctrl+Q` | Quit |
 
-### Input Editing 📝
+### Input Editing
 
 | Shortcut | Action |
 |----------|--------|
@@ -44,7 +44,8 @@ HELP_TEXT = """## Kader CLI Commands 📖
 
 ### Tips:
 - Type any question to chat with the AI
-- Use **Tab** to navigate between panels"""
+- Use **Tab** to navigate between panels
+"""
 
 
 def get_models_text() -> str:
@@ -52,12 +53,16 @@ def get_models_text() -> str:
     try:
         models = OllamaProvider.get_supported_models()
         if not models:
-            return "## Available Models 🤖\n\n*No models found. Is Ollama running?*"
+            return "## Available Models (^^)\n\n*No models found. Is Ollama running?*"
 
-        lines = ["## Available Models 🤖\n", "| Model | Status |", "|-------|--------|"]
+        lines = [
+            "## Available Models (^^)\n",
+            "| Model | Status |",
+            "|-------|--------|",
+        ]
         for model in models:
-            lines.append(f"| {model} | ✅ Available |")
+            lines.append(f"| {model} | (+) Available |")
         lines.append(f"\n*Currently using: **{DEFAULT_MODEL}***")
         return "\n".join(lines)
     except Exception as e:
-        return f"## Available Models 🤖\n\n*Error fetching models: {e}*"
+        return f"## Available Models (^^)\n\n*Error fetching models: {e}*"

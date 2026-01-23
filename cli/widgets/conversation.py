@@ -15,7 +15,7 @@ class Message(Static):
         self.add_class(f"message-{role}")
 
     def compose(self) -> ComposeResult:
-        prefix = "👤 **You:**" if self.role == "user" else "🤖 **Kader:**"
+        prefix = "(**) **You:**" if self.role == "user" else "(^^) **Kader:**"
         yield Markdown(f"{prefix}\n\n{self.content}")
 
 
