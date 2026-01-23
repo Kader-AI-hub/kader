@@ -10,12 +10,12 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical
 from textual.widgets import (
-    DirectoryTree,
     Footer,
     Header,
     Input,
     Markdown,
     Static,
+    Tree,
 )
 
 from kader.agent.agents import ReActAgent
@@ -64,6 +64,13 @@ Type a message below to start chatting, or use one of the commands:
 # Minimum terminal size to prevent UI breakage
 MIN_WIDTH = 89
 MIN_HEIGHT = 29
+
+
+class ASCIITree(Tree):
+    """A Tree widget that uses no icons."""
+
+    ICON_NODE = ""
+    ICON_NODE_EXPANDED = ""
 
 
 class KaderApp(App):
@@ -180,7 +187,7 @@ class KaderApp(App):
         if event.confirmed:
             if tool_message:
                 conversation.add_message(tool_message, "assistant")
-            conversation.add_message("✅ Executing tool...", "assistant")
+            conversation.add_message("(+) Executing tool...", "assistant")
             # Restart spinner
             try:
                 spinner = self.query_one(LoadingSpinner)
@@ -188,7 +195,7 @@ class KaderApp(App):
             except Exception:
                 pass
         else:
-            conversation.add_message("❌ Tool execution skipped.", "assistant")
+            conversation.add_message("(-) Tool execution skipped.", "assistant")
 
         # Re-enable input
         prompt_input = self.query_one("#prompt-input", Input)
@@ -210,7 +217,8 @@ class KaderApp(App):
             models = OllamaProvider.get_supported_models()
             if not models:
                 conversation.add_message(
-                    "## Models 🤖\n\n*No models found. Is Ollama running?*", "assistant"
+                    "## Models (^^)\n\n*No models found. Is Ollama running?*",
+                    "assistant",
                 )
                 return
 
@@ -228,7 +236,7 @@ class KaderApp(App):
 
         except Exception as e:
             conversation.add_message(
-                f"## Models 🤖\n\n*Error fetching models: {e}*", "assistant"
+                f"## Models (^^)\n\n*Error fetching models: {e}*", "assistant"
             )
 
     def on_model_selector_model_selected(
@@ -248,7 +256,7 @@ class KaderApp(App):
         self._agent = self._create_agent(self._current_model)
 
         conversation.add_message(
-            f"✅ Model changed from `{old_model}` to `{self._current_model}`",
+            f"(+) Model changed from `{old_model}` to `{self._current_model}`",
             "assistant",
         )
 
@@ -285,8 +293,8 @@ class KaderApp(App):
         with Horizontal(id="main-container"):
             # Sidebar with directory tree
             with Vertical(id="sidebar"):
-                yield Static("📁 Files", id="sidebar-title")
-                yield DirectoryTree(Path.cwd(), id="directory-tree")
+                yield Static("Files", id="sidebar-title")
+                yield ASCIITree(str(Path.cwd().name), id="directory-tree")
 
             # Main content area
             with Vertical(id="content-area"):
@@ -317,7 +325,30 @@ class KaderApp(App):
         self._check_terminal_size()
 
         # Start background update check
+        # Start background update check
         threading.Thread(target=self._check_for_updates, daemon=True).start()
+
+        # Initial tree population
+        self._refresh_directory_tree()
+
+    def _populate_tree(self, node, path: Path) -> None:
+        """Recursively populate the tree with ASCII symbols."""
+        try:
+            # Sort: directories first, then files
+            items = sorted(
+                path.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())
+            )
+            for child in items:
+                if child.name.startswith((".", "__pycache__")):
+                    continue
+
+                if child.is_dir():
+                    new_node = node.add(f"[+] {child.name}", expand=False)
+                    self._populate_tree(new_node, child)
+                else:
+                    node.add(f"{child.name}")
+        except Exception:
+            pass
 
     def _check_for_updates(self) -> None:
         """Check for package updates in background thread."""
@@ -369,7 +400,7 @@ class KaderApp(App):
         except Exception:
             if too_small:
                 # Show warning overlay
-                warning_text = f"""⚠️  Terminal Too Small
+                warning_text = f"""<!>  Terminal Too Small
 
 Current: {width}x{height}
 Minimum: {MIN_WIDTH}x{MIN_HEIGHT}
@@ -406,7 +437,7 @@ Please resize your terminal."""
             self._cycle_theme()
             theme_name = THEME_NAMES[self._current_theme_index]
             conversation.add_message(
-                f"🎨 Theme changed to **{theme_name}**!", "assistant"
+                f"{{~}} Theme changed to **{theme_name}**!", "assistant"
             )
         elif cmd == "/clear":
             conversation.clear_messages()
@@ -482,7 +513,7 @@ Please resize your terminal."""
 
         except Exception as e:
             spinner.stop()
-            error_msg = f"❌ **Error:** {str(e)}\n\nMake sure Ollama is running and the model `{self._current_model}` is available."
+            error_msg = f"(-) **Error:** {str(e)}\n\nMake sure Ollama is running and the model `{self._current_model}` is available."
             conversation.add_message(error_msg, "assistant")
             self.notify(f"Error: {e}", severity="error")
 
@@ -530,10 +561,13 @@ Please resize your terminal."""
         self.notify("Directory tree refreshed!", severity="information")
 
     def _refresh_directory_tree(self) -> None:
-        """Refresh the directory tree to show new/modified files."""
+        """Refresh the directory tree with ASCII symbols."""
         try:
-            tree = self.query_one("#directory-tree", DirectoryTree)
-            tree.reload()
+            tree = self.query_one("#directory-tree", ASCIITree)
+            tree.clear()
+            tree.root.label = str(Path.cwd().name)
+            self._populate_tree(tree.root, Path.cwd())
+            tree.root.expand()
         except Exception:
             pass  # Silently ignore if tree not found
 
@@ -550,12 +584,12 @@ Please resize your terminal."""
             self._session_manager.save_conversation(self._current_session_id, messages)
 
             conversation.add_message(
-                f"✅ Session saved!\n\n**Session ID:** `{self._current_session_id}`",
+                f"(+) Session saved!\n\n**Session ID:** `{self._current_session_id}`",
                 "assistant",
             )
             self.notify("Session saved!", severity="information")
         except Exception as e:
-            conversation.add_message(f"❌ Error saving session: {e}", "assistant")
+            conversation.add_message(f"(-) Error saving session: {e}", "assistant")
             self.notify(f"Error: {e}", severity="error")
 
     def _handle_load_session(
@@ -567,7 +601,7 @@ Please resize your terminal."""
             session = self._session_manager.get_session(session_id)
             if not session:
                 conversation.add_message(
-                    f"❌ Session `{session_id}` not found.\n\nUse `/sessions` to see available sessions.",
+                    f"(-) Session `{session_id}` not found.\n\nUse `/sessions` to see available sessions.",
                     "assistant",
                 )
                 return
@@ -589,12 +623,12 @@ Please resize your terminal."""
 
             self._current_session_id = session_id
             conversation.add_message(
-                f"✅ Session `{session_id}` loaded with {len(messages)} messages.",
+                f"(+) Session `{session_id}` loaded with {len(messages)} messages.",
                 "assistant",
             )
             self.notify("Session loaded!", severity="information")
         except Exception as e:
-            conversation.add_message(f"❌ Error loading session: {e}", "assistant")
+            conversation.add_message(f"(-) Error loading session: {e}", "assistant")
             self.notify(f"Error: {e}", severity="error")
 
     def _handle_list_sessions(self, conversation: ConversationView) -> None:
@@ -604,13 +638,13 @@ Please resize your terminal."""
 
             if not sessions:
                 conversation.add_message(
-                    "📭 No saved sessions found.\n\nUse `/save` to save the current session.",
+                    "[ ] No saved sessions found.\n\nUse `/save` to save the current session.",
                     "assistant",
                 )
                 return
 
             lines = [
-                "## Saved Sessions 📂\n",
+                "## Saved Sessions [=]\n",
                 "| Session ID | Created | Updated |",
                 "|------------|---------|---------|",
             ]
@@ -635,7 +669,7 @@ Please resize your terminal."""
             model = self._agent.provider.model
 
             lines = [
-                "## Usage Costs 💰\n",
+                "## Usage Costs ($)\n",
                 f"**Model:** `{model}`\n",
                 "### Cost Breakdown",
                 "| Type | Amount |",
@@ -654,12 +688,12 @@ Please resize your terminal."""
 
             if cost.total_cost == 0.0:
                 lines.append(
-                    "\n> 💡 *Note: Ollama runs locally, so there are no API costs.*"
+                    "\n> (!) *Note: Ollama runs locally, so there are no API costs.*"
                 )
 
             conversation.add_message("\n".join(lines), "assistant")
         except Exception as e:
-            conversation.add_message(f"❌ Error getting costs: {e}", "assistant")
+            conversation.add_message(f"(-) Error getting costs: {e}", "assistant")
             self.notify(f"Error: {e}", severity="error")
 
 

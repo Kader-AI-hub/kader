@@ -84,12 +84,12 @@ class InlineSelector(Widget, can_focus=True):
     def __init__(self, message: str, options: list[str] = None, **kwargs) -> None:
         super().__init__(**kwargs)
         self.message = message
-        self.options = options or ["✅ Yes", "❌ No"]
+        self.options = options or ["(+) Yes", "(-) No"]
 
     def compose(self) -> ComposeResult:
         from textual.containers import Horizontal
 
-        yield Static(f"🔧 {self.message}", classes="message-text")
+        yield Static(f">_ {self.message}", classes="message-text")
         yield Static(
             "↑↓ to select • Enter to confirm • Y/N for quick select",
             classes="prompt-text",
@@ -230,7 +230,7 @@ class ModelSelector(Widget, can_focus=True):
             self.selected_index = models.index(current_model)
 
     def compose(self) -> ComposeResult:
-        yield Static("🤖 Select Model", classes="title-text")
+        yield Static("(^^) Select Model", classes="title-text")
         yield Static(
             "↑↓ to navigate • Enter to select • Esc to cancel", classes="prompt-text"
         )
@@ -245,7 +245,7 @@ class ModelSelector(Widget, can_focus=True):
                     classes += " not-selected"
                 if is_current:
                     classes += " current"
-                label = f"  ▶ {model}" if is_selected else f"    {model}"
+                label = f"  >> {model}" if is_selected else f"    {model}"
                 if is_current:
                     label += " (current)"
                 yield Static(label, classes=classes, id=f"model-{i}")
@@ -272,7 +272,7 @@ class ModelSelector(Widget, can_focus=True):
             new_option.remove_class("not-selected")
             new_option.add_class("selected")
             new_model = self.models[new_index]
-            new_label = f"  ▶ {new_model}"
+            new_label = f"  >> {new_model}"
             if new_model == self.current_model:
                 new_label += " (current)"
             new_option.update(new_label)

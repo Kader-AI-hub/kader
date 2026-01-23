@@ -21,7 +21,7 @@ class LoadingSpinner(Static):
     }
     """
 
-    SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+    SPINNER_FRAMES = ["=   ", "==  ", "=== ", " ===", "  ==", "   =", "    "]
 
     frame_index: reactive[int] = reactive(0)
     is_spinning: reactive[bool] = reactive(False)
