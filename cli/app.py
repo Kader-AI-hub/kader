@@ -29,7 +29,6 @@ from kader.tools import get_default_registry
 from .utils import (
     DEFAULT_MODEL,
     HELP_TEXT,
-    THEME_NAMES,
 )
 from .widgets import ConversationView, InlineSelector, LoadingSpinner, ModelSelector
 
@@ -51,7 +50,6 @@ Type a message below to start chatting, or use one of the commands:
 
 - `/help` - Show available commands
 - `/models` - View available LLM models
-- `/theme` - Change the color theme
 - `/clear` - Clear the conversation
 - `/save` - Save current session
 - `/load` - Load a saved session
@@ -83,7 +81,6 @@ class KaderApp(App):
     BINDINGS = [
         Binding("ctrl+q", "quit", "Quit"),
         Binding("ctrl+l", "clear", "Clear"),
-        Binding("ctrl+t", "cycle_theme", "Theme"),
         Binding("ctrl+s", "save_session", "Save"),
         Binding("ctrl+r", "refresh_tree", "Refresh"),
         Binding("tab", "focus_next", "Next", show=False),
@@ -92,7 +89,6 @@ class KaderApp(App):
 
     def __init__(self) -> None:
         super().__init__()
-        self._current_theme_index = 0
         self._is_processing = False
         self._current_model = DEFAULT_MODEL
         self._current_session_id: str | None = None
@@ -433,12 +429,6 @@ Please resize your terminal."""
             conversation.add_message(HELP_TEXT, "assistant")
         elif cmd == "/models":
             await self._show_model_selector(conversation)
-        elif cmd == "/theme":
-            self._cycle_theme()
-            theme_name = THEME_NAMES[self._current_theme_index]
-            conversation.add_message(
-                f"{{~}} Theme changed to **{theme_name}**!", "assistant"
-            )
         elif cmd == "/clear":
             conversation.clear_messages()
             self._agent.memory.clear()
@@ -522,33 +512,12 @@ Please resize your terminal."""
             # Auto-refresh directory tree in case agent created/modified files
             self._refresh_directory_tree()
 
-    def _cycle_theme(self) -> None:
-        """Cycle through available themes."""
-        # Remove current theme class if it's not dark
-        current_theme = THEME_NAMES[self._current_theme_index]
-        if current_theme != "dark":
-            self.remove_class(f"theme-{current_theme}")
-
-        # Move to next theme
-        self._current_theme_index = (self._current_theme_index + 1) % len(THEME_NAMES)
-        new_theme = THEME_NAMES[self._current_theme_index]
-
-        # Apply new theme class (dark is default, no class needed)
-        if new_theme != "dark":
-            self.add_class(f"theme-{new_theme}")
-
     def action_clear(self) -> None:
         """Clear the conversation (Ctrl+L)."""
         conversation = self.query_one("#conversation-view", ConversationView)
         conversation.clear_messages()
         self._agent.memory.clear()
         self.notify("Conversation cleared!", severity="information")
-
-    def action_cycle_theme(self) -> None:
-        """Cycle theme (Ctrl+T)."""
-        self._cycle_theme()
-        theme_name = THEME_NAMES[self._current_theme_index]
-        self.notify(f"Theme: {theme_name}", severity="information")
 
     def action_save_session(self) -> None:
         """Save session (Ctrl+S)."""

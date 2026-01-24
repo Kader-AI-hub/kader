@@ -2,9 +2,6 @@
 
 from kader.providers import OllamaProvider
 
-# Theme names for cycling
-THEME_NAMES = ["dark", "ocean", "forest", "sunset"]
-
 # Default model
 DEFAULT_MODEL = "qwen3-coder:480b-cloud"
 
@@ -13,7 +10,6 @@ HELP_TEXT = """## Kader CLI Commands
 | Command | Description |
 |---------|-------------|
 | `/models` | Show available LLM models |
-| `/theme` | Cycle through color themes |
 | `/help` | Show this help message |
 | `/clear` | Clear the conversation |
 | `/save` | Save current session |
@@ -28,7 +24,6 @@ HELP_TEXT = """## Kader CLI Commands
 | Shortcut | Action |
 |----------|--------|
 | `Ctrl+L` | Clear conversation |
-| `Ctrl+T` | Cycle theme |
 | `Ctrl+S` | Save session |
 | `Ctrl+R` | Refresh file tree |
 | `Ctrl+Q` | Quit |
