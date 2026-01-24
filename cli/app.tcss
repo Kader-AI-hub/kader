@@ -42,7 +42,7 @@ Header {
     background: $primary;
     color: $text;
     text-style: bold;
-    height: 3;
+    height: 1;
     dock: top;
 }
 
@@ -75,9 +75,9 @@ FooterKey > .footer-key--key {
 /* ===== Sidebar (Directory Tree) ===== */
 
 #sidebar {
-    width: 30;
-    min-width: 20;
-    max-width: 50;
+    width: 22;
+    min-width: 18;
+    max-width: 35;
     background: $surface;
     border-right: thick $primary;
     padding: 0;
@@ -126,7 +126,6 @@ DirectoryTree:focus > .directory-tree--cursor {
 #conversation {
     height: 1fr;
     background: $background;
-    border-bottom: thick $surface;
 }
 
 ConversationView {
@@ -148,15 +147,15 @@ ConversationView {
 
 #input-container {
     height: auto;
-    min-height: 3;
-    max-height: 5;
-    background: $surface;
+    min-height: 4;
+    max-height: 7;
+    background: $background;
     padding: 1;
-    border-top: thick $primary;
+    margin-bottom: 1;
 }
 
 #prompt-input {
-    background: $background;
+    background: transparent;
     border: round $primary;
     padding: 0 1;
     height: 3;

@@ -77,7 +77,7 @@ class KaderApp(App):
     """Main Kader CLI application."""
 
     TITLE = "Kader CLI"
-    SUB_TITLE = "Modern Vibe Coding Assistant"
+    SUB_TITLE = f"v{get_version('kader')}"
     CSS_PATH = "app.tcss"
 
     BINDINGS = [
