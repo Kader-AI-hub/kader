@@ -132,6 +132,26 @@ ConversationView {
     scrollbar-size: 1 1;
 }
 
+.message-footer {
+    height: auto;
+    margin-top: 0;
+    padding: 0 1;
+    border-top: none;
+}
+
+.footer-left {
+    color: $secondary;
+    text-style: italic;
+    width: 1fr;
+}
+
+.footer-right {
+    color: $success;
+    text-style: bold;
+    text-align: right;
+    width: auto;
+}
+
 /* ===== Welcome Message ===== */
 
 #welcome {

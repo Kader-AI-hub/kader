@@ -499,7 +499,12 @@ Please resize your terminal."""
             # Hide spinner and show response (this runs on main thread via await)
             spinner.stop()
             if response and response.content:
-                conversation.add_message(response.content, "assistant")
+                conversation.add_message(
+                    response.content,
+                    "assistant",
+                    model_name=self._agent.provider.model,
+                    usage_cost=self._agent.provider.total_cost.total_cost,
+                )
 
         except Exception as e:
             spinner.stop()
