@@ -1,7 +1,7 @@
 """Conversation display widget for Kader CLI."""
 
 from textual.app import ComposeResult
-from textual.containers import VerticalScroll, Horizontal
+from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Markdown, Static
 
 
@@ -26,7 +26,9 @@ class Message(Static):
         prefix = "(**) **You:**" if self.role == "user" else "(^^) **Kader:**"
         yield Markdown(f"{prefix}\n\n{self.content}")
 
-        if self.role == "assistant" and (self.model_name or self.usage_cost is not None):
+        if self.role == "assistant" and (
+            self.model_name or self.usage_cost is not None
+        ):
             with Horizontal(classes="message-footer"):
                 model_label = f"[*] {self.model_name}" if self.model_name else ""
                 yield Static(model_label, classes="footer-left")
