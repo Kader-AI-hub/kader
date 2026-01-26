@@ -9,6 +9,7 @@ from kader.tools.exec_commands import (
     CommandExecutorTool,
 )
 
+from .agent import AgentTool
 from .base import (
     # Core classes
     BaseTool,
@@ -125,6 +126,8 @@ __all__ = [
     "CommandExecutorTool",
     # Todo Tool
     "TodoTool",
+    # Agent Tool
+    "AgentTool",
     # Helpers
     "get_default_registry",
 ]

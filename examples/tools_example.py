@@ -18,6 +18,8 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from kader.tools import (
+    # Agent Tool
+    AgentTool,
     # Command execution
     CommandExecutorTool,
     GrepTool,
@@ -371,6 +373,66 @@ def demo_tool_parameters():
     print(f"\nTool schema (first 200 chars): {str(schema)[:200]}...")
 
 
+def demo_agent_tool():
+    """Demonstrate the AgentTool that wraps a ReActAgent."""
+    print("\n=== Agent Tool Demo ===")
+
+    # Example 1: Autonomous execution (no tool interrupts)
+    print("\n--- Autonomous AgentTool ---")
+    autonomous_agent = AgentTool(
+        name="research_agent",
+        description="An agent that can research topics and perform tasks autonomously",
+        interrupt_before_tool=False,  # Default: runs without pausing
+    )
+
+    print(f"Tool created: {autonomous_agent.name}")
+    print(f"Description: {autonomous_agent.description}")
+    print(f"Category: {autonomous_agent.schema.category.value}")
+    print(f"Interrupt before tool: {autonomous_agent._interrupt_before_tool}")
+
+    # Show parameters
+    print("\nParameters:")
+    for param in autonomous_agent.schema.parameters:
+        print(
+            f"  - {param.name}: {param.description} (type: {param.type}, required: {param.required})"
+        )
+
+    # Test interruption message
+    task = "Find the current stock price of AAPL and summarize the market trends"
+    msg = autonomous_agent.get_interruption_message(task=task)
+    print(f"\nInterruption message: {msg}")
+
+    # Example 2: Interactive execution with tool confirmation
+    print("\n--- Interactive AgentTool ---")
+
+    # Define a custom confirmation callback
+    def example_callback(tool_call_dict, llm_content=None):
+        """Example callback that would normally prompt the user."""
+        # In a real scenario, this would prompt the user
+        # Return (should_execute, optional_user_feedback)
+        return (True, None)
+
+    interactive_agent = AgentTool(
+        name="interactive_agent",
+        description="An agent that confirms each tool execution with the user",
+        interrupt_before_tool=True,  # Pause before each tool
+        tool_confirmation_callback=example_callback,
+    )
+
+    print(f"Tool created: {interactive_agent.name}")
+    print(f"Interrupt before tool: {interactive_agent._interrupt_before_tool}")
+    print(
+        f"Callback provided: {interactive_agent._tool_confirmation_callback is not None}"
+    )
+
+    # Note: Actual execution would require LLM access
+    print("\n[Note] To actually run the agent, LLM access is required.")
+    print(
+        "When interrupt_before_tool=True, the agent pauses before each tool execution "
+        "for confirmation. The task completes only when the agent returns its final response."
+    )
+
+
 def main():
     """Run all tool demos."""
     print("Kader Tools Examples")
@@ -390,6 +452,7 @@ def main():
     demo_custom_tool()
     demo_async_operations()
     demo_tool_parameters()
+    demo_agent_tool()
 
     print("\n[OK] All tool demos completed!")
 
