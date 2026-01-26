@@ -38,3 +38,18 @@ class KaderPlannerPrompt(PromptBase):
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(template_path="kader_planner.j2", **kwargs)
+
+
+class ExecutorAgentPrompt(PromptBase):
+    """
+    Prompt for Executor Agent (sub-agents in PlannerExecutorWorkflow).
+
+    Emphasizes:
+    - Careful thinking before each action
+    - Safe execution with error handling
+    - Detailed step-by-step reporting of what was done
+    - Structured final answer with files created, summary, and issues
+    """
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(template_path="executor_agent.j2", **kwargs)
