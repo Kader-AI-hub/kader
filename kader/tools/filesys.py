@@ -646,5 +646,5 @@ def get_filesystem_tools(
         EditFileTool(bp, virtual_mode),
         GrepTool(bp, virtual_mode),
         GlobTool(bp, virtual_mode),
-        SearchInDirectoryTool(bp),
+        #SearchInDirectoryTool(bp), #TODO: remove search in directory from file system tools
     ]
