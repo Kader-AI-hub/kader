@@ -9,6 +9,7 @@ from kader.tools.exec_commands import (
     CommandExecutorTool,
 )
 
+from .agent import AgentTool
 from .base import (
     # Core classes
     BaseTool,
@@ -47,7 +48,6 @@ from .rag import (
     RAGSearchTool,
     SearchResult,
 )
-from .agent import AgentTool
 from .todo import TodoTool
 from .web import (
     WebFetchTool,

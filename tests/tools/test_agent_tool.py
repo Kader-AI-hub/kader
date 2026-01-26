@@ -79,7 +79,9 @@ class TestAgentToolExecution:
         mock_registry.return_value = MagicMock()
         mock_agent_instance = MagicMock()
         mock_response = MagicMock()
-        mock_response.content = "Task completed successfully. Found relevant information."
+        mock_response.content = (
+            "Task completed successfully. Found relevant information."
+        )
         mock_agent_instance.invoke.return_value = mock_response
         mock_react_agent.return_value = mock_agent_instance
 

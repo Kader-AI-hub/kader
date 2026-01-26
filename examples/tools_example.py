@@ -404,7 +404,7 @@ def demo_agent_tool():
 
     # Example 2: Interactive execution with tool confirmation
     print("\n--- Interactive AgentTool ---")
-    
+
     # Define a custom confirmation callback
     def example_callback(tool_call_dict, llm_content=None):
         """Example callback that would normally prompt the user."""
@@ -421,12 +421,12 @@ def demo_agent_tool():
 
     print(f"Tool created: {interactive_agent.name}")
     print(f"Interrupt before tool: {interactive_agent._interrupt_before_tool}")
-    print(f"Callback provided: {interactive_agent._tool_confirmation_callback is not None}")
+    print(
+        f"Callback provided: {interactive_agent._tool_confirmation_callback is not None}"
+    )
 
     # Note: Actual execution would require LLM access
-    print(
-        "\n[Note] To actually run the agent, LLM access is required."
-    )
+    print("\n[Note] To actually run the agent, LLM access is required.")
     print(
         "When interrupt_before_tool=True, the agent pauses before each tool execution "
         "for confirmation. The task completes only when the agent returns its final response."

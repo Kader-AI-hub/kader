@@ -47,7 +47,9 @@ class AgentTool(BaseTool[str]):
         provider: Optional[BaseLLMProvider] = None,
         model_name: str = "qwen3-coder:480b-cloud",
         interrupt_before_tool: bool = True,
-        tool_confirmation_callback: Optional[Callable[..., Tuple[bool, Optional[str]]]] = None,
+        tool_confirmation_callback: Optional[
+            Callable[..., Tuple[bool, Optional[str]]]
+        ] = None,
     ) -> None:
         """
         Initialize the AgentTool.
@@ -197,4 +199,3 @@ class AgentTool(BaseTool[str]):
         # Truncate long tasks for readability
         task_preview = task[:100] + "..." if len(task) > 100 else task
         return f"execute {self.name}: {task_preview}"
-
