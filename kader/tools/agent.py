@@ -7,6 +7,7 @@ Allows spawning sub-agents to execute specific tasks with isolated memory contex
 from typing import Any, Callable, Optional, Tuple
 
 from kader.memory import SlidingWindowConversationManager
+from kader.prompts import ExecutorAgentPrompt
 from kader.providers.base import BaseLLMProvider, Message
 
 from .base import BaseTool, ParameterSchema, ToolCategory
@@ -118,10 +119,14 @@ class AgentTool(BaseTool[str]):
         # Get default tools (filesystem, web, command executor)
         tools = get_default_registry()
 
-        # Create the ReActAgent with separate memory
+        # Create ExecutorAgentPrompt with tool descriptions
+        system_prompt = ExecutorAgentPrompt(tools=tools.tools)
+
+        # Create the ReActAgent with separate memory and executor prompt
         agent = ReActAgent(
             name=f"{self.name}_worker",
             tools=tools,
+            system_prompt=system_prompt,
             provider=self._provider,
             memory=memory,
             model_name=self._model_name,
@@ -173,10 +178,14 @@ class AgentTool(BaseTool[str]):
         # Get default tools (filesystem, web, command executor)
         tools = get_default_registry()
 
-        # Create the ReActAgent with separate memory
+        # Create ExecutorAgentPrompt with tool descriptions
+        system_prompt = ExecutorAgentPrompt(tools=tools.tools)
+
+        # Create the ReActAgent with separate memory and executor prompt
         agent = ReActAgent(
             name=f"{self.name}_worker",
             tools=tools,
+            system_prompt=system_prompt,
             provider=self._provider,
             memory=memory,
             model_name=self._model_name,
