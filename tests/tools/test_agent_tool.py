@@ -41,13 +41,13 @@ class TestAgentToolInit:
         tool = AgentTool(name="test_agent")
 
         assert len(tool.schema.parameters) == 2
-        
+
         # Check task param
         task_param = tool.schema.parameters[0]
         assert task_param.name == "task"
         assert task_param.type == "string"
         assert task_param.required is True
-        
+
         # Check context param
         context_param = tool.schema.parameters[1]
         assert context_param.name == "context"
