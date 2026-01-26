@@ -38,4 +38,3 @@ class KaderPlannerPrompt(PromptBase):
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(template_path="kader_planner.j2", **kwargs)
-
