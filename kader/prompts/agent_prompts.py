@@ -25,3 +25,17 @@ class PlanningAgentPrompt(PromptBase):
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(template_path="planning_agent.j2", **kwargs)
+
+
+class KaderPlannerPrompt(PromptBase):
+    """
+    Prompt for Kader Planner Agent.
+
+    Enhanced planning prompt with specific instructions for:
+    - Using Agent as a Tool with proper task/context parameters
+    - Tracking completed actions to avoid repetition
+    """
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(template_path="kader_planner.j2", **kwargs)
+

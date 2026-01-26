@@ -1,4 +1,9 @@
-from .agent_prompts import BasicAssistancePrompt, PlanningAgentPrompt, ReActAgentPrompt
+from .agent_prompts import (
+    BasicAssistancePrompt,
+    KaderPlannerPrompt,
+    PlanningAgentPrompt,
+    ReActAgentPrompt,
+)
 from .base import PromptBase
 
 __all__ = [
@@ -6,4 +11,5 @@ __all__ = [
     "BasicAssistancePrompt",
     "ReActAgentPrompt",
     "PlanningAgentPrompt",
+    "KaderPlannerPrompt",
 ]
