@@ -15,6 +15,7 @@ Kader is an intelligent coding agent designed to assist with software developmen
 - 🔄 **ReAct Agent Framework** - Reasoning and Acting agent architecture
 - 🗂️ **File System Tools** - Read, write, search, and edit files
 - 🔍 **Planning Agent** - Task planning and execution capabilities
+- 🤝 **Agent-As-Tool** - Spawn sub-agents for specific tasks with isolated memory
 
 ## Installation
 
@@ -160,6 +161,40 @@ Kader provides several agent types:
 - **PlanningAgent**: Agent that plans multi-step tasks
 - **BaseAgent**: Base agent class for creating custom agents
 
+### Agent-As-Tool (AgentTool)
+
+The `AgentTool` allows you to wrap a `ReActAgent` as a callable tool, enabling agents to spawn sub-agents for specific tasks with isolated memory contexts.
+
+```python
+from kader.tools import AgentTool
+
+# Autonomous execution (runs without pausing for confirmation)
+autonomous_agent = AgentTool(
+    name="research_agent",
+    description="Research topics autonomously",
+    interrupt_before_tool=False,
+)
+result = autonomous_agent.execute(task="Find info about topic X")
+
+# Interactive execution (pauses for user confirmation before each tool)
+def my_callback(tool_call_dict, llm_content=None):
+    user_input = input("Execute? [y/n]: ")
+    return (user_input.lower() == 'y', None)
+
+interactive_agent = AgentTool(
+    name="interactive_agent",
+    interrupt_before_tool=True,
+    tool_confirmation_callback=my_callback,
+)
+result = interactive_agent.execute(task="Analyze data and generate report")
+```
+
+**Key Features:**
+- Each sub-agent has isolated memory (separate `SlidingWindowConversationManager`)
+- Default tools included: filesystem, web search, command executor
+- Optional `interrupt_before_tool` for user confirmation before tool execution
+- Task completes when the agent returns its final response
+
 ### Memory Management
 
 Kader's memory system includes:
@@ -177,6 +212,7 @@ Kader includes a rich set of tools:
 - **Command Executor**: Execute shell commands safely
 - **Web Tools**: Search and fetch web content
 - **RAG Tools**: Retrieval Augmented Generation capabilities
+- **AgentTool**: Spawn sub-agents for specific tasks
 
 ## Examples
 
