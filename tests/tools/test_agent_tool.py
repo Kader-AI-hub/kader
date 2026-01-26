@@ -129,7 +129,7 @@ class TestAgentToolExecution:
     @patch("kader.agent.agents.ReActAgent")
     @patch("kader.tools.get_default_registry")
     def test_agent_created_with_no_interrupt(self, mock_registry, mock_react_agent):
-        """Test that sub-agent is created with interrupt_before_tool=False."""
+        """Test that sub-agent is created with interrupt_before_tool=True."""
         mock_registry.return_value = MagicMock()
         mock_agent_instance = MagicMock()
         mock_response = MagicMock()
@@ -141,9 +141,9 @@ class TestAgentToolExecution:
         tool = AgentTool(name="test_agent")
         tool.execute(task="Test task")
 
-        # Verify the agent was created with interrupt_before_tool=False
+        # Verify the agent was created with interrupt_before_tool=True
         call_kwargs = mock_react_agent.call_args[1]
-        assert call_kwargs["interrupt_before_tool"] is False
+        assert call_kwargs["interrupt_before_tool"] is True
 
 
 @pytest.mark.asyncio
