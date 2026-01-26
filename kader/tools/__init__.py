@@ -47,6 +47,7 @@ from .rag import (
     RAGSearchTool,
     SearchResult,
 )
+from .agent import AgentTool
 from .todo import TodoTool
 from .web import (
     WebFetchTool,
@@ -125,6 +126,8 @@ __all__ = [
     "CommandExecutorTool",
     # Todo Tool
     "TodoTool",
+    # Agent Tool
+    "AgentTool",
     # Helpers
     "get_default_registry",
 ]
