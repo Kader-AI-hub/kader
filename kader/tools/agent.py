@@ -7,7 +7,7 @@ Allows spawning sub-agents to execute specific tasks with isolated memory contex
 from typing import Any, Callable, Optional, Tuple
 
 from kader.memory import SlidingWindowConversationManager
-from kader.providers.base import BaseLLMProvider
+from kader.providers.base import BaseLLMProvider, Message
 
 from .base import BaseTool, ParameterSchema, ToolCategory
 
@@ -76,6 +76,12 @@ class AgentTool(BaseTool[str]):
                     description="The specific task for the agent to execute",
                     required=True,
                 ),
+                ParameterSchema(
+                    name="context",
+                    type="string",
+                    description="Context to provide to the agent before executing the task",
+                    required=True,
+                ),
             ],
             category=ToolCategory.UTILITY,
         )
@@ -84,7 +90,7 @@ class AgentTool(BaseTool[str]):
         self._interrupt_before_tool = interrupt_before_tool
         self._tool_confirmation_callback = tool_confirmation_callback
 
-    def execute(self, task: str) -> str:
+    def execute(self, task: str, context: str) -> str:
         """
         Execute a task using a ReActAgent with isolated memory.
 
@@ -94,6 +100,7 @@ class AgentTool(BaseTool[str]):
 
         Args:
             task: The task to execute.
+            context: Context to add to memory before the task.
 
         Returns:
             A summary of what the agent accomplished.
@@ -104,6 +111,9 @@ class AgentTool(BaseTool[str]):
 
         # Create a fresh memory manager for isolated context
         memory = SlidingWindowConversationManager(window_size=20)
+
+        # Add context to memory as user message
+        memory.add_message(Message.user(context))
 
         # Get default tools (filesystem, web, command executor)
         tools = get_default_registry()
@@ -135,7 +145,7 @@ class AgentTool(BaseTool[str]):
         except Exception as e:
             return f"Agent execution failed: {str(e)}"
 
-    async def aexecute(self, task: str) -> str:
+    async def aexecute(self, task: str, context: str) -> str:
         """
         Asynchronously execute a task using a ReActAgent.
 
@@ -145,6 +155,7 @@ class AgentTool(BaseTool[str]):
 
         Args:
             task: The task to execute.
+            context: Context to add to memory before the task.
 
         Returns:
             A summary of what the agent accomplished.
@@ -155,6 +166,9 @@ class AgentTool(BaseTool[str]):
 
         # Create a fresh memory manager for isolated context
         memory = SlidingWindowConversationManager(window_size=20)
+
+        # Add context to memory as user message
+        memory.add_message(Message.user(context))
 
         # Get default tools (filesystem, web, command executor)
         tools = get_default_registry()

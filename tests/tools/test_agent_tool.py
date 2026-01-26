@@ -40,11 +40,19 @@ class TestAgentToolInit:
         """Test that the tool has correct parameters."""
         tool = AgentTool(name="test_agent")
 
-        assert len(tool.schema.parameters) == 1
-        param = tool.schema.parameters[0]
-        assert param.name == "task"
-        assert param.type == "string"
-        assert param.required is True
+        assert len(tool.schema.parameters) == 2
+        
+        # Check task param
+        task_param = tool.schema.parameters[0]
+        assert task_param.name == "task"
+        assert task_param.type == "string"
+        assert task_param.required is True
+        
+        # Check context param
+        context_param = tool.schema.parameters[1]
+        assert context_param.name == "context"
+        assert context_param.type == "string"
+        assert context_param.required is True
 
 
 class TestAgentToolInterruptionMessage:
@@ -87,7 +95,7 @@ class TestAgentToolExecution:
 
         # Execute
         tool = AgentTool(name="test_agent")
-        result = tool.execute(task="Test task")
+        result = tool.execute(task="Test task", context="Test context")
 
         # Verify
         assert result == "Task completed successfully. Found relevant information."
@@ -105,7 +113,7 @@ class TestAgentToolExecution:
 
         # Execute
         tool = AgentTool(name="test_agent")
-        result = tool.execute(task="Test task")
+        result = tool.execute(task="Test task", context="Test context")
 
         # Verify
         assert result == "Dict response"
@@ -122,7 +130,7 @@ class TestAgentToolExecution:
 
         # Execute
         tool = AgentTool(name="test_agent")
-        result = tool.execute(task="Test task")
+        result = tool.execute(task="Test task", context="Test context")
 
         # Verify error handling
         assert "Agent execution failed" in result
@@ -141,7 +149,7 @@ class TestAgentToolExecution:
 
         # Execute
         tool = AgentTool(name="test_agent")
-        tool.execute(task="Test task")
+        tool.execute(task="Test task", context="Test context")
 
         # Verify the agent was created with interrupt_before_tool=True
         call_kwargs = mock_react_agent.call_args[1]
@@ -171,7 +179,7 @@ class TestAgentToolAsyncExecution:
 
         # Execute
         tool = AgentTool(name="test_agent")
-        result = await tool.aexecute(task="Async test task")
+        result = await tool.aexecute(task="Async test task", context="Async context")
 
         # Verify
         assert result == "Async task completed"
