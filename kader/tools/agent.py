@@ -4,13 +4,60 @@ Agent Tool - Use a ReActAgent as a callable tool.
 Allows spawning sub-agents to execute specific tasks with isolated memory contexts.
 """
 
+import uuid
+from pathlib import Path
 from typing import Any, Callable, Optional, Tuple
 
 from kader.memory import SlidingWindowConversationManager
+from kader.memory.types import save_json
 from kader.prompts import ExecutorAgentPrompt
 from kader.providers.base import BaseLLMProvider, Message
 
 from .base import BaseTool, ParameterSchema, ToolCategory
+
+
+class PersistentSlidingWindowConversationManager(SlidingWindowConversationManager):
+    """
+    SlidingWindowConversationManager with JSON persistence.
+
+    Saves the entire message history (dict format) to a JSON file
+    after every add_message(s) call.
+    """
+
+    def __init__(self, file_path: Path, window_size: int = 20) -> None:
+        """
+        Initialize with a file path for persistence.
+        """
+        super().__init__(window_size=window_size)
+        self.file_path = file_path
+
+    def _save(self) -> None:
+        """Save entire history to JSON."""
+        try:
+            # We want to save plain dicts
+            messages_dicts = [msg.message for msg in self._messages]
+            data = {"messages": messages_dicts}
+            # Ensure parent temp-directory exists is done by caller usually,
+            # but best effort here:
+            self.file_path.parent.mkdir(parents=True, exist_ok=True)
+            save_json(self.file_path, data)
+        except Exception:
+            # Best effort save
+            pass
+
+    def add_message(self, message: Any) -> Any:
+        # Call super
+        result = super().add_message(message)
+        # Save
+        self._save()
+        return result
+
+    def add_messages(self, messages: list[Any]) -> list[Any]:
+        # Call super
+        result = super().add_messages(messages)
+        # Save
+        self._save()
+        return result
 
 
 class AgentTool(BaseTool[str]):
@@ -111,7 +158,18 @@ class AgentTool(BaseTool[str]):
         from kader.tools import get_default_registry
 
         # Create a fresh memory manager for isolated context
-        memory = SlidingWindowConversationManager(window_size=20)
+        # Persistence: ~/.kader/memory/sessions/<main-session-id>/executors/<agent-name>-<id>.json
+        execution_id = str(uuid.uuid4())
+        # Use propagated session ID or 'standalone' if not set
+        main_session_id = self._session_id if self._session_id else "standalone"
+
+        home = Path.home()
+        memory_dir = home / ".kader" / "memory" / "sessions" / main_session_id / "executors" / f"{self.name}-{execution_id}"
+        memory_file = memory_dir / "conversation.json"
+
+        memory = PersistentSlidingWindowConversationManager(
+            file_path=memory_file, window_size=20
+        )
 
         # Add context to memory as user message
         memory.add_message(Message.user(context))
@@ -170,7 +228,18 @@ class AgentTool(BaseTool[str]):
         from kader.tools import get_default_registry
 
         # Create a fresh memory manager for isolated context
-        memory = SlidingWindowConversationManager(window_size=20)
+        # Persistence: ~/.kader/memory/sessions/<main-session-id>/executors/<agent-name>-<id>.json
+        execution_id = str(uuid.uuid4())
+        # Use propagated session ID or 'standalone' if not set
+        main_session_id = self._session_id if self._session_id else "standalone"
+
+        home = Path.home()
+        memory_dir = home / ".kader" / "memory" / "sessions" / main_session_id / "executors" / f"{self.name}-{execution_id}"
+        memory_file = memory_dir / "conversation.json"
+
+        memory = PersistentSlidingWindowConversationManager(
+            file_path=memory_file, window_size=20
+        )
 
         # Add context to memory as user message
         memory.add_message(Message.user(context))
