@@ -14,20 +14,39 @@ from kader.providers.ollama import OllamaProvider
 
 
 CHECKPOINT_SYSTEM_PROMPT = """You are an assistant that summarizes agent conversation histories.
-Given a conversation between a user and an AI agent, create a clear step-by-step summary in markdown format.
+Given a conversation between a user and an AI agent, create a structured summary in markdown format.
 
-Your summary should:
-1. Be organized chronologically
-2. Highlight key actions taken by the agent
-3. Note any tool calls and their results
-4. Summarize the user's requests and the agent's responses
-5. Use clear, natural language
+Your summary MUST include the following sections:
 
-Format the output as a markdown document with:
-- A title summarizing the overall conversation goal
-- Numbered steps describing the progression
-- Code blocks for any code or commands mentioned
-- Bullet points for details within each step
+## Directory Structure
+List the directory structure of any files/folders created or modified during the conversation.
+Use a tree-like format:
+```
+project/
+├── src/
+│   └── main.py
+└── README.md
+```
+
+## Created Files
+For each file that was created, show its full content in a code block with the appropriate language.
+Format:
+### `filename.ext`
+```language
+file content here
+```
+
+## Todo List
+List all todo items mentioned or tracked during the conversation with their status:
+- [x] Completed item
+- [ ] Pending item
+
+## Actions Performed
+Numbered list of actions taken by the agent in chronological order:
+1. Action description
+2. Action description
+
+If a section has no relevant content, write "None" under that section.
 """
 
 
@@ -142,23 +161,40 @@ class Checkpointer:
 
         return "\n".join(lines)
 
-    def _generate_summary(self, conversation_text: str) -> str:
+    def _generate_summary(self, conversation_text: str, existing_checkpoint: str | None = None) -> str:
         """
-        Generate a step-by-step summary using the LLM.
+        Generate a step-by-step summary using the LLM (synchronous).
 
         Args:
             conversation_text: Formatted conversation text
+            existing_checkpoint: Existing checkpoint content to update, if any
 
         Returns:
             Markdown summary of the conversation
         """
-        user_prompt = f"""Please analyze this agent conversation and create a step-by-step summary in markdown:
+        if existing_checkpoint:
+            user_prompt = f"""Here is the existing checkpoint from previous iterations:
+
+---
+{existing_checkpoint}
+---
+
+Here is the new conversation to incorporate:
 
 ---
 {conversation_text}
 ---
 
-Create a clear, organized summary of what happened in this conversation."""
+Update the existing checkpoint by incorporating the new information. Merge new items into the existing sections.
+Keep all previously documented content and add new content from this iteration."""
+        else:
+            user_prompt = f"""Please analyze this agent conversation and create a checkpoint summary:
+
+---
+{conversation_text}
+---
+
+Create a structured summary following the format specified."""
 
         messages = [
             Message.system(CHECKPOINT_SYSTEM_PROMPT),
@@ -168,9 +204,71 @@ Create a clear, organized summary of what happened in this conversation."""
         response = self._provider.invoke(messages)
         return response.content
 
+    async def _agenerate_summary(self, conversation_text: str, existing_checkpoint: str | None = None) -> str:
+        """
+        Generate a step-by-step summary using the LLM (asynchronous).
+
+        Args:
+            conversation_text: Formatted conversation text
+            existing_checkpoint: Existing checkpoint content to update, if any
+
+        Returns:
+            Markdown summary of the conversation
+        """
+        if existing_checkpoint:
+            user_prompt = f"""Here is the existing checkpoint from previous iterations:
+
+---
+{existing_checkpoint}
+---
+
+Here is the new conversation to incorporate:
+
+---
+{conversation_text}
+---
+
+Update the existing checkpoint by incorporating the new information. Merge new items into the existing sections.
+Keep all previously documented content and add new content from this iteration."""
+        else:
+            user_prompt = f"""Please analyze this agent conversation and create a checkpoint summary:
+
+---
+{conversation_text}
+---
+
+Create a structured summary following the format specified."""
+
+        messages = [
+            Message.system(CHECKPOINT_SYSTEM_PROMPT),
+            Message.user(user_prompt),
+        ]
+
+        response = await self._provider.ainvoke(messages)
+        return response.content
+
+    def _load_existing_checkpoint(self, checkpoint_path: Path) -> str | None:
+        """
+        Load existing checkpoint content if it exists.
+
+        Args:
+            checkpoint_path: Path to the checkpoint file
+
+        Returns:
+            Checkpoint content if exists, None otherwise
+        """
+        if checkpoint_path.exists():
+            try:
+                return checkpoint_path.read_text(encoding="utf-8")
+            except Exception:
+                return None
+        return None
+
     def generate_checkpoint(self, memory_path: str) -> str:
         """
-        Generate a checkpoint markdown file from an agent's memory.
+        Generate a checkpoint markdown file from an agent's memory (synchronous).
+
+        If a checkpoint already exists, it will be updated instead of overwritten.
 
         Args:
             memory_path: Relative path within ~/.kader/memory/sessions/
@@ -197,12 +295,59 @@ Create a clear, organized summary of what happened in this conversation."""
         if not messages:
             raise ValueError(f"No messages found in memory file: {path}")
 
+        # Check for existing checkpoint
+        checkpoint_path = path.parent / "checkpoint.md"
+        existing_checkpoint = self._load_existing_checkpoint(checkpoint_path)
+
         # Format and generate summary
         conversation_text = self._format_conversation_for_prompt(messages)
-        summary = self._generate_summary(conversation_text)
+        summary = self._generate_summary(conversation_text, existing_checkpoint)
 
         # Save checkpoint markdown
+        checkpoint_path.write_text(summary, encoding="utf-8")
+
+        return str(checkpoint_path)
+
+    async def agenerate_checkpoint(self, memory_path: str) -> str:
+        """
+        Generate a checkpoint markdown file from an agent's memory (asynchronous).
+
+        If a checkpoint already exists, it will be updated instead of overwritten.
+
+        Args:
+            memory_path: Relative path within ~/.kader/memory/sessions/
+                         (e.g., "session-id/conversation.json")
+                         Or absolute path to the memory JSON file.
+
+        Returns:
+            Absolute path to the generated markdown file
+
+        Raises:
+            FileNotFoundError: If the memory file doesn't exist
+            ValueError: If no messages found in memory
+        """
+        # Resolve path
+        path = Path(memory_path)
+        if not path.is_absolute():
+            base_dir = get_default_memory_dir() / "sessions"
+            path = base_dir / memory_path
+
+        # Load and parse memory
+        memory_data = self._load_memory(path)
+        messages = self._extract_messages(memory_data)
+
+        if not messages:
+            raise ValueError(f"No messages found in memory file: {path}")
+
+        # Check for existing checkpoint
         checkpoint_path = path.parent / "checkpoint.md"
+        existing_checkpoint = self._load_existing_checkpoint(checkpoint_path)
+
+        # Format and generate summary
+        conversation_text = self._format_conversation_for_prompt(messages)
+        summary = await self._agenerate_summary(conversation_text, existing_checkpoint)
+
+        # Save checkpoint markdown
         checkpoint_path.write_text(summary, encoding="utf-8")
 
         return str(checkpoint_path)
