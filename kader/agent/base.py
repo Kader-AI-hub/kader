@@ -346,6 +346,20 @@ class BaseAgent:
         # Default: use console input
         print(display_str)
 
+        # Direct execution for specific tools (Show message but don't ask)
+        # We need to extract the tool name effectively
+        fn_info = tool_call_dict.get("function", {})
+        if not fn_info and "name" in tool_call_dict:
+            fn_info = tool_call_dict
+        
+        tool_name = fn_info.get("name", "")
+        
+        # List of tools to execute directly
+        direct_execution_tools = {"read_file", "glob", "grep", "read_directory", "read_dir"}
+        
+        if tool_name in direct_execution_tools:
+            return True, None
+
         while True:
             user_input = input("\nExecute this tool? (yes/no): ").strip().lower()
 
