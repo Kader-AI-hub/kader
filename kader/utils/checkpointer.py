@@ -28,19 +28,6 @@ project/
 └── README.md
 ```
 
-## Created Files
-For each file that was created, show its full content in a code block with the appropriate language.
-Format:
-### `filename.ext`
-```language
-file content here
-```
-
-## Todo List
-List all todo items mentioned or tracked during the conversation with their status:
-- [x] Completed item
-- [ ] Pending item
-
 ## Actions Performed
 Numbered list of actions taken by the agent in chronological order:
 1. Action description
