@@ -12,7 +12,7 @@ from kader.memory import SlidingWindowConversationManager
 from kader.memory.types import save_json
 from kader.prompts import ExecutorAgentPrompt
 from kader.providers.base import BaseLLMProvider, Message
-from kader.utils import Checkpointer
+from kader.utils import Checkpointer, ContextAggregator
 
 from .base import BaseTool, ParameterSchema, ToolCategory
 
@@ -139,6 +139,32 @@ class AgentTool(BaseTool[str]):
         self._interrupt_before_tool = interrupt_before_tool
         self._tool_confirmation_callback = tool_confirmation_callback
 
+    def _load_aggregated_context(self, main_session_id: str) -> str | None:
+        """
+        Load the aggregated checkpoint from executors directory if it exists.
+
+        Args:
+            main_session_id: The main session ID
+
+        Returns:
+            Content of the aggregated checkpoint, or None if not found
+        """
+        if main_session_id == "standalone":
+            return None
+
+        home = Path.home()
+        aggregated_path = (
+            home / ".kader" / "memory" / "sessions" / main_session_id
+            / "executors" / "checkpoint.md"
+        )
+
+        if aggregated_path.exists():
+            try:
+                return aggregated_path.read_text(encoding="utf-8")
+            except Exception:
+                return None
+        return None
+
     def execute(self, task: str, context: str) -> str:
         """
         Execute a task using a ReActAgent with isolated memory.
@@ -172,8 +198,15 @@ class AgentTool(BaseTool[str]):
             file_path=memory_file, window_size=20
         )
 
+        # Load aggregated context from previous executors
+        aggregated_context = self._load_aggregated_context(main_session_id)
+        if aggregated_context:
+            full_context = f"## Previous Executor Context\n{aggregated_context}\n\n## Current Task Context\n{context}"
+        else:
+            full_context = context
+
         # Add context to memory as user message
-        memory.add_message(Message.user(context))
+        memory.add_message(Message.user(full_context))
 
         # Get default tools (filesystem, web, command executor)
         tools = get_default_registry()
@@ -198,11 +231,19 @@ class AgentTool(BaseTool[str]):
             # The agent will handle tool interruptions internally
             response = agent.invoke(task)
 
-            # Generate checkpoint and return its content
+            # Generate checkpoint and aggregate it
             try:
                 checkpointer = Checkpointer()
                 checkpoint_path = checkpointer.generate_checkpoint(str(memory_file))
                 checkpoint_content = Path(checkpoint_path).read_text(encoding="utf-8")
+
+                # Aggregate the checkpoint into the main executors checkpoint
+                if main_session_id != "standalone":
+                    aggregator = ContextAggregator(session_id=main_session_id)
+                    # Use relative path from executors directory
+                    relative_path = f"{self.name}-{execution_id}/checkpoint.md"
+                    aggregator.aggregate(relative_path, subagent_name=self.name)
+
                 return checkpoint_content
             except Exception:
                 # Fallback to raw response if checkpointing fails
@@ -249,8 +290,15 @@ class AgentTool(BaseTool[str]):
             file_path=memory_file, window_size=20
         )
 
+        # Load aggregated context from previous executors
+        aggregated_context = self._load_aggregated_context(main_session_id)
+        if aggregated_context:
+            full_context = f"## Previous Executor Context\n{aggregated_context}\n\n## Current Task Context\n{context}"
+        else:
+            full_context = context
+
         # Add context to memory as user message
-        memory.add_message(Message.user(context))
+        memory.add_message(Message.user(full_context))
 
         # Get default tools (filesystem, web, command executor)
         tools = get_default_registry()
@@ -275,11 +323,19 @@ class AgentTool(BaseTool[str]):
             # The agent will handle tool interruptions internally
             response = await agent.ainvoke(task)
 
-            # Generate checkpoint and return its content
+            # Generate checkpoint and aggregate it
             try:
                 checkpointer = Checkpointer()
                 checkpoint_path = await checkpointer.agenerate_checkpoint(str(memory_file))
                 checkpoint_content = Path(checkpoint_path).read_text(encoding="utf-8")
+
+                # Aggregate the checkpoint into the main executors checkpoint
+                if main_session_id != "standalone":
+                    aggregator = ContextAggregator(session_id=main_session_id)
+                    # Use relative path from executors directory
+                    relative_path = f"{self.name}-{execution_id}/checkpoint.md"
+                    await aggregator.aaggregate(relative_path, subagent_name=self.name)
+
                 return checkpoint_content
             except Exception:
                 # Fallback to raw response if checkpointing fails
