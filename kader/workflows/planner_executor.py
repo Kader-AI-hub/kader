@@ -5,13 +5,17 @@ Orchestrates a PlanningAgent with TodoTool and AgentTool to break down tasks
 and delegate sub-tasks to executor agents.
 """
 
+import uuid
+from pathlib import Path
 from typing import Callable, Optional, Tuple
 
 from kader.agent.agents import PlanningAgent
 from kader.memory import SlidingWindowConversationManager
+from kader.memory.types import get_default_memory_dir
 from kader.prompts import KaderPlannerPrompt
 from kader.providers.base import BaseLLMProvider, Message
 from kader.tools import AgentTool, TodoTool, ToolRegistry
+from kader.utils import Checkpointer
 
 from .base import BaseWorkflow
 
@@ -66,11 +70,36 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         )
         self.tool_confirmation_callback = tool_confirmation_callback
         self.use_persistence = use_persistence
-        self.session_id = session_id
+        self.session_id = session_id if session_id else str(uuid.uuid4())
         self.executor_names = executor_names or ["executor"]
 
         # Build the planner agent with tools
         self._planner = self._build_planner()
+
+    def _load_checkpoint_context(self) -> Optional[str]:
+        """
+        Load checkpoint context from the session directory if it exists.
+
+        Returns:
+            The checkpoint markdown content if file exists, None otherwise.
+        """
+        if not self.session_id:
+            return None
+
+        checkpoint_path = (
+            get_default_memory_dir()
+            / "sessions"
+            / self.session_id
+            / "checkpoint.md"
+        )
+
+        if checkpoint_path.exists():
+            try:
+                return checkpoint_path.read_text(encoding="utf-8")
+            except Exception:
+                return None
+
+        return None
 
     def _build_planner(self) -> PlanningAgent:
         """Build the PlanningAgent with TodoTool and AgentTool(s)."""
@@ -98,8 +127,14 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         # Create memory for the planner
         memory = SlidingWindowConversationManager(window_size=20)
 
-        # Create the Kader system prompt with tool descriptions
-        system_prompt = KaderPlannerPrompt(tools=registry.tools)
+        # Load checkpoint context if it exists from previous iterations
+        checkpoint_context = self._load_checkpoint_context()
+
+        # Create the Kader system prompt with tool descriptions and context
+        system_prompt = KaderPlannerPrompt(
+            tools=registry.tools,
+            context=checkpoint_context,
+        )
 
         # Build the PlanningAgent
         # Note: The planner itself runs without interruption (TodoTool, AgentTool execute directly)
@@ -131,6 +166,25 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         formatted_output = f"[{executor_name} completed]: {output}"
         self._planner.memory.add_message(Message.assistant(formatted_output))
 
+    def _create_checkpoint(self) -> Optional[str]:
+        """
+        Create a checkpoint of the current session using the Checkpointer.
+
+        Returns:
+            Path to the checkpoint file if created, None otherwise.
+        """
+        if not self.session_id or not self.use_persistence:
+            return None
+
+        try:
+            checkpointer = Checkpointer()
+            memory_path = f"{self.session_id}/conversation.json"
+            checkpoint_path = checkpointer.generate_checkpoint(memory_path)
+            return checkpoint_path
+        except Exception:
+            # Silently fail if checkpointing fails - don't interrupt workflow
+            return None
+
     def run(self, task: str) -> str:
         """
         Execute the planner-executor workflow synchronously.
@@ -149,6 +203,9 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         # 4. Continue until all tasks are done
 
         response = self._planner.invoke(task)
+
+        # Create checkpoint after execution completes
+        self._create_checkpoint()
 
         # Extract content from response
         if hasattr(response, "content"):
@@ -169,6 +226,9 @@ class PlannerExecutorWorkflow(BaseWorkflow):
             Final response from the planner summarizing completed work.
         """
         response = await self._planner.ainvoke(task)
+
+        # Create checkpoint after execution completes
+        self._create_checkpoint()
 
         if hasattr(response, "content"):
             return str(response.content)
