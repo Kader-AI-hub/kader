@@ -12,6 +12,7 @@ from kader.memory import SlidingWindowConversationManager
 from kader.memory.types import save_json
 from kader.prompts import ExecutorAgentPrompt
 from kader.providers.base import BaseLLMProvider, Message
+from kader.utils import Checkpointer
 
 from .base import BaseTool, ParameterSchema, ToolCategory
 
@@ -197,13 +198,20 @@ class AgentTool(BaseTool[str]):
             # The agent will handle tool interruptions internally
             response = agent.invoke(task)
 
-            # Extract and return the response content
-            if hasattr(response, "content"):
-                return str(response.content)
-            elif isinstance(response, dict):
-                return str(response.get("content", str(response)))
-            else:
-                return str(response)
+            # Generate checkpoint and return its content
+            try:
+                checkpointer = Checkpointer()
+                checkpoint_path = checkpointer.generate_checkpoint(str(memory_file))
+                checkpoint_content = Path(checkpoint_path).read_text(encoding="utf-8")
+                return checkpoint_content
+            except Exception:
+                # Fallback to raw response if checkpointing fails
+                if hasattr(response, "content"):
+                    return str(response.content)
+                elif isinstance(response, dict):
+                    return str(response.get("content", str(response)))
+                else:
+                    return str(response)
 
         except Exception as e:
             return f"Agent execution failed: {str(e)}"
@@ -267,13 +275,20 @@ class AgentTool(BaseTool[str]):
             # The agent will handle tool interruptions internally
             response = await agent.ainvoke(task)
 
-            # Extract and return the response content
-            if hasattr(response, "content"):
-                return str(response.content)
-            elif isinstance(response, dict):
-                return str(response.get("content", str(response)))
-            else:
-                return str(response)
+            # Generate checkpoint and return its content
+            try:
+                checkpointer = Checkpointer()
+                checkpoint_path = await checkpointer.agenerate_checkpoint(str(memory_file))
+                checkpoint_content = Path(checkpoint_path).read_text(encoding="utf-8")
+                return checkpoint_content
+            except Exception:
+                # Fallback to raw response if checkpointing fails
+                if hasattr(response, "content"):
+                    return str(response.content)
+                elif isinstance(response, dict):
+                    return str(response.get("content", str(response)))
+                else:
+                    return str(response)
 
         except Exception as e:
             return f"Agent execution failed: {str(e)}"
