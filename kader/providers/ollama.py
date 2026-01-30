@@ -437,7 +437,11 @@ class OllamaProvider(BaseLLMProvider):
                 model
                 for model, config in models_config.items()
                 if config.capabilities
-                in [["completion", "tools", "thinking"], ["completion", "tools"]]
+                in [
+                    ["completion", "tools", "thinking"],
+                    ["completion", "tools"],
+                    ["completion", "tools", "thinking", "vision"],
+                ]
             ]
         except Exception:
             return []

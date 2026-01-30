@@ -4,12 +4,61 @@ Agent Tool - Use a ReActAgent as a callable tool.
 Allows spawning sub-agents to execute specific tasks with isolated memory contexts.
 """
 
+import uuid
+from pathlib import Path
 from typing import Any, Callable, Optional, Tuple
 
 from kader.memory import SlidingWindowConversationManager
-from kader.providers.base import BaseLLMProvider
+from kader.memory.types import save_json
+from kader.prompts import ExecutorAgentPrompt
+from kader.providers.base import BaseLLMProvider, Message
+from kader.utils import Checkpointer, ContextAggregator
 
 from .base import BaseTool, ParameterSchema, ToolCategory
+
+
+class PersistentSlidingWindowConversationManager(SlidingWindowConversationManager):
+    """
+    SlidingWindowConversationManager with JSON persistence.
+
+    Saves the entire message history (dict format) to a JSON file
+    after every add_message(s) call.
+    """
+
+    def __init__(self, file_path: Path, window_size: int = 20) -> None:
+        """
+        Initialize with a file path for persistence.
+        """
+        super().__init__(window_size=window_size)
+        self.file_path = file_path
+
+    def _save(self) -> None:
+        """Save entire history to JSON."""
+        try:
+            # We want to save plain dicts
+            messages_dicts = [msg.message for msg in self._messages]
+            data = {"messages": messages_dicts}
+            # Ensure parent temp-directory exists is done by caller usually,
+            # but best effort here:
+            self.file_path.parent.mkdir(parents=True, exist_ok=True)
+            save_json(self.file_path, data)
+        except Exception:
+            # Best effort save
+            pass
+
+    def add_message(self, message: Any) -> Any:
+        # Call super
+        result = super().add_message(message)
+        # Save
+        self._save()
+        return result
+
+    def add_messages(self, messages: list[Any]) -> list[Any]:
+        # Call super
+        result = super().add_messages(messages)
+        # Save
+        self._save()
+        return result
 
 
 class AgentTool(BaseTool[str]):
@@ -76,6 +125,12 @@ class AgentTool(BaseTool[str]):
                     description="The specific task for the agent to execute",
                     required=True,
                 ),
+                ParameterSchema(
+                    name="context",
+                    type="string",
+                    description="Context to provide to the agent before executing the task",
+                    required=True,
+                ),
             ],
             category=ToolCategory.UTILITY,
         )
@@ -84,7 +139,38 @@ class AgentTool(BaseTool[str]):
         self._interrupt_before_tool = interrupt_before_tool
         self._tool_confirmation_callback = tool_confirmation_callback
 
-    def execute(self, task: str) -> str:
+    def _load_aggregated_context(self, main_session_id: str) -> str | None:
+        """
+        Load the aggregated checkpoint from executors directory if it exists.
+
+        Args:
+            main_session_id: The main session ID
+
+        Returns:
+            Content of the aggregated checkpoint, or None if not found
+        """
+        if main_session_id == "standalone":
+            return None
+
+        home = Path.home()
+        aggregated_path = (
+            home
+            / ".kader"
+            / "memory"
+            / "sessions"
+            / main_session_id
+            / "executors"
+            / "checkpoint.md"
+        )
+
+        if aggregated_path.exists():
+            try:
+                return aggregated_path.read_text(encoding="utf-8")
+            except Exception:
+                return None
+        return None
+
+    def execute(self, task: str, context: str) -> str:
         """
         Execute a task using a ReActAgent with isolated memory.
 
@@ -94,6 +180,7 @@ class AgentTool(BaseTool[str]):
 
         Args:
             task: The task to execute.
+            context: Context to add to memory before the task.
 
         Returns:
             A summary of what the agent accomplished.
@@ -103,15 +190,48 @@ class AgentTool(BaseTool[str]):
         from kader.tools import get_default_registry
 
         # Create a fresh memory manager for isolated context
-        memory = SlidingWindowConversationManager(window_size=20)
+        # Persistence: ~/.kader/memory/sessions/<main-session-id>/executors/<agent-name>-<id>.json
+        execution_id = str(uuid.uuid4())
+        # Use propagated session ID or 'standalone' if not set
+        main_session_id = self._session_id if self._session_id else "standalone"
+
+        home = Path.home()
+        memory_dir = (
+            home
+            / ".kader"
+            / "memory"
+            / "sessions"
+            / main_session_id
+            / "executors"
+            / f"{self.name}-{execution_id}"
+        )
+        memory_file = memory_dir / "conversation.json"
+
+        memory = PersistentSlidingWindowConversationManager(
+            file_path=memory_file, window_size=20
+        )
+
+        # Load aggregated context from previous executors
+        aggregated_context = self._load_aggregated_context(main_session_id)
+        if aggregated_context:
+            full_context = f"## Previous Executor Context\n{aggregated_context}\n\n## Current Task Context\n{context}"
+        else:
+            full_context = context
+
+        # Add context to memory as user message
+        memory.add_message(Message.user(full_context))
 
         # Get default tools (filesystem, web, command executor)
         tools = get_default_registry()
 
-        # Create the ReActAgent with separate memory
+        # Create ExecutorAgentPrompt with tool descriptions
+        system_prompt = ExecutorAgentPrompt(tools=tools.tools)
+
+        # Create the ReActAgent with separate memory and executor prompt
         agent = ReActAgent(
             name=f"{self.name}_worker",
             tools=tools,
+            system_prompt=system_prompt,
             provider=self._provider,
             memory=memory,
             model_name=self._model_name,
@@ -124,18 +244,33 @@ class AgentTool(BaseTool[str]):
             # The agent will handle tool interruptions internally
             response = agent.invoke(task)
 
-            # Extract and return the response content
-            if hasattr(response, "content"):
-                return str(response.content)
-            elif isinstance(response, dict):
-                return str(response.get("content", str(response)))
-            else:
-                return str(response)
+            # Generate checkpoint and aggregate it
+            try:
+                checkpointer = Checkpointer()
+                checkpoint_path = checkpointer.generate_checkpoint(str(memory_file))
+                checkpoint_content = Path(checkpoint_path).read_text(encoding="utf-8")
+
+                # Aggregate the checkpoint into the main executors checkpoint
+                if main_session_id != "standalone":
+                    aggregator = ContextAggregator(session_id=main_session_id)
+                    # Use relative path from executors directory
+                    relative_path = f"{self.name}-{execution_id}/checkpoint.md"
+                    aggregator.aggregate(relative_path, subagent_name=self.name)
+
+                return checkpoint_content
+            except Exception:
+                # Fallback to raw response if checkpointing fails
+                if hasattr(response, "content"):
+                    return str(response.content)
+                elif isinstance(response, dict):
+                    return str(response.get("content", str(response)))
+                else:
+                    return str(response)
 
         except Exception as e:
             return f"Agent execution failed: {str(e)}"
 
-    async def aexecute(self, task: str) -> str:
+    async def aexecute(self, task: str, context: str) -> str:
         """
         Asynchronously execute a task using a ReActAgent.
 
@@ -145,6 +280,7 @@ class AgentTool(BaseTool[str]):
 
         Args:
             task: The task to execute.
+            context: Context to add to memory before the task.
 
         Returns:
             A summary of what the agent accomplished.
@@ -154,15 +290,48 @@ class AgentTool(BaseTool[str]):
         from kader.tools import get_default_registry
 
         # Create a fresh memory manager for isolated context
-        memory = SlidingWindowConversationManager(window_size=20)
+        # Persistence: ~/.kader/memory/sessions/<main-session-id>/executors/<agent-name>-<id>.json
+        execution_id = str(uuid.uuid4())
+        # Use propagated session ID or 'standalone' if not set
+        main_session_id = self._session_id if self._session_id else "standalone"
+
+        home = Path.home()
+        memory_dir = (
+            home
+            / ".kader"
+            / "memory"
+            / "sessions"
+            / main_session_id
+            / "executors"
+            / f"{self.name}-{execution_id}"
+        )
+        memory_file = memory_dir / "conversation.json"
+
+        memory = PersistentSlidingWindowConversationManager(
+            file_path=memory_file, window_size=20
+        )
+
+        # Load aggregated context from previous executors
+        aggregated_context = self._load_aggregated_context(main_session_id)
+        if aggregated_context:
+            full_context = f"## Previous Executor Context\n{aggregated_context}\n\n## Current Task Context\n{context}"
+        else:
+            full_context = context
+
+        # Add context to memory as user message
+        memory.add_message(Message.user(full_context))
 
         # Get default tools (filesystem, web, command executor)
         tools = get_default_registry()
 
-        # Create the ReActAgent with separate memory
+        # Create ExecutorAgentPrompt with tool descriptions
+        system_prompt = ExecutorAgentPrompt(tools=tools.tools)
+
+        # Create the ReActAgent with separate memory and executor prompt
         agent = ReActAgent(
             name=f"{self.name}_worker",
             tools=tools,
+            system_prompt=system_prompt,
             provider=self._provider,
             memory=memory,
             model_name=self._model_name,
@@ -175,13 +344,30 @@ class AgentTool(BaseTool[str]):
             # The agent will handle tool interruptions internally
             response = await agent.ainvoke(task)
 
-            # Extract and return the response content
-            if hasattr(response, "content"):
-                return str(response.content)
-            elif isinstance(response, dict):
-                return str(response.get("content", str(response)))
-            else:
-                return str(response)
+            # Generate checkpoint and aggregate it
+            try:
+                checkpointer = Checkpointer()
+                checkpoint_path = await checkpointer.agenerate_checkpoint(
+                    str(memory_file)
+                )
+                checkpoint_content = Path(checkpoint_path).read_text(encoding="utf-8")
+
+                # Aggregate the checkpoint into the main executors checkpoint
+                if main_session_id != "standalone":
+                    aggregator = ContextAggregator(session_id=main_session_id)
+                    # Use relative path from executors directory
+                    relative_path = f"{self.name}-{execution_id}/checkpoint.md"
+                    await aggregator.aaggregate(relative_path, subagent_name=self.name)
+
+                return checkpoint_content
+            except Exception:
+                # Fallback to raw response if checkpointing fails
+                if hasattr(response, "content"):
+                    return str(response.content)
+                elif isinstance(response, dict):
+                    return str(response.get("content", str(response)))
+                else:
+                    return str(response)
 
         except Exception as e:
             return f"Agent execution failed: {str(e)}"
