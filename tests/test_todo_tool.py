@@ -52,15 +52,19 @@ def test_read_todo_not_found(todo_tool):
     assert "Error: Todo list 'non-existent' not found" in result
 
 
-def test_update_todo(todo_tool):
-    """Test updating a todo list."""
+def test_update_todo_status_only(todo_tool):
+    """Test updating a todo list with status changes only (valid update)."""
     todo_id = "list-2"
-    items = [{"task": "Init", "status": "not-started"}]
+    items = [
+        {"task": "Task 1", "status": "not-started"},
+        {"task": "Task 2", "status": "not-started"},
+    ]
     todo_tool.execute(action="create", todo_id=todo_id, items=items)
 
+    # Update only statuses - this should work
     new_items = [
-        {"task": "Init", "status": "completed"},
-        {"task": "New Task", "status": "not-started"},
+        {"task": "Task 1", "status": "completed"},
+        {"task": "Task 2", "status": "in-progress"},
     ]
 
     result = todo_tool.execute(action="update", todo_id=todo_id, items=new_items)
@@ -70,6 +74,55 @@ def test_update_todo(todo_tool):
     data = json.loads(result_read)
     assert len(data) == 2
     assert data[0]["status"] == "completed"
+    assert data[1]["status"] == "in-progress"
+
+
+def test_update_todo_integrity_add_task(todo_tool):
+    """Test that adding a new task during update is rejected."""
+    todo_id = "list-integrity-add"
+    items = [{"task": "Task 1", "status": "not-started"}]
+    todo_tool.execute(action="create", todo_id=todo_id, items=items)
+
+    # Try to add a new task - this should be rejected
+    new_items = [
+        {"task": "Task 1", "status": "completed"},
+        {"task": "New Task", "status": "not-started"},
+    ]
+
+    result = todo_tool.execute(action="update", todo_id=todo_id, items=new_items)
+    assert "integrity violation" in result
+    assert "Current todo list" in result
+    assert "Task 1" in result  # Should show the existing task
+
+
+def test_update_todo_integrity_remove_task(todo_tool):
+    """Test that removing a task during update is rejected."""
+    todo_id = "list-integrity-remove"
+    items = [
+        {"task": "Task 1", "status": "not-started"},
+        {"task": "Task 2", "status": "not-started"},
+    ]
+    todo_tool.execute(action="create", todo_id=todo_id, items=items)
+
+    # Try to remove a task - this should be rejected
+    new_items = [{"task": "Task 1", "status": "completed"}]
+
+    result = todo_tool.execute(action="update", todo_id=todo_id, items=new_items)
+    assert "integrity violation" in result
+
+
+def test_update_todo_integrity_modify_task(todo_tool):
+    """Test that modifying a task description during update is rejected."""
+    todo_id = "list-integrity-modify"
+    items = [{"task": "Original Task", "status": "not-started"}]
+    todo_tool.execute(action="create", todo_id=todo_id, items=items)
+
+    # Try to modify the task description - this should be rejected
+    new_items = [{"task": "Modified Task", "status": "completed"}]
+
+    result = todo_tool.execute(action="update", todo_id=todo_id, items=new_items)
+    assert "integrity violation" in result
+    assert "Original Task" in result  # Should show the correct task
 
 
 def test_delete_todo(todo_tool):
