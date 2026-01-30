@@ -12,7 +12,6 @@ from kader.memory.types import get_default_memory_dir, load_json
 from kader.providers.base import Message
 from kader.providers.ollama import OllamaProvider
 
-
 CHECKPOINT_SYSTEM_PROMPT = """You are an assistant that summarizes agent conversation histories.
 Given a conversation between a user and an AI agent, create a structured summary in markdown format.
 
@@ -108,9 +107,7 @@ class Checkpointer:
             # Return empty if no known format
             return []
 
-    def _format_conversation_for_prompt(
-        self, messages: list[dict[str, Any]]
-    ) -> str:
+    def _format_conversation_for_prompt(self, messages: list[dict[str, Any]]) -> str:
         """
         Format messages into a readable string for the LLM prompt.
 
@@ -148,7 +145,9 @@ class Checkpointer:
 
         return "\n".join(lines)
 
-    def _generate_summary(self, conversation_text: str, existing_checkpoint: str | None = None) -> str:
+    def _generate_summary(
+        self, conversation_text: str, existing_checkpoint: str | None = None
+    ) -> str:
         """
         Generate a step-by-step summary using the LLM (synchronous).
 
@@ -191,7 +190,9 @@ Create a structured summary following the format specified."""
         response = self._provider.invoke(messages)
         return response.content
 
-    async def _agenerate_summary(self, conversation_text: str, existing_checkpoint: str | None = None) -> str:
+    async def _agenerate_summary(
+        self, conversation_text: str, existing_checkpoint: str | None = None
+    ) -> str:
         """
         Generate a step-by-step summary using the LLM (asynchronous).
 

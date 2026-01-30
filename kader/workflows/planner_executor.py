@@ -6,7 +6,6 @@ and delegate sub-tasks to executor agents.
 """
 
 import uuid
-from pathlib import Path
 from typing import Callable, Optional, Tuple
 
 from kader.agent.agents import PlanningAgent
@@ -87,10 +86,7 @@ class PlannerExecutorWorkflow(BaseWorkflow):
             return None
 
         checkpoint_path = (
-            get_default_memory_dir()
-            / "sessions"
-            / self.session_id
-            / "checkpoint.md"
+            get_default_memory_dir() / "sessions" / self.session_id / "checkpoint.md"
         )
 
         if checkpoint_path.exists():

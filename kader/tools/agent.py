@@ -154,8 +154,13 @@ class AgentTool(BaseTool[str]):
 
         home = Path.home()
         aggregated_path = (
-            home / ".kader" / "memory" / "sessions" / main_session_id
-            / "executors" / "checkpoint.md"
+            home
+            / ".kader"
+            / "memory"
+            / "sessions"
+            / main_session_id
+            / "executors"
+            / "checkpoint.md"
         )
 
         if aggregated_path.exists():
@@ -191,7 +196,15 @@ class AgentTool(BaseTool[str]):
         main_session_id = self._session_id if self._session_id else "standalone"
 
         home = Path.home()
-        memory_dir = home / ".kader" / "memory" / "sessions" / main_session_id / "executors" / f"{self.name}-{execution_id}"
+        memory_dir = (
+            home
+            / ".kader"
+            / "memory"
+            / "sessions"
+            / main_session_id
+            / "executors"
+            / f"{self.name}-{execution_id}"
+        )
         memory_file = memory_dir / "conversation.json"
 
         memory = PersistentSlidingWindowConversationManager(
@@ -283,7 +296,15 @@ class AgentTool(BaseTool[str]):
         main_session_id = self._session_id if self._session_id else "standalone"
 
         home = Path.home()
-        memory_dir = home / ".kader" / "memory" / "sessions" / main_session_id / "executors" / f"{self.name}-{execution_id}"
+        memory_dir = (
+            home
+            / ".kader"
+            / "memory"
+            / "sessions"
+            / main_session_id
+            / "executors"
+            / f"{self.name}-{execution_id}"
+        )
         memory_file = memory_dir / "conversation.json"
 
         memory = PersistentSlidingWindowConversationManager(
@@ -326,7 +347,9 @@ class AgentTool(BaseTool[str]):
             # Generate checkpoint and aggregate it
             try:
                 checkpointer = Checkpointer()
-                checkpoint_path = await checkpointer.agenerate_checkpoint(str(memory_file))
+                checkpoint_path = await checkpointer.agenerate_checkpoint(
+                    str(memory_file)
+                )
                 checkpoint_content = Path(checkpoint_path).read_text(encoding="utf-8")
 
                 # Aggregate the checkpoint into the main executors checkpoint

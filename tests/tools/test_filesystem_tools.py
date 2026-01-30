@@ -481,7 +481,7 @@ class TestGetFilesystemTools:
         # Should return a list of tools
         assert isinstance(tools, list)
         assert (
-            len(tools) == 6 ## TODO Remove SearchInDirectoryTool
+            len(tools) == 6  ## TODO Remove SearchInDirectoryTool
         )  # ReadFileTool, ReadDirectoryTool, WriteFileTool, EditFileTool, GrepTool, GlobTool
 
         # Check that all expected tools are present
@@ -493,7 +493,7 @@ class TestGetFilesystemTools:
             "edit_file",
             "grep",
             "glob",
-            #"search_in_directory", # TODO: Remove search in directory tool
+            # "search_in_directory", # TODO: Remove search in directory tool
         ]
         for name in expected_names:
             assert name in tool_names

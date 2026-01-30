@@ -11,7 +11,6 @@ from kader.memory.types import get_default_memory_dir
 from kader.providers.base import Message
 from kader.providers.ollama import OllamaProvider
 
-
 AGGREGATOR_SYSTEM_PROMPT = """You are an assistant that aggregates and merges checkpoint summaries from multiple sub-agents.
 Given checkpoint summaries from different sub-agents, create a unified summary that combines all information.
 
@@ -124,7 +123,7 @@ class ContextAggregator:
         self,
         existing_aggregated: str | None,
         new_checkpoint: str,
-        subagent_name: str | None = None
+        subagent_name: str | None = None,
     ) -> str:
         """
         Merge a new sub-agent checkpoint into the existing aggregated checkpoint.
@@ -147,7 +146,7 @@ class ContextAggregator:
 {existing_aggregated}
 ---
 
-Here is the new checkpoint from sub-agent{f' "{subagent_name}"' if subagent_name else ''}:
+Here is the new checkpoint from sub-agent{f' "{subagent_name}"' if subagent_name else ""}:
 
 ---
 {new_checkpoint}
@@ -168,7 +167,7 @@ Combine items into the appropriate sections, remove duplicates, and keep everyth
         self,
         existing_aggregated: str | None,
         new_checkpoint: str,
-        subagent_name: str | None = None
+        subagent_name: str | None = None,
     ) -> str:
         """
         Merge a new sub-agent checkpoint into the existing aggregated checkpoint (async).
@@ -191,7 +190,7 @@ Combine items into the appropriate sections, remove duplicates, and keep everyth
 {existing_aggregated}
 ---
 
-Here is the new checkpoint from sub-agent{f' "{subagent_name}"' if subagent_name else ''}:
+Here is the new checkpoint from sub-agent{f' "{subagent_name}"' if subagent_name else ""}:
 
 ---
 {new_checkpoint}
@@ -209,9 +208,7 @@ Combine items into the appropriate sections, remove duplicates, and keep everyth
         return response.content
 
     def aggregate(
-        self,
-        subagent_checkpoint_path: str,
-        subagent_name: str | None = None
+        self, subagent_checkpoint_path: str, subagent_name: str | None = None
     ) -> str:
         """
         Aggregate a sub-agent's checkpoint into the main executors checkpoint.
@@ -260,9 +257,7 @@ Combine items into the appropriate sections, remove duplicates, and keep everyth
         return str(aggregated_path)
 
     async def aaggregate(
-        self,
-        subagent_checkpoint_path: str,
-        subagent_name: str | None = None
+        self, subagent_checkpoint_path: str, subagent_name: str | None = None
     ) -> str:
         """
         Aggregate a sub-agent's checkpoint into the main executors checkpoint (async).

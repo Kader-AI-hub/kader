@@ -1,4 +1,3 @@
-
 import json
 import shutil
 import tempfile
@@ -13,14 +12,16 @@ class TestAgentToolPersistence(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         # Create a temporary directory for tests
         self.test_dir = Path(tempfile.mkdtemp())
-        
+
         # Patch Path.home() to return our temp dir
         self.home_patcher = patch("pathlib.Path.home", return_value=self.test_dir)
         self.mock_home = self.home_patcher.start()
 
         # Create a dummy checkpoint file
         self.checkpoint_path = self.test_dir / "checkpoint.md"
-        self.checkpoint_path.write_text("Task completed via checkpoint", encoding="utf-8")
+        self.checkpoint_path.write_text(
+            "Task completed via checkpoint", encoding="utf-8"
+        )
 
     def tearDown(self):
         self.home_patcher.stop()
@@ -30,7 +31,9 @@ class TestAgentToolPersistence(unittest.IsolatedAsyncioTestCase):
     @patch("kader.tools.agent.Checkpointer")
     @patch("kader.agent.agents.ReActAgent")
     @patch("kader.tools.get_default_registry")
-    def test_execute_creates_persistence_file_standalone(self, mock_get_registry, mock_agent_cls, mock_checkpointer, mock_aggregator):
+    def test_execute_creates_persistence_file_standalone(
+        self, mock_get_registry, mock_agent_cls, mock_checkpointer, mock_aggregator
+    ):
         # Setup mocks
         mock_registry = MagicMock()
         mock_registry.tools = []
@@ -54,7 +57,14 @@ class TestAgentToolPersistence(unittest.IsolatedAsyncioTestCase):
 
         # Verify directory structure for standalone
         # Expected: .../executors/test_agent-<uuid>/conversation.json
-        executors_dir = self.test_dir / ".kader" / "memory" / "sessions" / "standalone" / "executors"
+        executors_dir = (
+            self.test_dir
+            / ".kader"
+            / "memory"
+            / "sessions"
+            / "standalone"
+            / "executors"
+        )
         self.assertTrue(executors_dir.exists())
 
         # Find the specific agent execution directory
@@ -66,7 +76,7 @@ class TestAgentToolPersistence(unittest.IsolatedAsyncioTestCase):
         # Verify conversation.json exists
         conversation_file = agent_dir / "conversation.json"
         self.assertTrue(conversation_file.exists())
-        
+
         # Verify file content
         with open(conversation_file, "r") as f:
             data = json.load(f)
@@ -79,7 +89,9 @@ class TestAgentToolPersistence(unittest.IsolatedAsyncioTestCase):
     @patch("kader.tools.agent.Checkpointer")
     @patch("kader.agent.agents.ReActAgent")
     @patch("kader.tools.get_default_registry")
-    def test_execute_creates_persistence_file_with_session(self, mock_get_registry, mock_agent_cls, mock_checkpointer, mock_aggregator):
+    def test_execute_creates_persistence_file_with_session(
+        self, mock_get_registry, mock_agent_cls, mock_checkpointer, mock_aggregator
+    ):
         # Setup mocks
         mock_registry = MagicMock()
         mock_registry.tools = []
@@ -107,7 +119,14 @@ class TestAgentToolPersistence(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, "Task completed via checkpoint")
 
         # Verify directory structure for specific session
-        executors_dir = self.test_dir / ".kader" / "memory" / "sessions" / "my-session-id" / "executors"
+        executors_dir = (
+            self.test_dir
+            / ".kader"
+            / "memory"
+            / "sessions"
+            / "my-session-id"
+            / "executors"
+        )
         self.assertTrue(executors_dir.exists())
 
         # Find the specific agent execution directory
@@ -124,7 +143,9 @@ class TestAgentToolPersistence(unittest.IsolatedAsyncioTestCase):
     @patch("kader.tools.agent.Checkpointer")
     @patch("kader.agent.agents.ReActAgent")
     @patch("kader.tools.get_default_registry")
-    async def test_aexecute_creates_persistence_file_async(self, mock_get_registry, mock_agent_cls, mock_checkpointer, mock_aggregator):
+    async def test_aexecute_creates_persistence_file_async(
+        self, mock_get_registry, mock_agent_cls, mock_checkpointer, mock_aggregator
+    ):
         # Setup mocks
         mock_registry = MagicMock()
         mock_registry.tools = []
@@ -132,13 +153,17 @@ class TestAgentToolPersistence(unittest.IsolatedAsyncioTestCase):
 
         mock_agent_instance = MagicMock()
         # Mock ainvoke for async
-        mock_agent_instance.ainvoke = AsyncMock(return_value=MagicMock(content="Async Task completed"))
+        mock_agent_instance.ainvoke = AsyncMock(
+            return_value=MagicMock(content="Async Task completed")
+        )
         mock_agent_cls.return_value = mock_agent_instance
 
         # Mock Checkpointer (async)
         mock_cp_instance = MagicMock()
         # agenerate_checkpoint is async
-        mock_cp_instance.agenerate_checkpoint = AsyncMock(return_value=str(self.checkpoint_path))
+        mock_cp_instance.agenerate_checkpoint = AsyncMock(
+            return_value=str(self.checkpoint_path)
+        )
         mock_checkpointer.return_value = mock_cp_instance
 
         # Mock Aggregator (async)
@@ -154,7 +179,14 @@ class TestAgentToolPersistence(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, "Task completed via checkpoint")
 
         # Verify directory structure for standalone
-        executors_dir = self.test_dir / ".kader" / "memory" / "sessions" / "standalone" / "executors"
+        executors_dir = (
+            self.test_dir
+            / ".kader"
+            / "memory"
+            / "sessions"
+            / "standalone"
+            / "executors"
+        )
         self.assertTrue(executors_dir.exists())
 
         # Find the specific agent execution directory
@@ -166,6 +198,7 @@ class TestAgentToolPersistence(unittest.IsolatedAsyncioTestCase):
         # Verify conversation.json exists
         conversation_file = agent_dir / "conversation.json"
         self.assertTrue(conversation_file.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

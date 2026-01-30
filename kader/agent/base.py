@@ -351,12 +351,18 @@ class BaseAgent:
         fn_info = tool_call_dict.get("function", {})
         if not fn_info and "name" in tool_call_dict:
             fn_info = tool_call_dict
-        
+
         tool_name = fn_info.get("name", "")
-        
+
         # List of tools to execute directly
-        direct_execution_tools = {"read_file", "glob", "grep", "read_directory", "read_dir"}
-        
+        direct_execution_tools = {
+            "read_file",
+            "glob",
+            "grep",
+            "read_directory",
+            "read_dir",
+        }
+
         if tool_name in direct_execution_tools:
             return True, None
 
