@@ -1,5 +1,7 @@
 """Unit tests for AgentTool."""
 
+import tempfile
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -79,31 +81,49 @@ class TestAgentToolInterruptionMessage:
 class TestAgentToolExecution:
     """Test AgentTool execution with mocked agent."""
 
+    def setup_method(self):
+        self.temp_fd, self.checkpoint_path = tempfile.mkstemp()
+    
+    def teardown_method(self):
+        os.close(self.temp_fd)
+        os.remove(self.checkpoint_path)
+
+    @patch("kader.tools.agent.ContextAggregator")
+    @patch("kader.tools.agent.Checkpointer")
     @patch("kader.agent.agents.ReActAgent")
     @patch("kader.tools.get_default_registry")
-    def test_execute_success(self, mock_registry, mock_react_agent):
+    def test_execute_success(self, mock_registry, mock_react_agent, mock_checkpointer, mock_aggregator):
         """Test successful task execution."""
         # Setup mocks
         mock_registry.return_value = MagicMock()
         mock_agent_instance = MagicMock()
         mock_response = MagicMock()
-        mock_response.content = (
-            "Task completed successfully. Found relevant information."
-        )
+        mock_response.content = ("Task completed successfully.")
         mock_agent_instance.invoke.return_value = mock_response
         mock_react_agent.return_value = mock_agent_instance
+
+        # Setup Checkpointer to return our temp file
+        with open(self.checkpoint_path, 'w', encoding='utf-8') as f:
+            f.write("Task completed via checkpoint.")
+        
+        mock_checkpointer_instance = MagicMock()
+        mock_checkpointer_instance.generate_checkpoint.return_value = self.checkpoint_path
+        mock_checkpointer.return_value = mock_checkpointer_instance
 
         # Execute
         tool = AgentTool(name="test_agent")
         result = tool.execute(task="Test task", context="Test context")
 
         # Verify
-        assert result == "Task completed successfully. Found relevant information."
+        # It should return the content of the checkpoint file
+        assert result == "Task completed via checkpoint."
         mock_agent_instance.invoke.assert_called_once_with("Test task")
 
+    @patch("kader.tools.agent.ContextAggregator")
+    @patch("kader.tools.agent.Checkpointer")
     @patch("kader.agent.agents.ReActAgent")
     @patch("kader.tools.get_default_registry")
-    def test_execute_with_dict_response(self, mock_registry, mock_react_agent):
+    def test_execute_with_dict_response(self, mock_registry, mock_react_agent, mock_checkpointer, mock_aggregator):
         """Test execution when agent returns a dict."""
         # Setup mocks
         mock_registry.return_value = MagicMock()
@@ -111,12 +131,20 @@ class TestAgentToolExecution:
         mock_agent_instance.invoke.return_value = {"content": "Dict response"}
         mock_react_agent.return_value = mock_agent_instance
 
+        # Setup Checkpointer to return our temp file
+        with open(self.checkpoint_path, 'w', encoding='utf-8') as f:
+            f.write("Dict response via checkpoint.")
+
+        mock_checkpointer_instance = MagicMock()
+        mock_checkpointer_instance.generate_checkpoint.return_value = self.checkpoint_path
+        mock_checkpointer.return_value = mock_checkpointer_instance
+
         # Execute
         tool = AgentTool(name="test_agent")
         result = tool.execute(task="Test task", context="Test context")
 
         # Verify
-        assert result == "Dict response"
+        assert result == "Dict response via checkpoint."
 
     @patch("kader.agent.agents.ReActAgent")
     @patch("kader.tools.get_default_registry")
@@ -147,22 +175,36 @@ class TestAgentToolExecution:
         mock_agent_instance.invoke.return_value = mock_response
         mock_react_agent.return_value = mock_agent_instance
 
-        # Execute
-        tool = AgentTool(name="test_agent")
-        tool.execute(task="Test task", context="Test context")
+        # We need to mock Checkpointer here too or ensure it doesn't fail
+        # Or just assert on what happens before checkpointer
+        # But execute() calls checkpointer. 
+        # If checkpointer fails (not mocked), we get execution failed or error.
+        # But we handle exceptions in execute().
+        
+        # Actually, let's just mock checkpointer to avoid errors in logs
+        with patch("kader.tools.agent.Checkpointer") as mock_cp:
+            mock_cp_instance = MagicMock()
+            mock_cp_instance.generate_checkpoint.side_effect = Exception("Checkpoint failed")
+            mock_cp.return_value = mock_cp_instance
+            
+            # Execute
+            tool = AgentTool(name="test_agent")
+            tool.execute(task="Test task", context="Test context")
 
-        # Verify the agent was created with interrupt_before_tool=True
-        call_kwargs = mock_react_agent.call_args[1]
-        assert call_kwargs["interrupt_before_tool"] is True
+            # Verify the agent was created with interrupt_before_tool=True
+            call_kwargs = mock_react_agent.call_args[1]
+            assert call_kwargs["interrupt_before_tool"] is True
 
 
 @pytest.mark.asyncio
 class TestAgentToolAsyncExecution:
     """Test async execution of AgentTool."""
 
+    @patch("kader.tools.agent.ContextAggregator")
+    @patch("kader.tools.agent.Checkpointer")
     @patch("kader.agent.agents.ReActAgent")
     @patch("kader.tools.get_default_registry")
-    async def test_aexecute_success(self, mock_registry, mock_react_agent):
+    async def test_aexecute_success(self, mock_registry, mock_react_agent, mock_checkpointer, mock_aggregator):
         """Test successful async execution."""
         # Setup mocks
         mock_registry.return_value = MagicMock()
@@ -177,9 +219,33 @@ class TestAgentToolAsyncExecution:
         mock_agent_instance.ainvoke = async_invoke
         mock_react_agent.return_value = mock_agent_instance
 
-        # Execute
-        tool = AgentTool(name="test_agent")
-        result = await tool.aexecute(task="Async test task", context="Async context")
+        # Create temp file
+        fd, path = tempfile.mkstemp()
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write("Async task completed via checkpoint.")
+        os.close(fd)
 
-        # Verify
-        assert result == "Async task completed"
+        try:
+            mock_checkpointer_instance = MagicMock()
+            
+            # agenerate_checkpoint is async
+            async def async_generate_checkpoint(file):
+                 return path
+                 
+            mock_checkpointer_instance.agenerate_checkpoint.side_effect = async_generate_checkpoint
+            mock_checkpointer.return_value = mock_checkpointer_instance
+            
+            # Mock aggregate (async)
+            mock_aggregator_instance = MagicMock()
+            mock_aggregator_instance.aaggregate = MagicMock()
+            mock_aggregator.return_value = mock_aggregator_instance
+            
+            # Execute
+            tool = AgentTool(name="test_agent")
+            result = await tool.aexecute(task="Async test task", context="Async context")
+
+            # Verify
+            assert result == "Async task completed via checkpoint."
+            
+        finally:
+            os.remove(path)
