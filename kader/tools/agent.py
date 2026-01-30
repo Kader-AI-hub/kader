@@ -257,6 +257,18 @@ class AgentTool(BaseTool[str]):
                     relative_path = f"{self.name}-{execution_id}/checkpoint.md"
                     aggregator.aggregate(relative_path, subagent_name=self.name)
 
+                # Append the agent's response to the checkpoint content if it exists
+                response_content = None
+                if hasattr(response, "content"):
+                    response_content = str(response.content)
+                elif isinstance(response, dict):
+                    response_content = str(response.get("content", str(response)))
+                else:
+                    response_content = str(response)
+
+                if response_content and response_content != "None":
+                    checkpoint_content += f"\n\nResponse:\n{response_content}"
+
                 return checkpoint_content
             except Exception:
                 # Fallback to raw response if checkpointing fails
@@ -358,6 +370,18 @@ class AgentTool(BaseTool[str]):
                     # Use relative path from executors directory
                     relative_path = f"{self.name}-{execution_id}/checkpoint.md"
                     await aggregator.aaggregate(relative_path, subagent_name=self.name)
+
+                # Append the agent's response to the checkpoint content if it exists
+                response_content = None
+                if hasattr(response, "content"):
+                    response_content = str(response.content)
+                elif isinstance(response, dict):
+                    response_content = str(response.get("content", str(response)))
+                else:
+                    response_content = str(response)
+
+                if response_content and response_content != "None":
+                    checkpoint_content += f"\n\nResponse:\n{response_content}"
 
                 return checkpoint_content
             except Exception:
