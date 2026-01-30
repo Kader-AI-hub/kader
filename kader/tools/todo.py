@@ -52,7 +52,10 @@ class TodoTool(BaseTool[str]):
                 "Manage todo lists for planning. "
                 "Supports creating, reading, updating, and deleting todo lists. "
                 "Each list is identified by a todo_id and contains items with status "
-                "(not-started, in-progress, completed)."
+                "(not-started, in-progress, completed). "
+                "IMPORTANT: When updating, you can ONLY change the status of existing items. "
+                "You cannot add, remove, or modify task descriptions. "
+                "If you need to change tasks, delete and recreate the list."
             ),
             category=ToolCategory.UTILITY,
             parameters=[
@@ -185,7 +188,10 @@ class TodoTool(BaseTool[str]):
     def _update_todo(
         self, session_id: str, todo_id: str, items: list[TodoItem] | None
     ) -> str:
-        """Update an existing todo list (overwrite)."""
+        """Update an existing todo list (status changes only).
+        This method enforces integrity by only allowing status updates.
+        The task descriptions must match the existing todo list exactly.
+        """
         path = self._get_todo_path(session_id, todo_id)
         if not path.exists():
             return f"Error: Todo list '{todo_id}' not found. Use 'create' to make a new list."
@@ -193,12 +199,47 @@ class TodoTool(BaseTool[str]):
         if items is None:
             return "Error: 'items' must be provided for update action."
 
+        # Read existing todo list
+        with open(path, "r", encoding="utf-8") as f:
+            try:
+                existing_data = json.load(f)
+            except json.JSONDecodeError:
+                return "Error: Failed to decode existing todo list JSON."
+
+        # Validate integrity: check that task descriptions match
+        existing_tasks = [item.get("task", "") for item in existing_data]
+        new_tasks = [item.task for item in items]
+
+        # Check if the number of items matches
+        if len(existing_tasks) != len(new_tasks):
+            return self._format_integrity_error(todo_id, existing_data)
+
+        # Check if all task descriptions match (order matters)
+        if existing_tasks != new_tasks:
+            return self._format_integrity_error(todo_id, existing_data)
+
+        # Validation passed - update with new statuses
         data = [item.model_dump() for item in items]
 
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
         return f"Successfully updated todo list '{todo_id}'."
+
+    def _format_integrity_error(self, todo_id: str, existing_data: list[dict]) -> str:
+        """Format an integrity error message with the current todo list content."""
+        items_description = "\n".join(
+            f"  {i + 1}. [{item.get('status', 'not-started')}] {item.get('task', '')}"
+            for i, item in enumerate(existing_data)
+        )
+        return (
+            f"Error: Update rejected - todo list integrity violation.\n"
+            f"The provided items do not match the existing todo list '{todo_id}'.\n"
+            f"You can only update the STATUS of existing items, not add, remove, or modify task descriptions.\n\n"
+            f"Current todo list '{todo_id}' content:\n{items_description}\n\n"
+            f"Please update using the exact task descriptions from the list above, "
+            f"only changing the 'status' field as needed."
+        )
 
     def _delete_todo(self, session_id: str, todo_id: str) -> str:
         """Delete a todo list."""
