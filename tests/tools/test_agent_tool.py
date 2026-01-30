@@ -120,7 +120,10 @@ class TestAgentToolExecution:
 
         # Verify
         # It should return the content of the checkpoint file
-        assert result == "Task completed via checkpoint."
+        assert (
+            result
+            == "Task completed via checkpoint.\n\nResponse:\nTask completed successfully."
+        )
         mock_agent_instance.invoke.assert_called_once_with("Test task")
 
     @patch("kader.tools.agent.ContextAggregator")
@@ -152,7 +155,8 @@ class TestAgentToolExecution:
         result = tool.execute(task="Test task", context="Test context")
 
         # Verify
-        assert result == "Dict response via checkpoint."
+        # Verify
+        assert result == "Dict response via checkpoint.\n\nResponse:\nDict response"
 
     @patch("kader.agent.agents.ReActAgent")
     @patch("kader.tools.get_default_registry")
@@ -261,7 +265,11 @@ class TestAgentToolAsyncExecution:
             )
 
             # Verify
-            assert result == "Async task completed via checkpoint."
+            # Verify
+            assert (
+                result
+                == "Async task completed via checkpoint.\n\nResponse:\nAsync task completed"
+            )
 
         finally:
             os.remove(path)

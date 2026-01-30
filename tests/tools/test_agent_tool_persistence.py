@@ -53,7 +53,10 @@ class TestAgentToolPersistence(unittest.IsolatedAsyncioTestCase):
         result = tool.execute(task="Do something", context="Some context")
 
         # Verify result is from the checkpoint file
-        self.assertEqual(result, "Task completed via checkpoint")
+        # Verify result is from the checkpoint file
+        self.assertEqual(
+            result, "Task completed via checkpoint\n\nResponse:\nTask completed"
+        )
 
         # Verify directory structure for standalone
         # Expected: .../executors/test_agent-<uuid>/conversation.json
@@ -116,7 +119,10 @@ class TestAgentToolPersistence(unittest.IsolatedAsyncioTestCase):
         result = tool.execute(task="Do something", context="Some context")
 
         # Verify result
-        self.assertEqual(result, "Task completed via checkpoint")
+        # Verify result
+        self.assertEqual(
+            result, "Task completed via checkpoint\n\nResponse:\nTask completed"
+        )
 
         # Verify directory structure for specific session
         executors_dir = (
@@ -176,7 +182,10 @@ class TestAgentToolPersistence(unittest.IsolatedAsyncioTestCase):
         result = await tool.aexecute(task="Do something async", context="Async context")
 
         # Verify result
-        self.assertEqual(result, "Task completed via checkpoint")
+        # Verify result
+        self.assertEqual(
+            result, "Task completed via checkpoint\n\nResponse:\nAsync Task completed"
+        )
 
         # Verify directory structure for standalone
         executors_dir = (
