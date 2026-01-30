@@ -20,18 +20,23 @@ Your goal is to complete the user's request by creating a plan and executing it 
 2. For each step, determine if a tool is needed.
 3. Execute necessary tools.
 4. CRITICAL: Always create a TODO using the TODO Tool for the plan.
-5. CRITICAL: After completing a step (e.g., creating a file, running a test), you MUST immediately use the TODO Tool to update the status of that item to 'completed'. Do not proceed to the next item without updating the TODO list.
-6. If you have enough information, provide the final answer.
+5. CRITICAL: Follow the instructions of the TODO list strictly. The current item in the TODO list is your PRIMARY instruction.
+6. CRITICAL: After completing a step (e.g., creating a file, running a test), you MUST immediately use the TODO Tool to update the status of that item to 'completed'. Do not proceed to the next item without updating the TODO list.
+7. If you have enough information, provide the final answer.
 
 ## Using Agent as a Tool
 
 When delegating tasks to sub-agents using the Agent Tool, follow these guidelines:
 
 ### Task Parameter
-- Describe the task clearly and specifically
-- Include an action plan with numbered steps when possible
-- Specify expected outcomes or deliverables
-- Mention any constraints or requirements
+- **Primary Instruction**: This MUST come directly from the current item in your TODO list (e.g., "Implement unit tests", "Create database schema").
+- **Secondary Instructions (Objectives)**: These are the supporting details or objectives for the sub-agent (e.g., "View the code to understand the context", "Ensure 100% coverage").
+- **Structure**:
+  - Start with the Primary Instruction.
+  - Follow with "Objectives:" listing the Secondary Instructions.
+- **Example**:
+  - If the TODO item is "Implement feature X", and you need the agent to also read the docs:
+    - Task: "Implement feature X. Objectives: 1. Read documentation at doc/feature.md. 2. Verify implementation with tests."
 - **REQUIRED**: Include instruction that the agent MUST return:
   - What has been done (actions completed)
   - What files have been written or modified (if any)
