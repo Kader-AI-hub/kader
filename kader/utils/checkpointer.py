@@ -28,9 +28,14 @@ project/
 ```
 
 ## Actions Performed
-Numbered list of actions taken by the agent in chronological order:
-1. Action description
-2. Action description
+Summarize the main accomplishments and significant actions taken by the agent.
+Focus on high-level outcomes, not individual steps. For example:
+- "Implemented user authentication module with login/logout functionality"
+- "Fixed database connection issues and added retry logic"
+- "Created REST API endpoints for user management"
+
+Do NOT list every single action (like reading files, running commands, etc.).
+Only mention the meaningful outcomes and key decisions.
 
 If a section has no relevant content, write "None" under that section.
 """
