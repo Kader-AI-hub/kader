@@ -1,7 +1,9 @@
 """Kader CLI - Modern Vibe Coding CLI with Textual."""
 
 import asyncio
+import atexit
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import version as get_version
 from pathlib import Path
 from typing import Optional
@@ -100,6 +102,13 @@ class KaderApp(App):
         self._inline_selector: Optional[InlineSelector] = None
         self._model_selector: Optional[ModelSelector] = None
         self._update_info: Optional[str] = None  # Latest version if update available
+
+        # Dedicated thread pool for agent invocation (isolated from default pool)
+        self._agent_executor = ThreadPoolExecutor(
+            max_workers=2, thread_name_prefix="kader_agent"
+        )
+        # Ensure executor is properly shut down on exit
+        atexit.register(self._agent_executor.shutdown, wait=False)
 
         self._workflow = self._create_workflow(self._current_model)
 
@@ -485,10 +494,10 @@ Please resize your terminal."""
         spinner = self.query_one(LoadingSpinner)
 
         try:
-            # Run the workflow in a thread
+            # Run the workflow in a dedicated thread pool
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
-                None, lambda: self._workflow.run(message)
+                self._agent_executor, lambda: self._workflow.run(message)
             )
 
             # Hide spinner and show response (this runs on main thread via await)
