@@ -218,7 +218,6 @@ class AgentTool(BaseTool[str]):
         """
         # Import here to avoid circular imports
         from kader.agent.agents import ReActAgent
-        from kader.tools import get_default_registry
 
         # Create a fresh memory manager for isolated context
         # Persistence: ~/.kader/memory/sessions/<main-session-id>/executors/<agent-name>-<id>.json
@@ -252,8 +251,10 @@ class AgentTool(BaseTool[str]):
         # Add context to memory as user message
         memory.add_message(Message.user(full_context))
 
-        # Get default tools (filesystem, web, command executor)
-        tools = get_default_registry()
+        # Get default tools (filesystem, web, command executor) - use cached version
+        from kader.tools import get_cached_default_registry
+
+        tools = get_cached_default_registry()
 
         # Create ExecutorAgentPrompt with tool descriptions
         system_prompt = ExecutorAgentPrompt(tools=tools.tools)
@@ -330,7 +331,6 @@ class AgentTool(BaseTool[str]):
         """
         # Import here to avoid circular imports
         from kader.agent.agents import ReActAgent
-        from kader.tools import get_default_registry
 
         # Create a fresh memory manager for isolated context
         # Persistence: ~/.kader/memory/sessions/<main-session-id>/executors/<agent-name>-<id>.json
@@ -364,8 +364,10 @@ class AgentTool(BaseTool[str]):
         # Add context to memory as user message
         memory.add_message(Message.user(full_context))
 
-        # Get default tools (filesystem, web, command executor)
-        tools = get_default_registry()
+        # Get default tools (filesystem, web, command executor) - use cached version
+        from kader.tools import get_cached_default_registry
+
+        tools = get_cached_default_registry()
 
         # Create ExecutorAgentPrompt with tool descriptions
         system_prompt = ExecutorAgentPrompt(tools=tools.tools)

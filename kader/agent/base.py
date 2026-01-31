@@ -925,9 +925,9 @@ class BaseAgent:
         if registry is None:
             # Lazy import to avoid circular dependencies if any
             try:
-                from kader.tools import get_default_registry
+                from kader.tools import get_cached_default_registry
 
-                registry = get_default_registry()
+                registry = get_cached_default_registry()
             except ImportError:
                 pass
 
