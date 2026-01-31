@@ -114,3 +114,63 @@ def load_json(path: Path) -> dict[str, Any]:
         return {}
     with open(path, "r", encoding="utf-8") as f:
         return decode_bytes_values(json.load(f))
+
+
+# --- Async File I/O Utilities ---
+
+
+async def aread_text(path: Path, encoding: str = "utf-8") -> str:
+    """Asynchronously read text from a file.
+
+    Args:
+        path: Path to the file
+        encoding: File encoding (default: utf-8)
+
+    Returns:
+        File contents as string
+    """
+    import aiofiles
+
+    async with aiofiles.open(path, "r", encoding=encoding) as f:
+        return await f.read()
+
+
+async def awrite_text(path: Path, content: str, encoding: str = "utf-8") -> None:
+    """Asynchronously write text to a file.
+
+    Args:
+        path: Path to the file
+        content: Text content to write
+        encoding: File encoding (default: utf-8)
+    """
+    import aiofiles
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    async with aiofiles.open(path, "w", encoding=encoding) as f:
+        await f.write(content)
+
+
+async def asave_json(path: Path, data: dict[str, Any]) -> None:
+    """Asynchronously save data to a JSON file.
+
+    Args:
+        path: Path to the JSON file
+        data: Data to save
+    """
+    content = json.dumps(encode_bytes_values(data), indent=2, ensure_ascii=False)
+    await awrite_text(path, content)
+
+
+async def aload_json(path: Path) -> dict[str, Any]:
+    """Asynchronously load data from a JSON file.
+
+    Args:
+        path: Path to the JSON file
+
+    Returns:
+        Loaded data, or empty dict if file doesn't exist
+    """
+    if not path.exists():
+        return {}
+    content = await aread_text(path)
+    return decode_bytes_values(json.loads(content))

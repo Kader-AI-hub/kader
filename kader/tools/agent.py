@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional, Tuple
 
 from kader.memory import SlidingWindowConversationManager
-from kader.memory.types import save_json
+from kader.memory.types import aread_text, save_json
 from kader.prompts import ExecutorAgentPrompt
 from kader.providers.base import BaseLLMProvider, Message
 from kader.utils import Checkpointer, ContextAggregator
@@ -170,6 +170,37 @@ class AgentTool(BaseTool[str]):
                 return None
         return None
 
+    async def _aload_aggregated_context(self, main_session_id: str) -> str | None:
+        """
+        Asynchronously load the aggregated checkpoint from executors directory.
+
+        Args:
+            main_session_id: The main session ID
+
+        Returns:
+            Content of the aggregated checkpoint, or None if not found
+        """
+        if main_session_id == "standalone":
+            return None
+
+        home = Path.home()
+        aggregated_path = (
+            home
+            / ".kader"
+            / "memory"
+            / "sessions"
+            / main_session_id
+            / "executors"
+            / "checkpoint.md"
+        )
+
+        if aggregated_path.exists():
+            try:
+                return await aread_text(aggregated_path)
+            except Exception:
+                return None
+        return None
+
     def execute(self, task: str, context: str) -> str:
         """
         Execute a task using a ReActAgent with isolated memory.
@@ -323,8 +354,8 @@ class AgentTool(BaseTool[str]):
             file_path=memory_file, window_size=20
         )
 
-        # Load aggregated context from previous executors
-        aggregated_context = self._load_aggregated_context(main_session_id)
+        # Load aggregated context from previous executors (async)
+        aggregated_context = await self._aload_aggregated_context(main_session_id)
         if aggregated_context:
             full_context = f"## Previous Executor Context\n{aggregated_context}\n\n## Current Task Context\n{context}"
         else:
@@ -362,7 +393,7 @@ class AgentTool(BaseTool[str]):
                 checkpoint_path = await checkpointer.agenerate_checkpoint(
                     str(memory_file)
                 )
-                checkpoint_content = Path(checkpoint_path).read_text(encoding="utf-8")
+                checkpoint_content = await aread_text(Path(checkpoint_path))
 
                 # Aggregate the checkpoint into the main executors checkpoint
                 if main_session_id != "standalone":

@@ -8,7 +8,13 @@ human-readable markdown summaries.
 from pathlib import Path
 from typing import Any
 
-from kader.memory.types import get_default_memory_dir, load_json
+from kader.memory.types import (
+    aload_json,
+    aread_text,
+    awrite_text,
+    get_default_memory_dir,
+    load_json,
+)
 from kader.providers.base import Message
 from kader.providers.ollama import OllamaProvider
 
@@ -257,6 +263,23 @@ Create a structured summary following the format specified."""
                 return None
         return None
 
+    async def _aload_existing_checkpoint(self, checkpoint_path: Path) -> str | None:
+        """
+        Asynchronously load existing checkpoint content if it exists.
+
+        Args:
+            checkpoint_path: Path to the checkpoint file
+
+        Returns:
+            Checkpoint content if exists, None otherwise
+        """
+        if checkpoint_path.exists():
+            try:
+                return await aread_text(checkpoint_path)
+            except Exception:
+                return None
+        return None
+
     def generate_checkpoint(self, memory_path: str) -> str:
         """
         Generate a checkpoint markdown file from an agent's memory (synchronous).
@@ -325,22 +348,24 @@ Create a structured summary following the format specified."""
             base_dir = get_default_memory_dir() / "sessions"
             path = base_dir / memory_path
 
-        # Load and parse memory
-        memory_data = self._load_memory(path)
+        # Load and parse memory (async)
+        if not path.exists():
+            raise FileNotFoundError(f"Memory file not found: {path}")
+        memory_data = await aload_json(path)
         messages = self._extract_messages(memory_data)
 
         if not messages:
             raise ValueError(f"No messages found in memory file: {path}")
 
-        # Check for existing checkpoint
+        # Check for existing checkpoint (async)
         checkpoint_path = path.parent / "checkpoint.md"
-        existing_checkpoint = self._load_existing_checkpoint(checkpoint_path)
+        existing_checkpoint = await self._aload_existing_checkpoint(checkpoint_path)
 
         # Format and generate summary
         conversation_text = self._format_conversation_for_prompt(messages)
         summary = await self._agenerate_summary(conversation_text, existing_checkpoint)
 
-        # Save checkpoint markdown
-        checkpoint_path.write_text(summary, encoding="utf-8")
+        # Save checkpoint markdown (async)
+        await awrite_text(checkpoint_path, summary)
 
         return str(checkpoint_path)
