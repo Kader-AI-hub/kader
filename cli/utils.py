@@ -3,7 +3,7 @@
 from kader.providers import OllamaProvider
 
 # Default model
-DEFAULT_MODEL = "kimi-k2.5:cloud"
+DEFAULT_MODEL = "qwen3-coder:480b-cloud"
 
 HELP_TEXT = """## Kader CLI Commands
 
