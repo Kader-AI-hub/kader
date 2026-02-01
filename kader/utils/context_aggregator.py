@@ -139,7 +139,9 @@ class ContextAggregator:
                 return None
         return None
 
-    async def _aload_subagent_checkpoint(self, checkpoint_path: str | Path) -> str | None:
+    async def _aload_subagent_checkpoint(
+        self, checkpoint_path: str | Path
+    ) -> str | None:
         """
         Asynchronously load a sub-agent's checkpoint content.
 

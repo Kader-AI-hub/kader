@@ -561,7 +561,9 @@ Please resize your terminal."""
                 self._current_session_id = session.session_id
 
             # Get messages from planner memory and save
-            messages = [msg.message for msg in self._workflow.planner.memory.get_messages()]
+            messages = [
+                msg.message for msg in self._workflow.planner.memory.get_messages()
+            ]
             self._session_manager.save_conversation(self._current_session_id, messages)
 
             conversation.add_message(
