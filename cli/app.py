@@ -139,7 +139,10 @@ class KaderApp(App):
 
         # Wait for user response (blocking in agent thread)
         # This is safe because we're in a background thread
-        self._confirmation_event.wait()
+        # Timeout after 5 minutes to prevent indefinite blocking
+        if not self._confirmation_event.wait(timeout=300):
+            # Timeout occurred - decline tool execution gracefully
+            return (False, "Tool confirmation timed out after 5 minutes")
 
         # Return the result
         return self._confirmation_result
