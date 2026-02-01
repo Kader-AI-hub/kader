@@ -48,6 +48,8 @@ class BaseAgent:
         provider: Optional[BaseLLMProvider] = None,
         memory: Optional[ConversationManager] = None,
         retry_attempts: int = 3,
+        retry_wait_min: int = 1,
+        retry_wait_max: int = 5,
         model_name: str = "qwen3-coder:480b-cloud",
         session_id: Optional[str] = None,
         use_persistence: bool = False,
@@ -75,6 +77,8 @@ class BaseAgent:
         self.name = name
         self.system_prompt = system_prompt
         self.retry_attempts = retry_attempts
+        self.retry_wait_min = retry_wait_min
+        self.retry_wait_max = retry_wait_max
         self.interrupt_before_tool = interrupt_before_tool
         self.tool_confirmation_callback = tool_confirmation_callback
 
@@ -529,7 +533,9 @@ class BaseAgent:
 
         runner = Retrying(
             stop=stop_after_attempt(self.retry_attempts),
-            wait=wait_exponential(multiplier=1, min=4, max=10),
+            wait=wait_exponential(
+                multiplier=1, min=self.retry_wait_min, max=self.retry_wait_max
+            ),
             reraise=True,
         )
 
@@ -672,7 +678,9 @@ class BaseAgent:
 
         runner = Retrying(
             stop=stop_after_attempt(self.retry_attempts),
-            wait=wait_exponential(multiplier=1, min=4, max=10),
+            wait=wait_exponential(
+                multiplier=1, min=self.retry_wait_min, max=self.retry_wait_max
+            ),
             reraise=True,
         )
 
@@ -709,7 +717,9 @@ class BaseAgent:
 
         runner = AsyncRetrying(
             stop=stop_after_attempt(self.retry_attempts),
-            wait=wait_exponential(multiplier=1, min=4, max=10),
+            wait=wait_exponential(
+                multiplier=1, min=self.retry_wait_min, max=self.retry_wait_max
+            ),
             reraise=True,
         )
 
