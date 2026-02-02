@@ -85,6 +85,28 @@ def get_default_registry() -> ToolRegistry:
     return registry
 
 
+# Module-level cached registry singleton
+_cached_default_registry: ToolRegistry | None = None
+
+
+def get_cached_default_registry() -> ToolRegistry:
+    """
+    Get a cached registry populated with all standard tools.
+
+    This is more efficient than get_default_registry() when called multiple times,
+    as it avoids repeated tool instantiation and registration.
+
+    The cached registry is created once and reused for all subsequent calls.
+
+    Returns:
+        Cached ToolRegistry with all standard tools registered.
+    """
+    global _cached_default_registry
+    if _cached_default_registry is None:
+        _cached_default_registry = get_default_registry()
+    return _cached_default_registry
+
+
 __all__ = [
     # Core classes
     "BaseTool",
@@ -130,4 +152,5 @@ __all__ = [
     "AgentTool",
     # Helpers
     "get_default_registry",
+    "get_cached_default_registry",
 ]

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional, Tuple
 
 from kader.memory import SlidingWindowConversationManager
-from kader.memory.types import save_json
+from kader.memory.types import aread_text, save_json
 from kader.prompts import ExecutorAgentPrompt
 from kader.providers.base import BaseLLMProvider, Message
 from kader.utils import Checkpointer, ContextAggregator
@@ -99,6 +99,8 @@ class AgentTool(BaseTool[str]):
         tool_confirmation_callback: Optional[
             Callable[..., Tuple[bool, Optional[str]]]
         ] = None,
+        direct_execution_callback: Optional[Callable[..., None]] = None,
+        tool_execution_result_callback: Optional[Callable[..., None]] = None,
     ) -> None:
         """
         Initialize the AgentTool.
@@ -138,6 +140,8 @@ class AgentTool(BaseTool[str]):
         self._model_name = model_name
         self._interrupt_before_tool = interrupt_before_tool
         self._tool_confirmation_callback = tool_confirmation_callback
+        self._direct_execution_callback = direct_execution_callback
+        self._tool_execution_result_callback = tool_execution_result_callback
 
     def _load_aggregated_context(self, main_session_id: str) -> str | None:
         """
@@ -170,6 +174,37 @@ class AgentTool(BaseTool[str]):
                 return None
         return None
 
+    async def _aload_aggregated_context(self, main_session_id: str) -> str | None:
+        """
+        Asynchronously load the aggregated checkpoint from executors directory.
+
+        Args:
+            main_session_id: The main session ID
+
+        Returns:
+            Content of the aggregated checkpoint, or None if not found
+        """
+        if main_session_id == "standalone":
+            return None
+
+        home = Path.home()
+        aggregated_path = (
+            home
+            / ".kader"
+            / "memory"
+            / "sessions"
+            / main_session_id
+            / "executors"
+            / "checkpoint.md"
+        )
+
+        if aggregated_path.exists():
+            try:
+                return await aread_text(aggregated_path)
+            except Exception:
+                return None
+        return None
+
     def execute(self, task: str, context: str) -> str:
         """
         Execute a task using a ReActAgent with isolated memory.
@@ -187,7 +222,6 @@ class AgentTool(BaseTool[str]):
         """
         # Import here to avoid circular imports
         from kader.agent.agents import ReActAgent
-        from kader.tools import get_default_registry
 
         # Create a fresh memory manager for isolated context
         # Persistence: ~/.kader/memory/sessions/<main-session-id>/executors/<agent-name>-<id>.json
@@ -221,8 +255,10 @@ class AgentTool(BaseTool[str]):
         # Add context to memory as user message
         memory.add_message(Message.user(full_context))
 
-        # Get default tools (filesystem, web, command executor)
-        tools = get_default_registry()
+        # Get default tools (filesystem, web, command executor) - use cached version
+        from kader.tools import get_cached_default_registry
+
+        tools = get_cached_default_registry()
 
         # Create ExecutorAgentPrompt with tool descriptions
         system_prompt = ExecutorAgentPrompt(tools=tools.tools)
@@ -237,6 +273,8 @@ class AgentTool(BaseTool[str]):
             model_name=self._model_name,
             interrupt_before_tool=self._interrupt_before_tool,
             tool_confirmation_callback=self._tool_confirmation_callback,
+            direct_execution_callback=self._direct_execution_callback,
+            tool_execution_result_callback=self._tool_execution_result_callback,
         )
 
         try:
@@ -299,7 +337,6 @@ class AgentTool(BaseTool[str]):
         """
         # Import here to avoid circular imports
         from kader.agent.agents import ReActAgent
-        from kader.tools import get_default_registry
 
         # Create a fresh memory manager for isolated context
         # Persistence: ~/.kader/memory/sessions/<main-session-id>/executors/<agent-name>-<id>.json
@@ -323,8 +360,8 @@ class AgentTool(BaseTool[str]):
             file_path=memory_file, window_size=20
         )
 
-        # Load aggregated context from previous executors
-        aggregated_context = self._load_aggregated_context(main_session_id)
+        # Load aggregated context from previous executors (async)
+        aggregated_context = await self._aload_aggregated_context(main_session_id)
         if aggregated_context:
             full_context = f"## Previous Executor Context\n{aggregated_context}\n\n## Current Task Context\n{context}"
         else:
@@ -333,8 +370,10 @@ class AgentTool(BaseTool[str]):
         # Add context to memory as user message
         memory.add_message(Message.user(full_context))
 
-        # Get default tools (filesystem, web, command executor)
-        tools = get_default_registry()
+        # Get default tools (filesystem, web, command executor) - use cached version
+        from kader.tools import get_cached_default_registry
+
+        tools = get_cached_default_registry()
 
         # Create ExecutorAgentPrompt with tool descriptions
         system_prompt = ExecutorAgentPrompt(tools=tools.tools)
@@ -349,6 +388,8 @@ class AgentTool(BaseTool[str]):
             model_name=self._model_name,
             interrupt_before_tool=self._interrupt_before_tool,
             tool_confirmation_callback=self._tool_confirmation_callback,
+            direct_execution_callback=self._direct_execution_callback,
+            tool_execution_result_callback=self._tool_execution_result_callback,
         )
 
         try:
@@ -362,7 +403,7 @@ class AgentTool(BaseTool[str]):
                 checkpoint_path = await checkpointer.agenerate_checkpoint(
                     str(memory_file)
                 )
-                checkpoint_content = Path(checkpoint_path).read_text(encoding="utf-8")
+                checkpoint_content = await aread_text(Path(checkpoint_path))
 
                 # Aggregate the checkpoint into the main executors checkpoint
                 if main_session_id != "standalone":

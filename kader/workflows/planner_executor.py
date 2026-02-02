@@ -44,6 +44,8 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         tool_confirmation_callback: Optional[
             Callable[..., Tuple[bool, Optional[str]]]
         ] = None,
+        direct_execution_callback: Optional[Callable[..., None]] = None,
+        tool_execution_result_callback: Optional[Callable[..., None]] = None,
         use_persistence: bool = False,
         session_id: Optional[str] = None,
         executor_names: Optional[list[str]] = None,
@@ -68,6 +70,8 @@ class PlannerExecutorWorkflow(BaseWorkflow):
             interrupt_before_tool=interrupt_before_tool,
         )
         self.tool_confirmation_callback = tool_confirmation_callback
+        self.direct_execution_callback = direct_execution_callback
+        self.tool_execution_result_callback = tool_execution_result_callback
         self.use_persistence = use_persistence
         self.session_id = session_id if session_id else str(uuid.uuid4())
         self.executor_names = executor_names or ["executor"]
@@ -117,6 +121,8 @@ class PlannerExecutorWorkflow(BaseWorkflow):
                 model_name=self.model_name,
                 interrupt_before_tool=self.interrupt_before_tool,
                 tool_confirmation_callback=self.tool_confirmation_callback,
+                direct_execution_callback=self.direct_execution_callback,
+                tool_execution_result_callback=self.tool_execution_result_callback,
             )
             registry.register(agent_tool)
 
@@ -146,6 +152,8 @@ class PlannerExecutorWorkflow(BaseWorkflow):
             use_persistence=self.use_persistence,
             interrupt_before_tool=False,  # Planner executes TodoTool/AgentTool directly
             tool_confirmation_callback=self.tool_confirmation_callback,
+            direct_execution_callback=self.direct_execution_callback,
+            tool_execution_result_callback=self.tool_execution_result_callback,
         )
 
         return planner

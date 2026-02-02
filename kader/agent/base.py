@@ -48,11 +48,15 @@ class BaseAgent:
         provider: Optional[BaseLLMProvider] = None,
         memory: Optional[ConversationManager] = None,
         retry_attempts: int = 3,
+        retry_wait_min: int = 1,
+        retry_wait_max: int = 5,
         model_name: str = "qwen3-coder:480b-cloud",
         session_id: Optional[str] = None,
         use_persistence: bool = False,
         interrupt_before_tool: bool = True,
         tool_confirmation_callback: Optional[callable] = None,
+        direct_execution_callback: Optional[callable] = None,
+        tool_execution_result_callback: Optional[callable] = None,
     ) -> None:
         """
         Initialize the Base Agent.
@@ -75,8 +79,12 @@ class BaseAgent:
         self.name = name
         self.system_prompt = system_prompt
         self.retry_attempts = retry_attempts
+        self.retry_wait_min = retry_wait_min
+        self.retry_wait_max = retry_wait_max
         self.interrupt_before_tool = interrupt_before_tool
         self.tool_confirmation_callback = tool_confirmation_callback
+        self.direct_execution_callback = direct_execution_callback
+        self.tool_execution_result_callback = tool_execution_result_callback
 
         # Persistence Configuration
         self.session_id = session_id
@@ -339,22 +347,13 @@ class BaseAgent:
         if llm_content and len(llm_content) > 0:
             display_str = f"{llm_content}\n\n{display_str}"
 
-        # Use callback if provided (e.g., for GUI/TUI)
-        if self.tool_confirmation_callback:
-            return self.tool_confirmation_callback(display_str)
-
-        # Default: use console input
-        print(display_str)
-
-        # Direct execution for specific tools (Show message but don't ask)
-        # We need to extract the tool name effectively
+        # Extract tool name for direct execution check
         fn_info = tool_call_dict.get("function", {})
         if not fn_info and "name" in tool_call_dict:
             fn_info = tool_call_dict
-
         tool_name = fn_info.get("name", "")
 
-        # List of tools to execute directly
+        # List of tools to execute directly (show message but don't ask for confirmation)
         direct_execution_tools = {
             "read_file",
             "glob",
@@ -363,8 +362,22 @@ class BaseAgent:
             "read_dir",
         }
 
+        # Direct execution for specific tools - applies regardless of callback
         if tool_name in direct_execution_tools:
+            # Notify via direct_execution_callback if available (for CLI/TUI display)
+            if self.direct_execution_callback:
+                self.direct_execution_callback(display_str, tool_name)
+            else:
+                # Fallback: print to console
+                print(display_str)
             return True, None
+
+        # Use callback if provided (e.g., for GUI/TUI)
+        if self.tool_confirmation_callback:
+            return self.tool_confirmation_callback(display_str)
+
+        # Default: use console input
+        print(display_str)
 
         while True:
             user_input = input("\nExecute this tool? (yes/no): ").strip().lower()
@@ -455,6 +468,18 @@ class BaseAgent:
                 # Execute tool
                 tool_result = self._tool_registry.run(tool_call)
 
+                # Notify about tool execution result if callback available
+                if self.tool_execution_result_callback:
+                    # Handle both enum and string status
+                    status = tool_result.status
+                    status_value = (
+                        status.value if hasattr(status, "value") else str(status)
+                    )
+                    success = status_value == "success"
+                    self.tool_execution_result_callback(
+                        tool_call.name, success, tool_result.content
+                    )
+
                 # add result to memory
                 # But here we just return messages, caller handles memory add
                 tool_msg = Message.tool(
@@ -502,6 +527,18 @@ class BaseAgent:
                 # Execute tool async
                 tool_result = await self._tool_registry.arun(tool_call)
 
+                # Notify about tool execution result if callback available
+                if self.tool_execution_result_callback:
+                    # Handle both enum and string status
+                    status = tool_result.status
+                    status_value = (
+                        status.value if hasattr(status, "value") else str(status)
+                    )
+                    success = status_value == "success"
+                    self.tool_execution_result_callback(
+                        tool_call.name, success, tool_result.content
+                    )
+
                 tool_msg = Message.tool(
                     tool_call_id=tool_result.tool_call_id, content=tool_result.content
                 )
@@ -529,7 +566,9 @@ class BaseAgent:
 
         runner = Retrying(
             stop=stop_after_attempt(self.retry_attempts),
-            wait=wait_exponential(multiplier=1, min=4, max=10),
+            wait=wait_exponential(
+                multiplier=1, min=self.retry_wait_min, max=self.retry_wait_max
+            ),
             reraise=True,
         )
 
@@ -672,7 +711,9 @@ class BaseAgent:
 
         runner = Retrying(
             stop=stop_after_attempt(self.retry_attempts),
-            wait=wait_exponential(multiplier=1, min=4, max=10),
+            wait=wait_exponential(
+                multiplier=1, min=self.retry_wait_min, max=self.retry_wait_max
+            ),
             reraise=True,
         )
 
@@ -709,7 +750,9 @@ class BaseAgent:
 
         runner = AsyncRetrying(
             stop=stop_after_attempt(self.retry_attempts),
-            wait=wait_exponential(multiplier=1, min=4, max=10),
+            wait=wait_exponential(
+                multiplier=1, min=self.retry_wait_min, max=self.retry_wait_max
+            ),
             reraise=True,
         )
 
@@ -925,9 +968,9 @@ class BaseAgent:
         if registry is None:
             # Lazy import to avoid circular dependencies if any
             try:
-                from kader.tools import get_default_registry
+                from kader.tools import get_cached_default_registry
 
-                registry = get_default_registry()
+                registry = get_cached_default_registry()
             except ImportError:
                 pass
 

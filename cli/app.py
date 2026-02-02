@@ -1,7 +1,9 @@
 """Kader CLI - Modern Vibe Coding CLI with Textual."""
 
 import asyncio
+import atexit
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import version as get_version
 from pathlib import Path
 from typing import Optional
@@ -18,13 +20,11 @@ from textual.widgets import (
     Tree,
 )
 
-from kader.agent.agents import ReActAgent
 from kader.memory import (
     FileSessionManager,
     MemoryConfig,
-    SlidingWindowConversationManager,
 )
-from kader.tools import get_default_registry
+from kader.workflows import PlannerExecutorWorkflow
 
 from .utils import (
     DEFAULT_MODEL,
@@ -103,21 +103,78 @@ class KaderApp(App):
         self._model_selector: Optional[ModelSelector] = None
         self._update_info: Optional[str] = None  # Latest version if update available
 
-        self._agent = self._create_agent(self._current_model)
+        # Dedicated thread pool for agent invocation (isolated from default pool)
+        self._agent_executor = ThreadPoolExecutor(
+            max_workers=2, thread_name_prefix="kader_agent"
+        )
+        # Ensure executor is properly shut down on exit
+        atexit.register(self._agent_executor.shutdown, wait=False)
 
-    def _create_agent(self, model_name: str) -> ReActAgent:
-        """Create a new ReActAgent with the specified model."""
-        registry = get_default_registry()
-        memory = SlidingWindowConversationManager(window_size=10)
-        return ReActAgent(
+        self._workflow = self._create_workflow(self._current_model)
+
+    def _create_workflow(self, model_name: str) -> PlannerExecutorWorkflow:
+        """Create a new PlannerExecutorWorkflow with the specified model."""
+        return PlannerExecutorWorkflow(
             name="kader_cli",
-            tools=registry,
-            memory=memory,
             model_name=model_name,
-            use_persistence=True,
             interrupt_before_tool=True,
             tool_confirmation_callback=self._tool_confirmation_callback,
+            direct_execution_callback=self._direct_execution_callback,
+            tool_execution_result_callback=self._tool_execution_result_callback,
+            use_persistence=True,
+            executor_names=["executor"],
         )
+
+    def _direct_execution_callback(self, message: str, tool_name: str) -> None:
+        """
+        Callback for direct execution tools - called from agent thread.
+
+        Shows a message in the conversation view without blocking for confirmation.
+        """
+        # Schedule message display on main thread
+        self.call_from_thread(self._show_direct_execution_message, message, tool_name)
+
+    def _show_direct_execution_message(self, message: str, tool_name: str) -> None:
+        """Show a direct execution message in the conversation view."""
+        try:
+            conversation = self.query_one("#conversation-view", ConversationView)
+            # User-friendly message showing the tool is executing
+            friendly_message = f"[>] Executing {tool_name}..."
+            conversation.add_message(friendly_message, "assistant")
+            conversation.scroll_end()
+        except Exception:
+            pass
+
+    def _tool_execution_result_callback(
+        self, tool_name: str, success: bool, result: str
+    ) -> None:
+        """
+        Callback for tool execution results - called from agent thread.
+
+        Updates the conversation view with the execution result.
+        """
+        # Schedule result display on main thread
+        self.call_from_thread(
+            self._show_tool_execution_result, tool_name, success, result
+        )
+
+    def _show_tool_execution_result(
+        self, tool_name: str, success: bool, result: str
+    ) -> None:
+        """Show the tool execution result in the conversation view."""
+        try:
+            conversation = self.query_one("#conversation-view", ConversationView)
+            if success:
+                # User-friendly success message
+                friendly_message = f"(+) {tool_name} completed successfully"
+            else:
+                # User-friendly error message with truncated result
+                error_preview = result[:100] + "..." if len(result) > 100 else result
+                friendly_message = f"(-) {tool_name} failed: {error_preview}"
+            conversation.add_message(friendly_message, "assistant")
+            conversation.scroll_end()
+        except Exception:
+            pass
 
     def _tool_confirmation_callback(self, message: str) -> tuple[bool, Optional[str]]:
         """
@@ -135,7 +192,10 @@ class KaderApp(App):
 
         # Wait for user response (blocking in agent thread)
         # This is safe because we're in a background thread
-        self._confirmation_event.wait()
+        # Timeout after 5 minutes to prevent indefinite blocking
+        if not self._confirmation_event.wait(timeout=300):
+            # Timeout occurred - decline tool execution gracefully
+            return (False, "Tool confirmation timed out after 5 minutes")
 
         # Return the result
         return self._confirmation_result
@@ -183,7 +243,8 @@ class KaderApp(App):
         if event.confirmed:
             if tool_message:
                 conversation.add_message(tool_message, "assistant")
-            conversation.add_message("(+) Executing tool...", "assistant")
+            # Show executing message - will be updated by result callback
+            conversation.add_message("[>] Executing tool...", "assistant")
             # Restart spinner
             try:
                 spinner = self.query_one(LoadingSpinner)
@@ -249,7 +310,7 @@ class KaderApp(App):
         # Update model and recreate agent
         old_model = self._current_model
         self._current_model = event.model
-        self._agent = self._create_agent(self._current_model)
+        self._workflow = self._create_workflow(self._current_model)
 
         conversation.add_message(
             f"(+) Model changed from `{old_model}` to `{self._current_model}`",
@@ -431,8 +492,8 @@ Please resize your terminal."""
             await self._show_model_selector(conversation)
         elif cmd == "/clear":
             conversation.clear_messages()
-            self._agent.memory.clear()
-            self._agent.provider.reset_tracking()  # Reset usage/cost tracking
+            self._workflow.planner.memory.clear()
+            self._workflow.planner.provider.reset_tracking()  # Reset usage/cost tracking
             self._current_session_id = None
             self.notify("Conversation cleared!", severity="information")
         elif cmd == "/save":
@@ -462,7 +523,7 @@ Please resize your terminal."""
             )
 
     async def _handle_chat(self, message: str) -> None:
-        """Handle regular chat messages with ReActAgent."""
+        """Handle regular chat messages with PlannerExecutorWorkflow."""
         if self._is_processing:
             self.notify("Please wait for the current response...", severity="warning")
             return
@@ -490,20 +551,20 @@ Please resize your terminal."""
         spinner = self.query_one(LoadingSpinner)
 
         try:
-            # Run the agent invoke in a thread
+            # Run the workflow in a dedicated thread pool
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
-                None, lambda: self._agent.invoke(message)
+                self._agent_executor, lambda: self._workflow.run(message)
             )
 
             # Hide spinner and show response (this runs on main thread via await)
             spinner.stop()
-            if response and response.content:
+            if response:
                 conversation.add_message(
-                    response.content,
+                    response,
                     "assistant",
-                    model_name=self._agent.provider.model,
-                    usage_cost=self._agent.provider.total_cost.total_cost,
+                    model_name=self._workflow.planner.provider.model,
+                    usage_cost=self._workflow.planner.provider.total_cost.total_cost,
                 )
 
         except Exception as e:
@@ -521,7 +582,7 @@ Please resize your terminal."""
         """Clear the conversation (Ctrl+L)."""
         conversation = self.query_one("#conversation-view", ConversationView)
         conversation.clear_messages()
-        self._agent.memory.clear()
+        self._workflow.planner.memory.clear()
         self.notify("Conversation cleared!", severity="information")
 
     def action_save_session(self) -> None:
@@ -553,8 +614,10 @@ Please resize your terminal."""
                 session = self._session_manager.create_session("kader_cli")
                 self._current_session_id = session.session_id
 
-            # Get messages from agent memory and save
-            messages = [msg.message for msg in self._agent.memory.get_messages()]
+            # Get messages from planner memory and save
+            messages = [
+                msg.message for msg in self._workflow.planner.memory.get_messages()
+            ]
             self._session_manager.save_conversation(self._current_session_id, messages)
 
             conversation.add_message(
@@ -585,11 +648,11 @@ Please resize your terminal."""
 
             # Clear current state
             conversation.clear_messages()
-            self._agent.memory.clear()
+            self._workflow.planner.memory.clear()
 
             # Add loaded messages to memory and UI
             for msg in messages:
-                self._agent.memory.add_message(msg)
+                self._workflow.planner.memory.add_message(msg)
                 role = msg.get("role", "user")
                 content = msg.get("content", "")
                 if role in ["user", "assistant"] and content:
@@ -638,9 +701,9 @@ Please resize your terminal."""
         """Display LLM usage costs."""
         try:
             # Get cost and usage from the provider
-            cost = self._agent.provider.total_cost
-            usage = self._agent.provider.total_usage
-            model = self._agent.provider.model
+            cost = self._workflow.planner.provider.total_cost
+            usage = self._workflow.planner.provider.total_usage
+            model = self._workflow.planner.provider.model
 
             lines = [
                 "## Usage Costs ($)\n",

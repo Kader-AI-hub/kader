@@ -31,6 +31,8 @@ class ReActAgent(BaseAgent):
         use_persistence: bool = False,
         interrupt_before_tool: bool = True,
         tool_confirmation_callback: Optional[callable] = None,
+        direct_execution_callback: Optional[callable] = None,
+        tool_execution_result_callback: Optional[callable] = None,
     ) -> None:
         # Resolve tools for prompt context if necessary
         # The base agent handles tool registration, but for the prompt template
@@ -67,6 +69,8 @@ class ReActAgent(BaseAgent):
             use_persistence=use_persistence,
             interrupt_before_tool=interrupt_before_tool,
             tool_confirmation_callback=tool_confirmation_callback,
+            direct_execution_callback=direct_execution_callback,
+            tool_execution_result_callback=tool_execution_result_callback,
         )
 
 
@@ -90,6 +94,8 @@ class PlanningAgent(BaseAgent):
         use_persistence: bool = False,
         interrupt_before_tool: bool = True,
         tool_confirmation_callback: Optional[callable] = None,
+        direct_execution_callback: Optional[callable] = None,
+        tool_execution_result_callback: Optional[callable] = None,
     ) -> None:
         # Ensure TodoTool is available
         _todo_tool = TodoTool()
@@ -123,4 +129,6 @@ class PlanningAgent(BaseAgent):
             use_persistence=use_persistence,
             interrupt_before_tool=interrupt_before_tool,
             tool_confirmation_callback=tool_confirmation_callback,
+            direct_execution_callback=direct_execution_callback,
+            tool_execution_result_callback=tool_execution_result_callback,
         )

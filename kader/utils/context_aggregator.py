@@ -7,7 +7,7 @@ in the main session's executors directory.
 
 from pathlib import Path
 
-from kader.memory.types import get_default_memory_dir
+from kader.memory.types import aread_text, awrite_text, get_default_memory_dir
 from kader.providers.base import Message
 from kader.providers.ollama import OllamaProvider
 
@@ -27,9 +27,14 @@ project/
 ```
 
 ## Actions Performed
-Numbered list of all actions taken by all sub-agents in chronological order:
-1. Action description
-2. Action description
+Summarize the main accomplishments and significant actions taken by all sub-agents.
+Focus on high-level outcomes, not individual steps. For example:
+- "Implemented user authentication module with login/logout functionality"
+- "Fixed database connection issues and added retry logic"
+- "Created REST API endpoints for user management"
+
+Do NOT list every single action (like reading files, running commands, etc.).
+Only mention the meaningful outcomes and key decisions.
 
 If a section has no relevant content, write "None" under that section.
 
@@ -100,6 +105,21 @@ class ContextAggregator:
                 return None
         return None
 
+    async def _aload_existing_aggregated(self) -> str | None:
+        """
+        Asynchronously load existing aggregated checkpoint if it exists.
+
+        Returns:
+            Content of existing aggregated checkpoint, or None if not exists
+        """
+        checkpoint_path = self._get_aggregated_checkpoint_path()
+        if checkpoint_path.exists():
+            try:
+                return await aread_text(checkpoint_path)
+            except Exception:
+                return None
+        return None
+
     def _load_subagent_checkpoint(self, checkpoint_path: str | Path) -> str | None:
         """
         Load a sub-agent's checkpoint content.
@@ -115,6 +135,27 @@ class ContextAggregator:
         if path.exists():
             try:
                 return path.read_text(encoding="utf-8")
+            except Exception:
+                return None
+        return None
+
+    async def _aload_subagent_checkpoint(
+        self, checkpoint_path: str | Path
+    ) -> str | None:
+        """
+        Asynchronously load a sub-agent's checkpoint content.
+
+        Args:
+            checkpoint_path: Path to the sub-agent's checkpoint.md file
+
+        Returns:
+            Content of the checkpoint file, or None if not found
+        """
+        full_path = self._get_executors_dir() / checkpoint_path
+        path = Path(full_path)
+        if path.exists():
+            try:
+                return await aread_text(path)
             except Exception:
                 return None
         return None
@@ -276,8 +317,8 @@ Combine items into the appropriate sections, remove duplicates, and keep everyth
             FileNotFoundError: If the sub-agent checkpoint file doesn't exist
             ValueError: If the sub-agent checkpoint is empty
         """
-        # Load the sub-agent's checkpoint
-        new_checkpoint = self._load_subagent_checkpoint(subagent_checkpoint_path)
+        # Load the sub-agent's checkpoint (async)
+        new_checkpoint = await self._aload_subagent_checkpoint(subagent_checkpoint_path)
         if not new_checkpoint:
             raise FileNotFoundError(
                 f"Sub-agent checkpoint not found: {subagent_checkpoint_path}"
@@ -288,8 +329,8 @@ Combine items into the appropriate sections, remove duplicates, and keep everyth
                 f"Sub-agent checkpoint is empty: {subagent_checkpoint_path}"
             )
 
-        # Load existing aggregated checkpoint if it exists
-        existing_aggregated = self._load_existing_aggregated()
+        # Load existing aggregated checkpoint if it exists (async)
+        existing_aggregated = await self._aload_existing_aggregated()
 
         # Merge the checkpoints
         merged_content = await self._amerge_checkpoints(
@@ -300,7 +341,7 @@ Combine items into the appropriate sections, remove duplicates, and keep everyth
         aggregated_path = self._get_aggregated_checkpoint_path()
         aggregated_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Save the aggregated checkpoint
-        aggregated_path.write_text(merged_content, encoding="utf-8")
+        # Save the aggregated checkpoint (async)
+        await awrite_text(aggregated_path, merged_content)
 
         return str(aggregated_path)
