@@ -472,7 +472,9 @@ class BaseAgent:
                 if self.tool_execution_result_callback:
                     # Handle both enum and string status
                     status = tool_result.status
-                    status_value = status.value if hasattr(status, 'value') else str(status)
+                    status_value = (
+                        status.value if hasattr(status, "value") else str(status)
+                    )
                     success = status_value == "success"
                     self.tool_execution_result_callback(
                         tool_call.name, success, tool_result.content
@@ -529,7 +531,9 @@ class BaseAgent:
                 if self.tool_execution_result_callback:
                     # Handle both enum and string status
                     status = tool_result.status
-                    status_value = status.value if hasattr(status, 'value') else str(status)
+                    status_value = (
+                        status.value if hasattr(status, "value") else str(status)
+                    )
                     success = status_value == "success"
                     self.tool_execution_result_callback(
                         tool_call.name, success, tool_result.content

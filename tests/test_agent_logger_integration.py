@@ -1,9 +1,6 @@
-import tempfile
 from pathlib import Path
 
 from kader.agent.logger import AgentLogger
-from loguru import logger
-
 
 
 class TestAgentLoggerIntegration:
@@ -14,23 +11,25 @@ class TestAgentLoggerIntegration:
         self.agent_logger = AgentLogger()
         # Clear the _loggers dictionary to isolate tests
         self.agent_logger._loggers = {}
-        # The global mock_kader_home fixture in conftest.py already handles 
+        # The global mock_kader_home fixture in conftest.py already handles
         # mocking Path.home() to a temp directory, so we don't need to do it here manually.
         # We can just rely on the fact that Path.home() returns a temp dir.
 
     def teardown_method(self):
         """Clean up after each test method."""
         # Remove all logger handlers created during the test to release file locks
-        for logger_id, (logger_instance, handler_id) in self.agent_logger._loggers.items():
+        for logger_id, (
+            logger_instance,
+            handler_id,
+        ) in self.agent_logger._loggers.items():
             try:
                 # Remove the handler from the specific logger instance
                 logger_instance.remove(handler_id)
             except Exception:
                 pass
-        
+
         # Clear the loggers dictionary
         self.agent_logger._loggers = {}
-
 
     def test_real_logger_setup_and_usage(self):
         """Test the actual logger setup and usage functionality."""
@@ -38,9 +37,11 @@ class TestAgentLoggerIntegration:
         logger_id = self.agent_logger.setup_logger("test_agent", "session123")
         assert logger_id == "test_agent_session123"
         assert logger_id in self.agent_logger._loggers
-        
+
         # Verify it created the directory in the mocked home
-        expected_log_file = Path.home() / ".kader" / "logs" / "test_agent_session123.log"
+        expected_log_file = (
+            Path.home() / ".kader" / "logs" / "test_agent_session123.log"
+        )
         assert expected_log_file.exists()
 
         # Test that logger is not created when no session_id is provided

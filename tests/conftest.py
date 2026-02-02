@@ -10,13 +10,13 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
 
-
 # If we need any fixtures, we can add them here
-import pytest
 import shutil
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 from loguru import logger
 
 
@@ -30,23 +30,21 @@ def mock_kader_home():
     # Create a temporary directory to act as the fake home
     temp_home = tempfile.mkdtemp()
     temp_home_path = Path(temp_home)
-    
+
     # Mock Path.home() to return our temporary directory
     # We use a patcher so we can start/stop it cleanly
-    patcher = patch('pathlib.Path.home', return_value=temp_home_path)
-    mock_home = patcher.start()
-    
+    patcher = patch("pathlib.Path.home", return_value=temp_home_path)
+    _ = patcher.start()
+
     yield temp_home_path
-    
+
     # Cleanup
     patcher.stop()
-    
+
     # Remove all logger handlers to release file locks on Windows
     try:
         logger.remove()
     except Exception:
         pass
-        
+
     shutil.rmtree(temp_home)
-
-
