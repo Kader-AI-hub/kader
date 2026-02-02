@@ -433,15 +433,11 @@ class OllamaProvider(BaseLLMProvider):
             models_config = {}
             for model in models:
                 models_config[model] = client.show(model)
+            accepted_capabilities = ["completion", "tools"]
             return [
                 model
                 for model, config in models_config.items()
-                if config.capabilities
-                in [
-                    ["completion", "tools", "thinking"],
-                    ["completion", "tools"],
-                    ["completion", "tools", "thinking", "vision"],
-                ]
+                if set(accepted_capabilities).issubset(set(config.capabilities))
             ]
         except Exception:
             return []
