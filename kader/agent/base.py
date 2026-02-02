@@ -343,22 +343,13 @@ class BaseAgent:
         if llm_content and len(llm_content) > 0:
             display_str = f"{llm_content}\n\n{display_str}"
 
-        # Use callback if provided (e.g., for GUI/TUI)
-        if self.tool_confirmation_callback:
-            return self.tool_confirmation_callback(display_str)
-
-        # Default: use console input
-        print(display_str)
-
-        # Direct execution for specific tools (Show message but don't ask)
-        # We need to extract the tool name effectively
+        # Extract tool name for direct execution check
         fn_info = tool_call_dict.get("function", {})
         if not fn_info and "name" in tool_call_dict:
             fn_info = tool_call_dict
-
         tool_name = fn_info.get("name", "")
 
-        # List of tools to execute directly
+        # List of tools to execute directly (show message but don't ask for confirmation)
         direct_execution_tools = {
             "read_file",
             "glob",
@@ -367,8 +358,22 @@ class BaseAgent:
             "read_dir",
         }
 
+        # Direct execution for specific tools - applies regardless of callback
         if tool_name in direct_execution_tools:
+            # Still show the message via callback if available, but auto-confirm
+            if self.tool_confirmation_callback:
+                # For CLI, we want to show what's happening but not block
+                # We pass the message but immediately return True
+                pass  # Message will be shown in console print below
+            print(display_str)
             return True, None
+
+        # Use callback if provided (e.g., for GUI/TUI)
+        if self.tool_confirmation_callback:
+            return self.tool_confirmation_callback(display_str)
+
+        # Default: use console input
+        print(display_str)
 
         while True:
             user_input = input("\nExecute this tool? (yes/no): ").strip().lower()
