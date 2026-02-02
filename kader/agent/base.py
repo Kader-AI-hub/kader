@@ -55,6 +55,8 @@ class BaseAgent:
         use_persistence: bool = False,
         interrupt_before_tool: bool = True,
         tool_confirmation_callback: Optional[callable] = None,
+        direct_execution_callback: Optional[callable] = None,
+        tool_execution_result_callback: Optional[callable] = None,
     ) -> None:
         """
         Initialize the Base Agent.
@@ -81,6 +83,8 @@ class BaseAgent:
         self.retry_wait_max = retry_wait_max
         self.interrupt_before_tool = interrupt_before_tool
         self.tool_confirmation_callback = tool_confirmation_callback
+        self.direct_execution_callback = direct_execution_callback
+        self.tool_execution_result_callback = tool_execution_result_callback
 
         # Persistence Configuration
         self.session_id = session_id
@@ -360,12 +364,12 @@ class BaseAgent:
 
         # Direct execution for specific tools - applies regardless of callback
         if tool_name in direct_execution_tools:
-            # Still show the message via callback if available, but auto-confirm
-            if self.tool_confirmation_callback:
-                # For CLI, we want to show what's happening but not block
-                # We pass the message but immediately return True
-                pass  # Message will be shown in console print below
-            print(display_str)
+            # Notify via direct_execution_callback if available (for CLI/TUI display)
+            if self.direct_execution_callback:
+                self.direct_execution_callback(display_str, tool_name)
+            else:
+                # Fallback: print to console
+                print(display_str)
             return True, None
 
         # Use callback if provided (e.g., for GUI/TUI)
@@ -464,6 +468,16 @@ class BaseAgent:
                 # Execute tool
                 tool_result = self._tool_registry.run(tool_call)
 
+                # Notify about tool execution result if callback available
+                if self.tool_execution_result_callback:
+                    # Handle both enum and string status
+                    status = tool_result.status
+                    status_value = status.value if hasattr(status, 'value') else str(status)
+                    success = status_value == "success"
+                    self.tool_execution_result_callback(
+                        tool_call.name, success, tool_result.content
+                    )
+
                 # add result to memory
                 # But here we just return messages, caller handles memory add
                 tool_msg = Message.tool(
@@ -510,6 +524,16 @@ class BaseAgent:
 
                 # Execute tool async
                 tool_result = await self._tool_registry.arun(tool_call)
+
+                # Notify about tool execution result if callback available
+                if self.tool_execution_result_callback:
+                    # Handle both enum and string status
+                    status = tool_result.status
+                    status_value = status.value if hasattr(status, 'value') else str(status)
+                    success = status_value == "success"
+                    self.tool_execution_result_callback(
+                        tool_call.name, success, tool_result.content
+                    )
 
                 tool_msg = Message.tool(
                     tool_call_id=tool_result.tool_call_id, content=tool_result.content

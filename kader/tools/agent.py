@@ -99,6 +99,8 @@ class AgentTool(BaseTool[str]):
         tool_confirmation_callback: Optional[
             Callable[..., Tuple[bool, Optional[str]]]
         ] = None,
+        direct_execution_callback: Optional[Callable[..., None]] = None,
+        tool_execution_result_callback: Optional[Callable[..., None]] = None,
     ) -> None:
         """
         Initialize the AgentTool.
@@ -138,6 +140,8 @@ class AgentTool(BaseTool[str]):
         self._model_name = model_name
         self._interrupt_before_tool = interrupt_before_tool
         self._tool_confirmation_callback = tool_confirmation_callback
+        self._direct_execution_callback = direct_execution_callback
+        self._tool_execution_result_callback = tool_execution_result_callback
 
     def _load_aggregated_context(self, main_session_id: str) -> str | None:
         """
@@ -269,6 +273,8 @@ class AgentTool(BaseTool[str]):
             model_name=self._model_name,
             interrupt_before_tool=self._interrupt_before_tool,
             tool_confirmation_callback=self._tool_confirmation_callback,
+            direct_execution_callback=self._direct_execution_callback,
+            tool_execution_result_callback=self._tool_execution_result_callback,
         )
 
         try:
@@ -382,6 +388,8 @@ class AgentTool(BaseTool[str]):
             model_name=self._model_name,
             interrupt_before_tool=self._interrupt_before_tool,
             tool_confirmation_callback=self._tool_confirmation_callback,
+            direct_execution_callback=self._direct_execution_callback,
+            tool_execution_result_callback=self._tool_execution_result_callback,
         )
 
         try:

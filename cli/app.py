@@ -119,9 +119,62 @@ class KaderApp(App):
             model_name=model_name,
             interrupt_before_tool=True,
             tool_confirmation_callback=self._tool_confirmation_callback,
+            direct_execution_callback=self._direct_execution_callback,
+            tool_execution_result_callback=self._tool_execution_result_callback,
             use_persistence=True,
             executor_names=["executor"],
         )
+
+    def _direct_execution_callback(self, message: str, tool_name: str) -> None:
+        """
+        Callback for direct execution tools - called from agent thread.
+
+        Shows a message in the conversation view without blocking for confirmation.
+        """
+        # Schedule message display on main thread
+        self.call_from_thread(self._show_direct_execution_message, message, tool_name)
+
+    def _show_direct_execution_message(self, message: str, tool_name: str) -> None:
+        """Show a direct execution message in the conversation view."""
+        try:
+            conversation = self.query_one("#conversation-view", ConversationView)
+            # User-friendly message showing the tool is executing
+            friendly_message = f"[>] Executing {tool_name}..."
+            conversation.add_message(friendly_message, "assistant")
+            conversation.scroll_end()
+        except Exception:
+            pass
+
+    def _tool_execution_result_callback(
+        self, tool_name: str, success: bool, result: str
+    ) -> None:
+        """
+        Callback for tool execution results - called from agent thread.
+
+        Updates the conversation view with the execution result.
+        """
+        # Schedule result display on main thread
+        self.call_from_thread(
+            self._show_tool_execution_result, tool_name, success, result
+        )
+
+    def _show_tool_execution_result(
+        self, tool_name: str, success: bool, result: str
+    ) -> None:
+        """Show the tool execution result in the conversation view."""
+        try:
+            conversation = self.query_one("#conversation-view", ConversationView)
+            if success:
+                # User-friendly success message
+                friendly_message = f"(+) {tool_name} completed successfully"
+            else:
+                # User-friendly error message with truncated result
+                error_preview = result[:100] + "..." if len(result) > 100 else result
+                friendly_message = f"(-) {tool_name} failed: {error_preview}"
+            conversation.add_message(friendly_message, "assistant")
+            conversation.scroll_end()
+        except Exception:
+            pass
 
     def _tool_confirmation_callback(self, message: str) -> tuple[bool, Optional[str]]:
         """
@@ -190,7 +243,8 @@ class KaderApp(App):
         if event.confirmed:
             if tool_message:
                 conversation.add_message(tool_message, "assistant")
-            conversation.add_message("(+) Executing tool...", "assistant")
+            # Show executing message - will be updated by result callback
+            conversation.add_message("[>] Executing tool...", "assistant")
             # Restart spinner
             try:
                 spinner = self.query_one(LoadingSpinner)
