@@ -26,6 +26,7 @@ from kader.memory import (
 )
 from kader.workflows import PlannerExecutorWorkflow
 
+from .llm_factory import LLMProviderFactory
 from .utils import (
     DEFAULT_MODEL,
     HELP_TEXT,
@@ -114,9 +115,13 @@ class KaderApp(App):
 
     def _create_workflow(self, model_name: str) -> PlannerExecutorWorkflow:
         """Create a new PlannerExecutorWorkflow with the specified model."""
+        # Create provider using factory (supports provider:model format)
+        provider = LLMProviderFactory.create_provider(model_name)
+
         return PlannerExecutorWorkflow(
             name="kader_cli",
-            model_name=model_name,
+            provider=provider,
+            model_name=model_name,  # Keep for reference
             interrupt_before_tool=True,
             tool_confirmation_callback=self._tool_confirmation_callback,
             direct_execution_callback=self._direct_execution_callback,
@@ -268,13 +273,12 @@ class KaderApp(App):
 
     async def _show_model_selector(self, conversation: ConversationView) -> None:
         """Show the model selector widget."""
-        from kader.providers import OllamaProvider
-
         try:
-            models = OllamaProvider.get_supported_models()
+            # Get models from all available providers
+            models = LLMProviderFactory.get_flat_model_list()
             if not models:
                 conversation.add_message(
-                    "## Models (^^)\n\n*No models found. Is Ollama running?*",
+                    "## Models (^^)\n\n*No models found. Check provider configurations.*",
                     "assistant",
                 )
                 return
@@ -569,7 +573,7 @@ Please resize your terminal."""
 
         except Exception as e:
             spinner.stop()
-            error_msg = f"(-) **Error:** {str(e)}\n\nMake sure Ollama is running and the model `{self._current_model}` is available."
+            error_msg = f"(-) **Error:** {str(e)}\n\nMake sure the provider for `{self._current_model}` is configured and available."
             conversation.add_message(error_msg, "assistant")
             self.notify(f"Error: {e}", severity="error")
 

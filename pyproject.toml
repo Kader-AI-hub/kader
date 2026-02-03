@@ -1,6 +1,6 @@
 [project]
 name = "kader"
-version = "1.0.0"
+version = "1.1.0"
 description = "kader coding agent"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -16,6 +16,7 @@ dependencies = [
     "jinja2>=3.1.6",
     "outdated>=0.2.2",
     "aiofiles>=25.1.0",
+    "google-genai>=1.61.0",
 ]
 
 [project.scripts]

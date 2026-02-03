@@ -1,9 +1,9 @@
 """Utility constants and helpers for Kader CLI."""
 
-from kader.providers import OllamaProvider
+from .llm_factory import LLMProviderFactory
 
-# Default model
-DEFAULT_MODEL = "kimi-k2.5:cloud"
+# Default model (with provider prefix for clarity)
+DEFAULT_MODEL = "ollama:kimi-k2.5:cloud"
 
 HELP_TEXT = """## Kader CLI Commands
 
@@ -40,24 +40,32 @@ HELP_TEXT = """## Kader CLI Commands
 ### Tips:
 - Type any question to chat with the AI
 - Use **Tab** to navigate between panels
+- Model format: `provider:model` (e.g., `google:gemini-2.5-flash`)
 """
 
 
 def get_models_text() -> str:
-    """Get formatted text of available Ollama models."""
+    """Get formatted text of available models from all providers."""
     try:
-        models = OllamaProvider.get_supported_models()
-        if not models:
-            return "## Available Models (^^)\n\n*No models found. Is Ollama running?*"
+        all_models = LLMProviderFactory.get_all_models()
+        flat_list = LLMProviderFactory.get_flat_model_list()
+
+        if not flat_list:
+            return "## Available Models (^^)\n\n*No models found. Check provider configurations.*"
 
         lines = [
             "## Available Models (^^)\n",
-            "| Model | Status |",
-            "|-------|--------|",
+            "| Provider | Model | Status |",
+            "|----------|-------|--------|",
         ]
-        for model in models:
-            lines.append(f"| {model} | (+) Available |")
+        for provider_name, provider_models in all_models.items():
+            for model in provider_models:
+                lines.append(f"| {provider_name.title()} | `{model}` | (+) Available |")
+
         lines.append(f"\n*Currently using: **{DEFAULT_MODEL}***")
+        lines.append(
+            "\n> (!) Tip: Use `provider:model` format (e.g., `google:gemini-2.5-flash`)"
+        )
         return "\n".join(lines)
     except Exception as e:
         return f"## Available Models (^^)\n\n*Error fetching models: {e}*"

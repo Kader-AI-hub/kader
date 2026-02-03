@@ -69,13 +69,21 @@ def ensure_kader_directory():
 def ensure_env_file(kader_dir):
     """
     Ensure that the .env file exists in the .kader directory with the
-    required OLLAMA_API_KEY configuration.
+    required API key configurations.
     """
     env_file = kader_dir / ".env"
 
     # Create the .env file if it doesn't exist
     if not env_file.exists():
-        env_file.write_text("OLLAMA_API_KEY=''\n", encoding="utf-8")
+        default_env_content = """# Kader Configuration
+# Ollama API Key (for local Ollama models)
+OLLAMA_API_KEY=''
+
+# Google Gemini API Key (for Google Gemini models)
+# Get your API key from: https://aistudio.google.com/apikey
+GEMINI_API_KEY=''
+"""
+        env_file.write_text(default_env_content, encoding="utf-8")
 
         # Set appropriate permissions for the .env file on Unix-like systems
         if not sys.platform.startswith("win"):
