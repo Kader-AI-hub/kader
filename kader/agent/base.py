@@ -23,7 +23,9 @@ from kader.providers.base import (
     Message,
     ModelConfig,
     StreamChunk,
+    Usage,
 )
+from kader.providers.google import GoogleProvider
 from kader.providers.ollama import OllamaProvider
 from kader.tools import BaseTool, ToolRegistry
 
@@ -222,6 +224,8 @@ class BaseAgent:
             provider_type = "openai"
             if isinstance(self.provider, OllamaProvider):
                 provider_type = "ollama"
+            elif isinstance(self.provider, GoogleProvider):
+                provider_type = "google"
 
             base_config = ModelConfig(
                 temperature=base_config.temperature,
@@ -624,7 +628,12 @@ class BaseAgent:
                     )
 
                     # estimate the cost...
-                    estimated_cost = self.provider.estimate_cost(token_usage)
+                    usage_obj = Usage(
+                        prompt_tokens=token_usage["prompt_tokens"],
+                        completion_tokens=token_usage["completion_tokens"],
+                        total_tokens=token_usage["total_tokens"],
+                    )
+                    estimated_cost = self.provider.estimate_cost(usage_obj)
 
                     # Calculate and log cost
                     agent_logger.calculate_cost(
@@ -796,7 +805,12 @@ class BaseAgent:
                     )
 
                     # estimate the cost...
-                    estimated_cost = self.provider.estimate_cost(token_usage)
+                    usage_obj = Usage(
+                        prompt_tokens=token_usage["prompt_tokens"],
+                        completion_tokens=token_usage["completion_tokens"],
+                        total_tokens=token_usage["total_tokens"],
+                    )
+                    estimated_cost = self.provider.estimate_cost(usage_obj)
 
                     # Calculate and log cost
                     agent_logger.calculate_cost(

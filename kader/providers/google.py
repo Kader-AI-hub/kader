@@ -184,9 +184,11 @@ class GoogleProvider(BaseLLMProvider):
             system_instruction=system_instruction,
         )
 
-        # Handle tools
+        # Handle tools - convert from dict format to Google's FunctionDeclaration format
         if config.tools:
-            generate_config.tools = config.tools
+            google_tools = self._convert_tools_to_google_format(config.tools)
+            if google_tools:
+                generate_config.tools = google_tools
 
         # Handle response format
         if config.response_format:
@@ -195,6 +197,59 @@ class GoogleProvider(BaseLLMProvider):
                 generate_config.response_mime_type = "application/json"
 
         return generate_config
+
+    def _convert_tools_to_google_format(
+        self, tools: list[dict]
+    ) -> list[types.Tool] | None:
+        """
+        Convert tool definitions from dict format to Google's Tool format.
+
+        Args:
+            tools: List of tool definitions (from to_google_format or to_openai_format)
+
+        Returns:
+            List of Google Tool objects, or None if no valid tools
+        """
+        if not tools:
+            return None
+
+        function_declarations: list[types.FunctionDeclaration] = []
+
+        for tool in tools:
+            # Handle OpenAI format (type: "function", function: {...})
+            if tool.get("type") == "function" and "function" in tool:
+                func_def = tool["function"]
+                name = func_def.get("name", "")
+                description = func_def.get("description", "")
+                parameters = func_def.get("parameters", {})
+            # Handle Google format (directly has name, description, parameters)
+            elif "name" in tool:
+                name = tool.get("name", "")
+                description = tool.get("description", "")
+                parameters = tool.get("parameters", {})
+            else:
+                continue
+
+            if not name:
+                continue
+
+            # Create FunctionDeclaration
+            try:
+                func_decl = types.FunctionDeclaration(
+                    name=name,
+                    description=description,
+                    parameters=parameters if parameters else None,
+                )
+                function_declarations.append(func_decl)
+            except Exception:
+                # Skip invalid function declarations
+                continue
+
+        if not function_declarations:
+            return None
+
+        # Wrap all function declarations in a single Tool
+        return [types.Tool(function_declarations=function_declarations)]
 
     def _parse_response(self, response, model: str) -> LLMResponse:
         """Parse Google GenAI response to LLMResponse."""
