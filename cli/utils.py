@@ -63,7 +63,9 @@ def get_models_text() -> str:
                 lines.append(f"| {provider_name.title()} | `{model}` | (+) Available |")
 
         lines.append(f"\n*Currently using: **{DEFAULT_MODEL}***")
-        lines.append("\n> (!) Tip: Use `provider:model` format (e.g., `google:gemini-2.5-flash`)")
+        lines.append(
+            "\n> (!) Tip: Use `provider:model` format (e.g., `google:gemini-2.5-flash`)"
+        )
         return "\n".join(lines)
     except Exception as e:
         return f"## Available Models (^^)\n\n*Error fetching models: {e}*"
