@@ -371,7 +371,7 @@ class KaderApp(App):
                     yield ASCIITree(str(Path.cwd().name), id="directory-tree")
                 
                 with Vertical(id="todo-container", classes="sidebar-section"):
-                    yield Static("TODO", id="todo-title")
+                    yield Static("Plan", id="todo-title")
                     yield TodoList(id="todo-list")
 
             # Main content area
