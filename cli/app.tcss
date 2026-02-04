@@ -89,7 +89,30 @@ FooterKey > .footer-key--key {
     text-style: bold;
     padding: 1;
     text-align: center;
-    height: 3;
+    dock: top;
+}
+
+.sidebar-section {
+    height: 1fr;
+    border-bottom: solid $primary;
+}
+
+#tree-container {
+    height: 60%;
+}
+
+#todo-container {
+    height: 40%;
+    border-bottom: none;
+}
+
+#todo-title {
+    background: $primary 20%;
+    color: $text;
+    text-style: bold;
+    padding: 1;
+    text-align: center;
+    dock: top;
 }
 
 DirectoryTree {
