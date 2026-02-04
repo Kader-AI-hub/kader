@@ -3,7 +3,7 @@ import json
 from typing import Optional
 
 from textual.app import ComposeResult
-from textual.containers import VerticalScroll
+from textual.containers import ScrollableContainer
 from textual.widgets import Static, Markdown
 
 from kader.tools.todo import TodoStatus
@@ -19,7 +19,7 @@ class TodoListItem(Static):
     def compose(self) -> ComposeResult:
         icon = {
             TodoStatus.NOT_STARTED: "[ ]",
-            TodoStatus.IN_PROGRESS: "[+]",
+            TodoStatus.IN_PROGRESS: "[-]",
             TodoStatus.COMPLETED: "[x]",
         }.get(self.status, "[?]")
         
@@ -28,7 +28,7 @@ class TodoListItem(Static):
         
         yield Static(f"{icon} {self.todo_task}", classes=classes, markup=False)
 
-class TodoList(VerticalScroll):
+class TodoList(ScrollableContainer):
     """Widget to display the current TODO list."""
 
     DEFAULT_CSS = """
@@ -37,6 +37,7 @@ class TodoList(VerticalScroll):
         border-top: solid $primary;
         background: $surface;
         padding: 0 1;
+        overflow: auto auto;
     }
     
     .todo-list-title {
@@ -79,52 +80,68 @@ class TodoList(VerticalScroll):
         self.refresh_todos()
 
     def refresh_todos(self) -> None:
-        """Reload todos from file."""
-        # Clear existing items
-        self.remove_children()
-        
+        """Reload todos from file in background."""
+        # Show loading state if empty
+        if not self.children:
+            self.mount(Static("Loading...", classes="todo-message"))
+
+        self.run_worker(self._load_todos_bg, thread=True)
+
+    def _load_todos_bg(self) -> None:
+        """Background worker to load todo data."""
         if not self._session_id:
-            self.mount(Static("No active session.", classes="todo-message"))
+            self.app.call_from_thread(self._update_todos_ui, None, "No active session.")
             return
 
-        # Path to todos
-        # ~/.kader/memory/sessions/<session_id>/todos/
         base_dir = Path.home() / ".kader" / "memory" / "sessions"
         todo_dir = base_dir / self._session_id / "todos"
         
         if not todo_dir.exists():
-            self.mount(Static("No todos found.", classes="todo-message"))
+            self.app.call_from_thread(self._update_todos_ui, None, "No todos found.")
             return
 
-        # Find most recent json file
         files = list(todo_dir.glob("*.json"))
         if not files:
-            self.mount(Static("No todos found.", classes="todo-message"))
+            self.app.call_from_thread(self._update_todos_ui, None, "No todos found.")
             return
-            
+
         # Sort by modification time (descending)
         latest_file = sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)[0]
         
         try:
             with open(latest_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                
-            if not data:
-                self.mount(Static("Empty todo list.", classes="todo-message"))
-                return
-                
-            self.mount(Static(f"List: {latest_file.stem}", classes="todo-file-name"))
             
-            for item in data:
-                task = item.get("task", "Unknown task")
-                # Fix: Handle potential string status or Enum
-                status_str = item.get("status", "not-started")
-                try:
-                    status = TodoStatus(status_str)
-                except ValueError:
-                    status = TodoStatus.NOT_STARTED
-                    
-                self.mount(TodoListItem(task, status))
-                
+            self.app.call_from_thread(self._update_todos_ui, data, None, latest_file.stem)
         except Exception as e:
-            self.mount(Static(f"Error loading todos: {str(e)}", classes="todo-error"))
+            self.app.call_from_thread(self._update_todos_ui, None, f"Error loading todos: {str(e)}")
+
+    def _update_todos_ui(
+        self, 
+        data: Optional[list], 
+        error_message: Optional[str] = None, 
+        list_name: Optional[str] = None
+    ) -> None:
+        """Update UI on main thread."""
+        self.remove_children()
+
+        if error_message:
+            self.mount(Static(error_message, classes="todo-message" if "Error" not in error_message else "todo-error"))
+            return
+
+        if not data:
+            self.mount(Static("Empty todo list.", classes="todo-message"))
+            return
+
+        if list_name:
+            self.mount(Static(list_name, classes="todo-file-name"))
+
+        for item in data:
+            task = item.get("task", "Unknown task")
+            status_str = item.get("status", "not-started")
+            try:
+                status = TodoStatus(status_str)
+            except ValueError:
+                status = TodoStatus.NOT_STARTED
+                
+            self.mount(TodoListItem(task, status))
