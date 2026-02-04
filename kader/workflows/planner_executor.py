@@ -73,7 +73,7 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         self.direct_execution_callback = direct_execution_callback
         self.tool_execution_result_callback = tool_execution_result_callback
         self.use_persistence = use_persistence
-        self.session_id = session_id if session_id else str(uuid.uuid4())
+        self.session_id = session_id
         self.executor_names = executor_names or ["executor"]
 
         # Build the planner agent with tools
@@ -148,13 +148,15 @@ class PlannerExecutorWorkflow(BaseWorkflow):
             provider=self.provider,
             memory=memory,
             model_name=self.model_name,
-            session_id=self.session_id,
             use_persistence=self.use_persistence,
             interrupt_before_tool=False,  # Planner executes TodoTool/AgentTool directly
             tool_confirmation_callback=self.tool_confirmation_callback,
             direct_execution_callback=self.direct_execution_callback,
             tool_execution_result_callback=self.tool_execution_result_callback,
         )
+
+        if not self.session_id:
+            self.session_id = planner.session_id
 
         return planner
 
