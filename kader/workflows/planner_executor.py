@@ -5,7 +5,6 @@ Orchestrates a PlanningAgent with TodoTool and AgentTool to break down tasks
 and delegate sub-tasks to executor agents.
 """
 
-import uuid
 from typing import Callable, Optional, Tuple
 
 from kader.agent.agents import PlanningAgent

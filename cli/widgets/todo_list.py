@@ -1,12 +1,13 @@
-from pathlib import Path
 import json
+from pathlib import Path
 from typing import Optional
 
 from textual.app import ComposeResult
 from textual.containers import ScrollableContainer
-from textual.widgets import Static, Markdown
+from textual.widgets import Static
 
 from kader.tools.todo import TodoStatus
+
 
 class TodoListItem(Static):
     """A single item in the todo list."""
@@ -15,18 +16,19 @@ class TodoListItem(Static):
         super().__init__()
         self.todo_task = task
         self.status = status
-        
+
     def compose(self) -> ComposeResult:
         icon = {
             TodoStatus.NOT_STARTED: "[ ]",
             TodoStatus.IN_PROGRESS: "[-]",
             TodoStatus.COMPLETED: "[x]",
         }.get(self.status, "[?]")
-        
+
         # Determine style class based on status
         classes = f"todo-item {self.status.value}"
-        
+
         yield Static(f"{icon} {self.todo_task}", classes=classes, markup=False)
+
 
 class TodoList(ScrollableContainer):
     """Widget to display the current TODO list."""
@@ -39,7 +41,7 @@ class TodoList(ScrollableContainer):
         padding: 0 1;
         overflow: auto auto;
     }
-    
+
     .todo-list-title {
         background: $primary 20%;
         color: $text;
@@ -95,7 +97,7 @@ class TodoList(ScrollableContainer):
 
         base_dir = Path.home() / ".kader" / "memory" / "sessions"
         todo_dir = base_dir / self._session_id / "todos"
-        
+
         if not todo_dir.exists():
             self.app.call_from_thread(self._update_todos_ui, None, "No todos found.")
             return
@@ -107,26 +109,37 @@ class TodoList(ScrollableContainer):
 
         # Sort by modification time (descending)
         latest_file = sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)[0]
-        
+
         try:
             with open(latest_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            
-            self.app.call_from_thread(self._update_todos_ui, data, None, latest_file.stem)
+
+            self.app.call_from_thread(
+                self._update_todos_ui, data, None, latest_file.stem
+            )
         except Exception as e:
-            self.app.call_from_thread(self._update_todos_ui, None, f"Error loading todos: {str(e)}")
+            self.app.call_from_thread(
+                self._update_todos_ui, None, f"Error loading todos: {str(e)}"
+            )
 
     def _update_todos_ui(
-        self, 
-        data: Optional[list], 
-        error_message: Optional[str] = None, 
-        list_name: Optional[str] = None
+        self,
+        data: Optional[list],
+        error_message: Optional[str] = None,
+        list_name: Optional[str] = None,
     ) -> None:
         """Update UI on main thread."""
         self.remove_children()
 
         if error_message:
-            self.mount(Static(error_message, classes="todo-message" if "Error" not in error_message else "todo-error"))
+            self.mount(
+                Static(
+                    error_message,
+                    classes="todo-message"
+                    if "Error" not in error_message
+                    else "todo-error",
+                )
+            )
             return
 
         if not data:
@@ -143,5 +156,5 @@ class TodoList(ScrollableContainer):
                 status = TodoStatus(status_str)
             except ValueError:
                 status = TodoStatus.NOT_STARTED
-                
+
             self.mount(TodoListItem(task, status))

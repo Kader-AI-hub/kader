@@ -31,7 +31,13 @@ from .utils import (
     DEFAULT_MODEL,
     HELP_TEXT,
 )
-from .widgets import ConversationView, InlineSelector, LoadingSpinner, ModelSelector, TodoList
+from .widgets import (
+    ConversationView,
+    InlineSelector,
+    LoadingSpinner,
+    ModelSelector,
+    TodoList,
+)
 
 WELCOME_MESSAGE = """
 <div align="center">
@@ -183,7 +189,7 @@ class KaderApp(App):
                 friendly_message = f"(-) {tool_name} failed: {error_preview}"
             conversation.add_message(friendly_message, "assistant")
             conversation.scroll_end()
-            
+
             # Refresh directory tree if file operations occurred
             self._refresh_directory_tree()
 
@@ -369,7 +375,7 @@ class KaderApp(App):
                 with Vertical(id="tree-container", classes="sidebar-section"):
                     yield Static("Files", id="sidebar-title")
                     yield ASCIITree(str(Path.cwd().name), id="directory-tree")
-                
+
                 with Vertical(id="todo-container", classes="sidebar-section"):
                     yield Static("Plan", id="todo-title")
                     yield TodoList(id="todo-list")
@@ -650,10 +656,12 @@ Please resize your terminal."""
             if not self._current_session_id:
                 session = self._session_manager.create_session("kader_cli")
                 self._current_session_id = session.session_id
-                
+
                 # Update todo list with new session ID
                 try:
-                    self.query_one("#todo-list", TodoList).set_session_id(self._current_session_id)
+                    self.query_one("#todo-list", TodoList).set_session_id(
+                        self._current_session_id
+                    )
                 except Exception:
                     pass
 
@@ -702,10 +710,12 @@ Please resize your terminal."""
                     conversation.add_message(content, role)
 
             self._current_session_id = session_id
-            
+
             # Update todo list with loaded session ID
             try:
-                self.query_one("#todo-list", TodoList).set_session_id(self._current_session_id)
+                self.query_one("#todo-list", TodoList).set_session_id(
+                    self._current_session_id
+                )
             except Exception:
                 pass
 
