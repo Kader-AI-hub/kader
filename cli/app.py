@@ -31,7 +31,13 @@ from .utils import (
     DEFAULT_MODEL,
     HELP_TEXT,
 )
-from .widgets import ConversationView, InlineSelector, LoadingSpinner, ModelSelector
+from .widgets import (
+    ConversationView,
+    InlineSelector,
+    LoadingSpinner,
+    ModelSelector,
+    TodoList,
+)
 
 WELCOME_MESSAGE = """
 <div align="center">
@@ -118,7 +124,7 @@ class KaderApp(App):
         # Create provider using factory (supports provider:model format)
         provider = LLMProviderFactory.create_provider(model_name)
 
-        return PlannerExecutorWorkflow(
+        workflow = PlannerExecutorWorkflow(
             name="kader_cli",
             provider=provider,
             model_name=model_name,  # Keep for reference
@@ -129,6 +135,11 @@ class KaderApp(App):
             use_persistence=True,
             executor_names=["executor"],
         )
+
+        if not self._current_session_id:
+            self._current_session_id = workflow.session_id
+
+        return workflow
 
     def _direct_execution_callback(self, message: str, tool_name: str) -> None:
         """
@@ -178,6 +189,13 @@ class KaderApp(App):
                 friendly_message = f"(-) {tool_name} failed: {error_preview}"
             conversation.add_message(friendly_message, "assistant")
             conversation.scroll_end()
+
+            # Refresh directory tree if file operations occurred
+            self._refresh_directory_tree()
+
+            # Refresh TODO list if todo tool was used
+            if "todo" in tool_name.lower():
+                self._refresh_todo_list()
         except Exception:
             pass
 
@@ -352,10 +370,15 @@ class KaderApp(App):
         yield Header()
 
         with Horizontal(id="main-container"):
-            # Sidebar with directory tree
+            # Sidebar with directory tree and todo list
             with Vertical(id="sidebar"):
-                yield Static("Files", id="sidebar-title")
-                yield ASCIITree(str(Path.cwd().name), id="directory-tree")
+                with Vertical(id="tree-container", classes="sidebar-section"):
+                    yield Static("Files", id="sidebar-title")
+                    yield ASCIITree(str(Path.cwd().name), id="directory-tree")
+
+                with Vertical(id="todo-container", classes="sidebar-section"):
+                    yield Static("Plan", id="todo-title")
+                    yield TodoList(id="todo-list")
 
             # Main content area
             with Vertical(id="content-area"):
@@ -499,6 +522,10 @@ Please resize your terminal."""
             self._workflow.planner.memory.clear()
             self._workflow.planner.provider.reset_tracking()  # Reset usage/cost tracking
             self._current_session_id = None
+            try:
+                self.query_one("#todo-list", TodoList).set_session_id(None)
+            except Exception:
+                pass
             self.notify("Conversation cleared!", severity="information")
         elif cmd == "/save":
             self._handle_save_session(conversation)
@@ -610,6 +637,18 @@ Please resize your terminal."""
         except Exception:
             pass  # Silently ignore if tree not found
 
+    def _refresh_todo_list(self) -> None:
+        """Refresh the TODO list widget."""
+        try:
+            todo_list = self.query_one("#todo-list", TodoList)
+            # Ensure session ID is set (might have been set during load/save)
+            if self._current_session_id and not todo_list._session_id:
+                todo_list.set_session_id(self._current_session_id)
+            else:
+                todo_list.refresh_todos()
+        except Exception:
+            pass
+
     def _handle_save_session(self, conversation: ConversationView) -> None:
         """Save the current session."""
         try:
@@ -617,6 +656,14 @@ Please resize your terminal."""
             if not self._current_session_id:
                 session = self._session_manager.create_session("kader_cli")
                 self._current_session_id = session.session_id
+
+                # Update todo list with new session ID
+                try:
+                    self.query_one("#todo-list", TodoList).set_session_id(
+                        self._current_session_id
+                    )
+                except Exception:
+                    pass
 
             # Get messages from planner memory and save
             messages = [
@@ -663,6 +710,15 @@ Please resize your terminal."""
                     conversation.add_message(content, role)
 
             self._current_session_id = session_id
+
+            # Update todo list with loaded session ID
+            try:
+                self.query_one("#todo-list", TodoList).set_session_id(
+                    self._current_session_id
+                )
+            except Exception:
+                pass
+
             conversation.add_message(
                 f"(+) Session `{session_id}` loaded with {len(messages)} messages.",
                 "assistant",

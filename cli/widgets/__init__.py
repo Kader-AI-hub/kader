@@ -3,6 +3,7 @@
 from .confirmation import InlineSelector, ModelSelector
 from .conversation import ConversationView, Message
 from .loading import LoadingSpinner
+from .todo_list import TodoList
 
 __all__ = [
     "ConversationView",
@@ -10,4 +11,5 @@ __all__ = [
     "LoadingSpinner",
     "InlineSelector",
     "ModelSelector",
+    "TodoList",
 ]
