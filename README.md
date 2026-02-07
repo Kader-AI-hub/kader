@@ -4,25 +4,27 @@ Kader is an intelligent coding agent designed to assist with software developmen
 
 ## Features
 
-- 🤖 **AI-powered Code Assistance** - Using Ollama for local LLM execution
-- 🖥️ **Interactive CLI** - Modern TUI interface built with Textual
-- 🛠️ **Tool Integration** - File system, command execution, web search, and more
-- 🧠 **Memory Management** - State persistence and conversation history
-- 🔁 **Session Management** - Save and load conversation sessions
-- 🎨 **Theming** - Multiple color themes for the CLI interface
-- ⌨️ **Keyboard Shortcuts** - Efficient navigation and operations
-- 📝 **YAML Configuration** - Agent configuration via YAML files
-- 🔄 **ReAct Agent Framework** - Reasoning and Acting agent architecture
-- 🗂️ **File System Tools** - Read, write, search, and edit files
-- 🔍 **Planning Agent** - Task planning and execution capabilities
-- 🤝 **Agent-As-Tool** - Spawn sub-agents for specific tasks with isolated memory
+- 🤖 **AI-powered Code Assistance** - Support for multiple LLM providers:
+  - **Ollama**: Local LLM execution for privacy and speed.
+  - **Google Gemini**: Cloud-based powerful models via the Google GenAI SDK.
+- 🖥️ **Interactive CLI** - Modern TUI interface built with Textual:
+  - **Lazy Loading**: Efficient directory tree loading for large projects.
+  - **TODO Management**: Integrated TODO list widget with automatic updates.
+- 🛠️ **Tool Integration** - File system, command execution, web search, and more.
+- 🧠 **Memory Management** - State persistence, conversation history, and isolated sub-agent memory.
+- 🔁 **Session Management** - Save and load conversation sessions.
+- ⌨️ **Keyboard Shortcuts** - Efficient navigation and operations.
+- 📝 **YAML Configuration** - Agent configuration via YAML files.
+- 🔄 **Planner-Executor Framework** - Sophisticated reasoning and acting architecture using task planning and delegation.
+- 🗂️ **File System Tools** - Read, write, search, and edit files.
+- 🤝 **Agent-As-Tool** - Spawn sub-agents for specific tasks with isolated memory and automated context aggregation.
 
 ## Installation
 
 ### Prerequisites
 
 - Python 3.11 or higher
-- [Ollama](https://ollama.ai/) running locally to use LLMs
+- [Ollama](https://ollama.ai/) (optional, for local LLMs)
 - [uv](https://docs.astral.sh/uv/) package manager (recommended) or [pip](https://pypi.org/project/pip/)
 
 ### Using uv (recommended)
@@ -69,38 +71,37 @@ python -m cli
 
 Once the CLI is running:
 
-1. Type any question to start chatting with the agent
-2. Use `/help` to see available commands
-3. Use `/models` to check available models
-4. Use `/theme` to cycle through color themes
+1. Type any question to start chatting with the agent.
+2. Use `/help` to see available commands.
+3. Use `/models` to check available models from all providers.
+4. The directory tree on the left features **lazy loading**, expanding only when needed.
+5. The **TODO list** on the right tracks tasks identified by the planner.
 
 ## Configuration
 
-When the kader module is imported for the first time, it automatically:
-1. Creates a `.kader` directory in your home directory (`~/.kader` on Unix systems, `%USERPROFILE%\.kader` on Windows)
-2. Creates a `.env` file with the required configuration (including `OLLAMA_API_KEY=''`)
-3. Loads all environment variables from the `.env` file into the application environment
+When the kader module is imported for the first time, it automatically creates a `.kader` directory in your home directory and a `.env` file.
 
 ### Environment Variables
 
 The application automatically loads environment variables from `~/.kader/.env`:
-- `OLLAMA_API_KEY`: API key for Ollama service (default: empty)
-- Additional variables can be added to the `.env` file and will be automatically loaded
+- `OLLAMA_API_KEY`: API key for Ollama service (if applicable).
+- `GOOGLE_API_KEY`: API key for Google Gemini (required for Google Provider).
+- Additional variables can be added to the `.env` file and will be automatically loaded.
 
 ### Memory and Sessions
 
 Kader stores data in `~/.kader/`:
-- Sessions: `~/.kader/sessions/`
+- Sessions: `~/.kader/memory/sessions/`
 - Configuration: `~/.kader/`
 - Memory files: `~/.kader/memory/`
+- Checkpoints: `~/.kader/memory/sessions/<session-id>/executors/` (Aggregated context from sub-agents)
 
 ## CLI Commands
 
 | Command | Description |
 |---------|-------------|
 | `/help` | Show command reference |
-| `/models` | Show available Ollama models |
-| `/theme` | Cycle color themes |
+| `/models` | Show available models (Ollama & Google) |
 | `/clear` | Clear conversation |
 | `/save` | Save current session |
 | `/load <id>` | Load a saved session |
@@ -114,7 +115,6 @@ Kader stores data in `~/.kader/`:
 |----------|--------|
 | `Ctrl+Q` | Quit |
 | `Ctrl+L` | Clear conversation |
-| `Ctrl+T` | Cycle theme |
 | `Ctrl+S` | Save session |
 | `Ctrl+R` | Refresh file tree |
 | `Tab` | Navigate panels |
@@ -126,26 +126,25 @@ kader/
 ├── cli/                    # Interactive command-line interface
 │   ├── app.py             # Main application entry point
 │   ├── app.tcss           # Textual CSS for styling
-│   ├── utils.py           # Utility functions and constants
+│   ├── llm_factory.py     # Provider selection logic
 │   ├── widgets/           # Custom Textual widgets
 │   │   ├── conversation.py # Chat display widget
 │   │   ├── loading.py     # Loading spinner widget
-│   │   └── confirmation.py # Tool/model selection widgets
+│   │   ├── confirmation.py # Tool/model selection widgets
+│   │   └── todo_list.py    # TODO tracking widget
 │   └── README.md          # CLI documentation
 ├── examples/              # Example implementations
 │   ├── memory_example.py  # Memory management examples
-│   ├── ollama_example.py  # Ollama provider examples
-│   ├── react_agent_example.py # ReAct agent examples
-│   ├── planning_agent_example.py # Planning agent examples
-│   ├── python_developer/  # Python expert agent example
-│   ├── todo_agent/       # Todo management agent example
+│   ├── google_example.py  # Google Gemini provider examples
+│   ├── planner_executor_example.py # Advanced workflow examples
 │   └── README.md         # Examples documentation
 ├── kader/                # Core framework
-│   ├── agent/            # Agent implementations
-│   ├── memory/           # Memory management
-│   ├── providers/        # LLM providers
-│   ├── tools/            # Tools and utilities
-│   └── prompts/          # Prompt templates
+│   ├── agent/            # Agent implementations (Planning, ReAct)
+│   ├── memory/           # Memory management & persistence
+│   ├── providers/        # LLM providers (Ollama, Google)
+│   ├── tools/            # Tools (File System, Web, Command, AgentTool)
+│   ├── prompts/          # Prompt templates (Jinja2)
+│   └── utils/            # Utilities (Checkpointer, ContextAggregator)
 ├── pyproject.toml        # Project dependencies
 ├── README.md             # This file
 └── uv.lock               # Dependency lock file
@@ -155,115 +154,29 @@ kader/
 
 ### Agents
 
-Kader provides several agent types:
+Kader provides a robust agent architecture:
 
-- **ReActAgent**: Reasoning and Acting agent that combines thoughts with actions
-- **PlanningAgent**: Agent that plans multi-step tasks
-- **BaseAgent**: Base agent class for creating custom agents
+- **ReActAgent**: Reasoning and Acting agent that combines thoughts with actions.
+- **PlanningAgent**: High-level agent that breaks complex tasks into manageable plans.
+- **BaseAgent**: Abstract base class for creating custom agent behaviors.
+
+### LLM Providers
+
+Kader supports multiple backends:
+- **OllamaProvider**: Connects to locally running Ollama instances.
+- **GoogleProvider**: High-performance access to Gemini models.
 
 ### Agent-As-Tool (AgentTool)
 
-The `AgentTool` allows you to wrap a `ReActAgent` as a callable tool, enabling agents to spawn sub-agents for specific tasks with isolated memory contexts.
-
-```python
-from kader.tools import AgentTool
-
-# Autonomous execution (runs without pausing for confirmation)
-autonomous_agent = AgentTool(
-    name="research_agent",
-    description="Research topics autonomously",
-    interrupt_before_tool=False,
-)
-result = autonomous_agent.execute(task="Find info about topic X")
-
-# Interactive execution (pauses for user confirmation before each tool)
-def my_callback(tool_call_dict, llm_content=None):
-    user_input = input("Execute? [y/n]: ")
-    return (user_input.lower() == 'y', None)
-
-interactive_agent = AgentTool(
-    name="interactive_agent",
-    interrupt_before_tool=True,
-    tool_confirmation_callback=my_callback,
-)
-result = interactive_agent.execute(task="Analyze data and generate report")
-```
-
-**Key Features:**
-- Each sub-agent has isolated memory (separate `SlidingWindowConversationManager`)
-- Default tools included: filesystem, web search, command executor
-- Optional `interrupt_before_tool` for user confirmation before tool execution
-- Task completes when the agent returns its final response
+The `AgentTool` allows a `PlanningAgent` (Architect) to delegate work to a `ReActAgent` (Worker). It features:
+- **Persistent Memory**: Sub-agent conversations are saved to JSON.
+- **Context Aggregation**: Sub-agent research and actions are automatically merged into the main session's `checkpoint.md` via `ContextAggregator`.
 
 ### Memory Management
 
-Kader's memory system includes:
-
-- **AgentState**: Persistent key-value storage for agents
-- **RequestState**: Ephemeral request-scoped state
-- **FileSessionManager**: Session persistence to disk
-- **SlidingWindowConversationManager**: Conversation windowing
-
-### Tools
-
-Kader includes a rich set of tools:
-
-- **File System Tools**: Read, write, edit, search files
-- **Command Executor**: Execute shell commands safely
-- **Web Tools**: Search and fetch web content
-- **RAG Tools**: Retrieval Augmented Generation capabilities
-- **AgentTool**: Spawn sub-agents for specific tasks
-
-## Examples
-
-Check out the examples directory for comprehensive demonstrations of Kader's features:
-
-### Basic Examples
-
-- `memory_example.py`: Shows memory management capabilities
-- `ollama_example.py`: Demonstrates how to use the Ollama provider for LLM interactions
-- `tools_example.py`: Demonstrates the various tools available in Kader
-- `simple_agent.py`: Basic agent implementation example
-
-### Advanced Examples
-
-- `react_agent_example.py`: Interactive ReAct agent with tool integration
-- `planning_agent_example.py`: Planning agent for multi-step tasks
-- `python_developer/`: Specialized Python expert agent (YAML-configured)
-- `todo_agent/`: Task management agent with TodoTool
-
-### Running Examples
-
-Use uv to run examples:
-
-```bash
-uv run python -m examples.memory_example
-uv run python -m examples.ollama_example
-uv run python -m examples.tools_example
-uv run python -m examples.react_agent_example
-uv run python -m examples.python_developer.main
-uv run python -m examples.todo_agent.main
-```
-
-## Architecture
-
-### Agent Architecture
-
-Kader uses a modular architecture where:
-
-1. **Agents** define the behavior and reasoning strategy
-2. **Tools** provide capabilities for external interactions
-3. **Memory** manages state and conversation history
-4. **Providers** handle LLM interactions
-
-### Tool Architecture
-
-Tools in Kader follow a standardized interface:
-
-- Each tool has a schema defining its inputs and outputs
-- Tools can be registered in a ToolRegistry
-- Tools can be executed synchronously or asynchronously
-- Tools can be configured with parameters
+- **SlidingWindowConversationManager**: Maintains context within token limits.
+- **PersistentSlidingWindowConversationManager**: Auto-saves sub-agent history.
+- **Checkpointer**: Generates markdown summaries of agent actions.
 
 ## Development
 
@@ -307,18 +220,8 @@ uv run ruff format .
 
 ### Common Issues
 
-- **No models found**: Make sure Ollama is running and you have at least one model installed (e.g., `ollama pull gpt-oss:120b-cloud`)
-- **Connection errors**: Verify that Ollama service is accessible at the configured endpoint
-- **Theme not changing**: Some terminal emulators may not support all color themes
-
-### Debugging
-
-If you encounter issues:
-
-1. Check that Ollama is running: `ollama serve`
-2. Verify your model is pulled: `ollama list`
-3. Ensure your terminal supports the required features
-4. Check the logs for specific error messages
+- **No models found**: Ensure your providers are correctly configured. For Ollama, run `ollama serve`. For Google, ensure `GOOGLE_API_KEY` is set.
+- **Connection errors**: Verify internet access for cloud providers and local service availability for Ollama.
 
 ## Contributing
 
@@ -335,6 +238,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Acknowledgments
 
-- Built with [Textual](https://textual.textualize.io/) for the beautiful CLI interface
-- Uses [Ollama](https://ollama.ai/) for local LLM execution
-- Inspired by ReAct (Reasoning and Acting) agent architecture
+- Built with [Textual](https://textual.textualize.io/) for the beautiful CLI interface.
+- Uses [Ollama](https://ollama.ai/) for local LLM execution.
+- Powered by [Google Gemini](https://ai.google.dev/) for advanced cloud-based reasoning.
