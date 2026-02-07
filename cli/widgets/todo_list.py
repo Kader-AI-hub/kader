@@ -19,10 +19,10 @@ class TodoListItem(Static):
 
     def compose(self) -> ComposeResult:
         icon = {
-            TodoStatus.NOT_STARTED: "[ ]",
-            TodoStatus.IN_PROGRESS: "[-]",
-            TodoStatus.COMPLETED: "[x]",
-        }.get(self.status, "[?]")
+            TodoStatus.NOT_STARTED: "( )",
+            TodoStatus.IN_PROGRESS: "(*)",
+            TodoStatus.COMPLETED: "(+)",
+        }.get(self.status, "(?)")
 
         # Determine style class based on status
         classes = f"todo-item {self.status.value}"
@@ -36,15 +36,15 @@ class TodoList(ScrollableContainer):
     DEFAULT_CSS = """
     TodoList {
         height: 1fr;
-        border-top: solid $primary;
-        background: $surface;
+        border-top: solid #a855f7;
+        background: #161622;
         padding: 0 1;
         overflow: auto auto;
     }
 
     .todo-list-title {
-        background: $primary 20%;
-        color: $text;
+        background: rgba(168, 85, 247, 0.2);
+        color: #cdd6f4;
         text-style: bold;
         padding: 1;
         text-align: center;
@@ -54,21 +54,42 @@ class TodoList(ScrollableContainer):
     .todo-item {
         padding: 0 1;
         margin-bottom: 1;
-        color: $text-muted;
+        color: #6c7086;
     }
 
     .todo-item.not-started {
-        color: $text;
+        color: #6c7086;
     }
 
     .todo-item.in-progress {
-        color: $warning;
+        color: #facc15;
         text-style: bold;
+        background: rgba(250, 204, 21, 0.05);
+        border: solid rgba(250, 204, 21, 0.2);
+        padding: 1;
     }
 
     .todo-item.completed {
-        color: $success;
+        color: #10b981;
         text-style: strike;
+    }
+
+    .todo-message {
+        color: #6c7086;
+        text-style: italic;
+        padding: 1;
+    }
+
+    .todo-error {
+        color: #f87171;
+        padding: 1;
+    }
+
+    .todo-file-name {
+        color: #a855f7;
+        text-style: bold;
+        padding: 0 1;
+        margin-bottom: 1;
     }
     """
 

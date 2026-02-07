@@ -12,8 +12,11 @@ class LoadingSpinner(Static):
         width: 100%;
         height: auto;
         padding: 1 2;
-        color: $text-muted;
+        background: #161622;
+        border-left: thick #facc15;
+        color: #6c7086;
         text-style: italic;
+        margin: 0 2;
     }
 
     LoadingSpinner.hidden {

@@ -2,7 +2,7 @@
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical
+from textual.containers import VerticalScroll
 from textual.message import Message as TextualMessage
 from textual.reactive import reactive
 from textual.widget import Widget
@@ -196,6 +196,7 @@ class ModelSelector(Widget, can_focus=True):
         width: 100%;
         height: auto;
         max-height: 15;
+        overflow-y: auto;
     }
 
     ModelSelector .model-option {
@@ -234,7 +235,7 @@ class ModelSelector(Widget, can_focus=True):
         yield Static(
             "↑↓ to navigate • Enter to select • Esc to cancel", classes="prompt-text"
         )
-        with Vertical(classes="model-list"):
+        with VerticalScroll(classes="model-list"):
             for i, model in enumerate(self.models):
                 is_current = model == self.current_model
                 is_selected = i == self.selected_index
@@ -276,6 +277,9 @@ class ModelSelector(Widget, can_focus=True):
             if new_model == self.current_model:
                 new_label += " (current)"
             new_option.update(new_label)
+
+            # Scroll the selected option into view
+            new_option.scroll_visible()
         except Exception:
             pass
 
