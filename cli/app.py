@@ -2,6 +2,7 @@
 
 import asyncio
 import atexit
+import subprocess
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import version as get_version
@@ -531,6 +532,8 @@ Please resize your terminal."""
         # Check if it's a command
         if user_input.startswith("/"):
             await self._handle_command(user_input)
+        elif user_input.startswith("!"):
+            await self._handle_terminal_command(user_input[1:])
         else:
             await self._handle_chat(user_input)
 
@@ -635,8 +638,63 @@ Please resize your terminal."""
             # Auto-refresh directory tree in case agent created/modified files
             self._refresh_directory_tree()
 
+    async def _handle_terminal_command(self, command: str) -> None:
+        """Handle terminal commands starting with !."""
+        conversation = self.query_one("#conversation-view", ConversationView)
+        spinner = self.query_one(LoadingSpinner)
+
+        # Strip command and whitespace
+        cmd = command.strip()
+        if not cmd:
+            return
+
+        # Add user message
+        conversation.add_message(f"!{cmd}", "user")
+
+        # Show executing message
+        conversation.add_message(f"[>] Executing: `{cmd}`...", "assistant")
+        conversation.scroll_end()
+        spinner.start()
+
+        try:
+            # executed command
+            process = await asyncio.create_subprocess_shell(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+
+            stdout, stderr = await process.communicate()
+
+            output = ""
+            if stdout:
+                output += stdout.decode().strip()
+            if stderr:
+                if output:
+                    output += "\n\n"
+                output += f"Stderr:\n{stderr.decode().strip()}"
+
+            if not output:
+                output = "*Command executed successfully with no output.*"
+
+            # Format as code block if it looks like code/data, otherwise plain text
+            if "\n" in output or len(output) > 100:
+                formatted_output = f"```\n{output}\n```"
+            else:
+                formatted_output = output
+
+            conversation.add_message(formatted_output, "assistant")
+            conversation.scroll_end()
+
+        except Exception as e:
+            conversation.add_message(f"(-) Error executing command: {e}", "assistant")
+            conversation.scroll_end()
+
+        finally:
+            spinner.stop()
+            self._refresh_directory_tree()
+
     def action_clear(self) -> None:
         """Clear the conversation (Ctrl+L)."""
+
         conversation = self.query_one("#conversation-view", ConversationView)
         conversation.clear_messages()
         self._workflow.planner.memory.clear()

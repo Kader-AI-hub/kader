@@ -18,6 +18,7 @@ HELP_TEXT = """## Kader CLI Commands
 | `/cost` | Show usage costs |
 | `/refresh` | Refresh file tree |
 | `/exit` | Exit the CLI |
+| `!cmd` | Run terminal command |
 
 ### Keyboard Shortcuts
 
