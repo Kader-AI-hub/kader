@@ -416,7 +416,11 @@ class KaderApp(App):
         self._refresh_directory_tree()
 
     def _populate_tree(self, node, path: Path) -> None:
-        """Recursively populate the tree with ASCII symbols."""
+        """Populate tree with immediate children only (lazy loading).
+
+        Directories are added with a placeholder child to indicate they can be expanded.
+        Actual contents are loaded when the user expands the directory.
+        """
         try:
             # Sort: directories first, then files
             items = sorted(
@@ -427,12 +431,34 @@ class KaderApp(App):
                     continue
 
                 if child.is_dir():
-                    new_node = node.add(f"[+] {child.name}", expand=False)
-                    self._populate_tree(new_node, child)
+                    # Add directory with path data for lazy loading
+                    new_node = node.add(f"[+] {child.name}", expand=False, data=child)
+                    # Add placeholder child to indicate expandable
+                    new_node.add("[...]")
                 else:
-                    node.add(f"{child.name}")
+                    node.add(f"{child.name}", data=child)
         except Exception:
             pass
+
+    def on_tree_node_expanded(self, event: Tree.NodeExpanded) -> None:
+        """Handle tree node expansion for lazy loading.
+
+        When a directory node is expanded, check if it has only a placeholder child.
+        If so, remove the placeholder and populate with actual directory contents.
+        """
+        node = event.node
+        path = node.data
+
+        # Skip if no path data or not a directory
+        if not path or not isinstance(path, Path) or not path.is_dir():
+            return
+
+        # Check if node has only a placeholder child (lazy loading)
+        children = list(node.children)
+        if len(children) == 1 and children[0].data is None:
+            # Remove placeholder and populate with actual contents
+            children[0].remove()
+            self._populate_tree(node, path)
 
     def _check_for_updates(self) -> None:
         """Check for package updates in background thread."""
