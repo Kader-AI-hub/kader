@@ -53,13 +53,13 @@ class ConversationView(VerticalScroll):
     }
 
     ConversationView .message-user {
-        background: $surface;
-        border-left: thick $primary;
+        background: #13131c;
+        border-left: thick #a855f7;
     }
 
     ConversationView .message-assistant {
-        background: $surface-darken-1;
-        border-left: thick $success;
+        background: #13131c;
+        border-left: thick #22d3ee;
     }
 
     .message-footer {
@@ -70,13 +70,13 @@ class ConversationView(VerticalScroll):
     }
 
     .footer-left {
-        color: $secondary;
+        color: #22d3ee;
         text-style: italic;
         width: 1fr;
     }
 
     .footer-right {
-        color: $success;
+        color: #10b981;
         text-style: bold;
         text-align: right;
         width: auto;

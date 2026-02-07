@@ -1,332 +1,216 @@
-/* Kader CLI - Modern Terminal UI Stylesheet */
+/* Kader CLI Theme - Modern Dark with Accent Colors */
 
-/* ===== Color Themes ===== */
-
-/* Default Dark Theme */
-$primary: #7c3aed;
-$secondary: #06b6d4;
-$success: #10b981;
-$warning: #f59e0b;
-$error: #ef4444;
-$surface: #1e1e2e;
-$background: #11111b;
-$text: #cdd6f4;
-$text-muted: #6c7086;
-
-/* ===== Root App ===== */
+/* ========================================
+   COLOR PALETTE
+   ========================================
+   Background: #0d0d14 (deep dark)
+   Surface: #161622 (card background)
+   Primary: #a855f7 (purple - commands/user)
+   Accent Cyan: #22d3ee (assistant/prompt mode)
+   Accent Yellow: #facc15 (in-progress/thinking)
+   Accent Orange: #fb923c (system mode)
+   Accent Green: #10b981 (success/completed)
+   Accent Red: #f87171 (error)
+   Text: #cdd6f4 (primary text)
+   Text Muted: #6c7086 (secondary text)
+   ======================================== */
 
 Screen {
-    background: $background;
-    min-width: 89;
-    min-height: 29;
+    background: #0d0d14;
 }
 
-/* ===== Size Warning Overlay ===== */
-
-#size-warning {
+/* Header Styling */
+Header {
+    height: 3;
     dock: top;
+    background: #161622;
+    border-bottom: solid #a855f7;
+    color: #cdd6f4;
+}
+
+Header .title {
+    color: #a855f7;
+    text-style: bold;
+}
+
+/* Footer Styling */
+Footer {
+    height: 1;
+    dock: bottom;
+    background: #0d0d14;
+    color: #6c7086;
+    border-top: solid #1e1e2e;
+}
+
+/* Main Container */
+#main-container {
     width: 100%;
     height: 100%;
-    background: $background 95%;
-    color: $warning;
+}
+
+/* Sidebar */
+#sidebar {
+    width: 28;
+    min-width: 24;
+    max-width: 32;
+    background: #161622;
+    border-right: solid #1e1e2e;
+}
+
+.sidebar-section {
+    height: auto;
+    min-height: 8;
+}
+
+#tree-container {
+    height: 1fr;
+    max-height: 60%;
+}
+
+#todo-container {
+    height: 1fr;
+    min-height: 6;
+}
+
+#sidebar-title, #todo-title {
+    background: rgba(168, 85, 247, 0.1);
+    color: #a855f7;
+    text-style: bold;
+    padding: 0 1;
+    text-align: center;
+}
+
+/* Directory Tree */
+#directory-tree {
+    padding: 0 1;
+    background: transparent;
+    scrollbar-size: 1 1;
+}
+
+Tree > .tree--guides {
+    color: #313244;
+}
+
+Tree > .tree--guides-hover {
+    color: #45475a;
+}
+
+Tree:focus > .tree--cursor {
+    background: rgba(168, 85, 247, 0.2);
+    color: #a855f7;
+}
+
+Tree > .tree--label {
+    color: #cdd6f4;
+}
+
+Tree > .tree--label:hover {
+    color: #22d3ee;
+}
+
+/* Content Area */
+#content-area {
+    width: 1fr;
+    background: #0d0d14;
+}
+
+#conversation {
+    height: 1fr;
+    background: #0d0d14;
+    padding: 0;
+}
+
+/* Scrollbar Styling */
+ScrollableContainer > .scrollbar {
+    background: #0d0d14;
+}
+
+ScrollableContainer > .scrollbar--thumb {
+    background: #313244;
+}
+
+ScrollableContainer:focus > .scrollbar--thumb {
+    background: #45475a;
+}
+
+VerticalScroll > .scrollbar {
+    background: #0d0d14;
+}
+
+VerticalScroll > .scrollbar--thumb {
+    background: #313244;
+}
+
+VerticalScroll:focus > .scrollbar--thumb {
+    background: #45475a;
+}
+
+/* Terminal Size Warning */
+#size-warning {
+    dock: top;
+    layer: above;
+    width: 100%;
+    height: 100%;
+    background: rgba(13, 13, 20, 0.95);
+    color: #f87171;
     text-align: center;
     content-align: center middle;
     text-style: bold;
     padding: 2;
-    layer: overlay;
+    border: double #f87171;
 }
 
-/* ===== Header ===== */
-
-Header {
-    background: $primary;
-    color: $text;
-    text-style: bold;
-    height: 1;
-    dock: top;
-}
-
-/* ===== Footer ===== */
-
-Footer {
-    background: $surface;
-    color: $text-muted;
-    height: 1;
+/* Input Container - ModeAwareInput is self-styling */
+ModeAwareInput {
     dock: bottom;
+    height: auto;
+    max-height: 10;
+    margin: 0 1 1 1;
 }
 
-FooterKey {
+/* Markdown Styling */
+Markdown {
     background: transparent;
-    color: $text-muted;
-}
-
-FooterKey > .footer-key--key {
-    background: $primary;
-    color: $text;
-}
-
-/* ===== Main Layout ===== */
-
-#main-container {
-    layout: horizontal;
-    height: 1fr;
-}
-
-/* ===== Sidebar (Directory Tree) ===== */
-
-#sidebar {
-    width: 22;
-    min-width: 18;
-    max-width: 35;
-    background: $surface;
-    border-right: thick $primary;
+    margin: 0;
     padding: 0;
 }
 
-#sidebar-title {
-    background: $primary 20%;
-    color: $text;
-    text-style: bold;
-    padding: 1;
-    text-align: center;
-    dock: top;
+/* Inline selectors */
+InlineSelector, ModelSelector {
+    margin: 1 2;
+    background: #161622;
+    border: solid #a855f7;
 }
 
-.sidebar-section {
-    height: 1fr;
-    border-bottom: solid $primary;
+InlineSelector:focus, ModelSelector:focus {
+    border: double #a855f7;
 }
 
-#tree-container {
-    height: 60%;
-}
-
-#todo-container {
-    height: 40%;
-    border-bottom: none;
-}
-
-#todo-title {
-    background: $primary 20%;
-    color: $text;
-    text-style: bold;
-    padding: 1;
-    text-align: center;
-    dock: top;
-}
-
-DirectoryTree {
-    background: transparent;
-    padding: 0 1;
-    scrollbar-size: 1 1;
-}
-
-DirectoryTree > .directory-tree--folder {
-    color: $secondary;
-}
-
-DirectoryTree > .directory-tree--file {
-    color: $text;
-}
-
-DirectoryTree > .directory-tree--extension {
-    color: $text-muted;
-}
-
-DirectoryTree:focus > .directory-tree--cursor {
-    background: $primary 40%;
-}
-
-/* ===== Content Area ===== */
-
-#content-area {
-    width: 1fr;
-    layout: vertical;
-}
-
-/* ===== Conversation ===== */
-
-#conversation {
-    height: 1fr;
-    background: $background;
-}
-
-ConversationView {
-    scrollbar-size: 1 1;
-}
-
-.message-footer {
-    height: auto;
-    margin-top: 0;
-    padding: 0 1;
-    border-top: none;
-}
-
-.footer-left {
-    color: $secondary;
+/* Command hints */
+.command-hint {
+    color: #6c7086;
     text-style: italic;
-    width: 1fr;
+    padding: 0 1;
 }
 
-.footer-right {
-    color: $success;
+/* Tool execution messages */
+.tool-message {
+    color: #22d3ee;
+    padding: 0 1;
+}
+
+/* Error messages */
+.error-message {
+    color: #f87171;
     text-style: bold;
-    text-align: right;
-    width: auto;
 }
 
-/* ===== Welcome Message ===== */
-
+/* Welcome message styling */
 #welcome {
-    padding: 2 4;
-    text-align: center;
+    margin: 2;
+    padding: 1;
 }
 
 #welcome Markdown {
-    text-align: center;
-}
-
-/* ===== Input Area ===== */
-
-#input-container {
-    height: auto;
-    min-height: 4;
-    max-height: 7;
-    background: $background;
-    padding: 1;
-    margin-bottom: 1;
-}
-
-#prompt-input {
     background: transparent;
-    border: round $primary;
-    padding: 0 1;
-    height: 3;
-}
-
-#prompt-input:focus {
-    border: round $secondary;
-}
-
-Input.-valid {
-    border: round $success;
-}
-
-Input > .input--placeholder {
-    color: $text-muted;
-    text-style: italic;
-}
-
-/* ===== Loading Spinner ===== */
-
-LoadingSpinner {
-    background: $surface;
-    margin: 0 2;
-    padding: 1;
-    border-left: thick $warning;
-}
-
-/* ===== Command Hints in Footer ===== */
-
-#command-hints {
-    dock: bottom;
-    height: 1;
-    background: $surface;
-    padding: 0 1;
-    text-align: center;
-}
-
-.command-hint {
-    margin: 0 1;
-    color: $text-muted;
-}
-
-.command-key {
-    color: $primary;
-    text-style: bold;
-}
-
-/* ===== Markdown Styling ===== */
-
-Markdown {
-    margin: 0;
-    padding: 0;
-}
-
-MarkdownH1 {
-    color: $primary;
-    text-style: bold underline;
-    margin: 1 0;
-}
-
-MarkdownH2 {
-    color: $secondary;
-    text-style: bold;
-    margin: 1 0;
-}
-
-MarkdownH3 {
-    color: $success;
-    text-style: bold;
-    margin: 1 0;
-}
-
-MarkdownFence {
-    background: $surface;
-    border: round #6c7086;
-    margin: 1 0;
-    padding: 1;
-}
-
-MarkdownBlockQuote {
-    background: $primary 10%;
-    border-left: thick $primary;
-    padding: 0 1;
-    margin: 1 0;
-}
-
-MarkdownBulletList {
-    margin: 0;
-    padding-left: 2;
-}
-
-MarkdownTable {
-    margin: 1 0;
-}
-
-MarkdownTH {
-    background: $primary 20%;
-    text-style: bold;
-}
-
-MarkdownTD {
-    padding: 0 1;
-}
-
-/* ===== Scrollbars ===== */
-
-Scrollbar {
-    background: $surface;
-}
-
-ScrollbarSlider {
-    color: $primary;
-}
-
-ScrollbarSlider:hover {
-    color: $secondary;
-}
-
-/* ===== Scrollbars ===== */
-
-Scrollbar {
-    background: $surface;
-}
-
-ScrollbarSlider {
-    color: $primary;
-}
-
-ScrollbarSlider:hover {
-    color: $secondary;
 }

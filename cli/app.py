@@ -36,34 +36,22 @@ from .widgets import (
     ConversationView,
     InlineSelector,
     LoadingSpinner,
+    ModeAwareInput,
     ModelSelector,
     TodoList,
 )
 
 WELCOME_MESSAGE = """
-<div align="center">
-
 ```
-    ██╗ ██╗  ██╗ █████╗ ██████╗ ███████╗██████╗
-   ██╔╝ ██║ ██╔╝██╔══██╗██╔══██╗██╔════╝██╔══██╗
-  ██╔╝  █████╔╝ ███████║██║  ██║█████╗  ██████╔╝
- ██╔╝   ██╔═██╗ ██╔══██║██║  ██║██╔══╝  ██╔══██╗
-██╔╝    ██║  ██╗██║  ██║██████╔╝███████╗██║  ██║
-╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚══════╝╚═╝  ╚═╝
+  _  __    _    ____  _____ ____
+ | |/ /   / \\  |  _ \\| ____|  _ \\
+ | ' /   / _ \\ | | | |  _| | |_) |
+ | . \\  / ___ \\| |_| | |___|  _ <
+ |_|\\_\\/_/   \\_\\____/|_____|_| \\_\\
 ```
 
-</div>
+Type a message below to start chatting, or use `/help` to see available commands.
 
-Type a message below to start chatting, or use one of the commands:
-
-- `/help` - Show available commands
-- `/models` - View available LLM models
-- `/clear` - Clear the conversation
-- `/save` - Save current session
-- `/load` - Load a saved session
-- `/sessions` - List saved sessions
-- `/cost` - Show the cost of the conversation
-- `/exit` - Exit the application
 """
 
 
@@ -241,7 +229,7 @@ class KaderApp(App):
         conversation.scroll_end()
 
         # Disable input and focus selector
-        prompt_input = self.query_one("#prompt-input", Input)
+        prompt_input = self.query_one("#prompt-input", ModeAwareInput)
         prompt_input.disabled = True
 
         # Force focus on the selector widget
@@ -279,7 +267,7 @@ class KaderApp(App):
             conversation.add_message("(-) Tool execution skipped.", "assistant")
 
         # Re-enable input
-        prompt_input = self.query_one("#prompt-input", Input)
+        prompt_input = self.query_one("#prompt-input", ModeAwareInput)
         prompt_input.disabled = False
 
         # Signal the waiting thread BEFORE focusing input
@@ -310,7 +298,7 @@ class KaderApp(App):
             conversation.scroll_end()
 
             # Disable input and focus selector
-            prompt_input = self.query_one("#prompt-input", Input)
+            prompt_input = self.query_one("#prompt-input", ModeAwareInput)
             prompt_input.disabled = True
             self.set_focus(self._model_selector)
 
@@ -341,7 +329,7 @@ class KaderApp(App):
         )
 
         # Re-enable input
-        prompt_input = self.query_one("#prompt-input", Input)
+        prompt_input = self.query_one("#prompt-input", ModeAwareInput)
         prompt_input.disabled = False
         prompt_input.focus()
 
@@ -362,7 +350,7 @@ class KaderApp(App):
         )
 
         # Re-enable input
-        prompt_input = self.query_one("#prompt-input", Input)
+        prompt_input = self.query_one("#prompt-input", ModeAwareInput)
         prompt_input.disabled = False
         prompt_input.focus()
 
@@ -389,11 +377,7 @@ class KaderApp(App):
                     yield LoadingSpinner()
 
                 # Input area
-                with Container(id="input-container"):
-                    yield Input(
-                        placeholder="Enter your prompt or /help for commands...",
-                        id="prompt-input",
-                    )
+                yield ModeAwareInput(id="prompt-input")
 
         yield Footer()
 
@@ -404,7 +388,7 @@ class KaderApp(App):
         conversation.mount(Markdown(WELCOME_MESSAGE, id="welcome"))
 
         # Focus the input
-        self.query_one("#prompt-input", Input).focus()
+        self.query_one("#prompt-input", ModeAwareInput).focus()
 
         # Check initial size
         self._check_terminal_size()
