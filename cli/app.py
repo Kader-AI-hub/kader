@@ -576,6 +576,10 @@ Please resize your terminal."""
         conversation = self.query_one("#conversation-view", ConversationView)
         spinner = self.query_one(LoadingSpinner)
 
+        # Disable input while processing
+        prompt_input = self.query_one("#prompt-input", ModeAwareInput)
+        prompt_input.disabled = True
+
         # Add user message to UI
         conversation.add_message(message, "user")
 
@@ -619,6 +623,13 @@ Please resize your terminal."""
 
         finally:
             self._is_processing = False
+            # Re-enable input and focus
+            try:
+                prompt_input = self.query_one("#prompt-input", ModeAwareInput)
+                prompt_input.disabled = False
+                prompt_input.focus()
+            except Exception:
+                pass
             # Auto-refresh directory tree in case agent created/modified files
             self._refresh_directory_tree()
 
@@ -631,6 +642,10 @@ Please resize your terminal."""
         cmd = command.strip()
         if not cmd:
             return
+
+        # Disable input while processing
+        prompt_input = self.query_one("#prompt-input", ModeAwareInput)
+        prompt_input.disabled = True
 
         # Add user message
         conversation.add_message(f"!{cmd}", "user")
@@ -674,6 +689,9 @@ Please resize your terminal."""
 
         finally:
             spinner.stop()
+            # Re-enable input and focus
+            prompt_input.disabled = False
+            prompt_input.focus()
             self._refresh_directory_tree()
 
     def action_clear(self) -> None:
