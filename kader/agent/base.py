@@ -364,6 +364,10 @@ class BaseAgent:
             "grep",
             "read_directory",
             "read_dir",
+            "write_file",
+            "edit_file",
+            "web_search",
+            "web_fetch",
         }
 
         # Direct execution for specific tools - applies regardless of callback
