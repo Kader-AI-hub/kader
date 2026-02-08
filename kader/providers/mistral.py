@@ -251,9 +251,7 @@ class MistralProvider(BaseLLMProvider):
             created=response.created,
         )
 
-    def _parse_stream_chunk(
-        self, chunk, accumulated_content: str
-    ) -> StreamChunk:
+    def _parse_stream_chunk(self, chunk, accumulated_content: str) -> StreamChunk:
         """Parse streaming chunk to StreamChunk."""
         delta = ""
         tool_calls = None
@@ -498,7 +496,12 @@ class MistralProvider(BaseLLMProvider):
         if not pricing:
             # Try to match by prefix (e.g., "mistral-large-2411" -> "mistral-large-latest")
             for model_pattern, model_pricing in MISTRAL_PRICING.items():
-                base_name = model_pattern.replace("-latest", "").replace("-2411", "").replace("-2503", "").replace("-2501", "")
+                base_name = (
+                    model_pattern.replace("-latest", "")
+                    .replace("-2411", "")
+                    .replace("-2503", "")
+                    .replace("-2501", "")
+                )
                 if self._model.startswith(base_name):
                     pricing = model_pricing
                     break
@@ -529,7 +532,8 @@ class MistralProvider(BaseLLMProvider):
                         return ModelInfo(
                             name=self._model,
                             provider="mistral",
-                            context_window=getattr(model, "max_context_length", 32768) or 32768,
+                            context_window=getattr(model, "max_context_length", 32768)
+                            or 32768,
                             max_output_tokens=getattr(model, "max_tokens", None),
                             pricing=MISTRAL_PRICING.get(self._model),
                             supports_tools=True,

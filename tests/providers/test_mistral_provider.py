@@ -2,16 +2,12 @@
 Unit tests for the Mistral provider.
 """
 
-import pytest
-
 from kader.providers.base import (
-    CostInfo,
     Message,
     ModelConfig,
-    StreamChunk,
     Usage,
 )
-from kader.providers.mistral import MistralProvider, MISTRAL_PRICING
+from kader.providers.mistral import MISTRAL_PRICING, MistralProvider
 
 
 class TestMistralProviderInit:
@@ -26,7 +22,7 @@ class TestMistralProviderInit:
         """Test provider initialization with default config."""
         config = ModelConfig(temperature=0.7, max_tokens=100)
         provider = MistralProvider(model="mistral-small-latest", default_config=config)
-        
+
         assert provider.model == "mistral-small-latest"
         assert provider._default_config == config
 
