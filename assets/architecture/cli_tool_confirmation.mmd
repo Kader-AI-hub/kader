@@ -1,0 +1,32 @@
+sequenceDiagram
+    autonumber
+    
+    participant Agent as Agent Thread
+    participant App as KaderApp
+    participant Event as confirmation_event
+    participant Selector as InlineSelector
+    participant User
+    
+    Agent->>App: tool_confirmation_callback(message)
+    App->>Event: create Event
+    
+    App->>App: call_from_thread(_show_inline_selector)
+    App->>Selector: mount InlineSelector
+    App->>Selector: set_focus()
+    
+    Note over Agent,Event: Agent thread blocks here
+    Agent->>Event: wait(timeout=300s)
+    
+    User->>Selector: Arrow keys + Enter/Escape
+    
+    alt Confirmed
+        Selector->>App: Confirmed(confirmed=True)
+        App->>Event: set()
+        Event-->>Agent: unblock
+        Agent->>Agent: Continue with tool execution
+    else Declined
+        Selector->>App: Confirmed(confirmed=False)
+        App->>Event: set()
+        Event-->>Agent: unblock
+        Agent->>Agent: Skip tool execution
+    end

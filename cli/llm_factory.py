@@ -6,7 +6,7 @@ with automatic provider detection based on model name format.
 
 from typing import Optional
 
-from kader.providers import GoogleProvider, OllamaProvider
+from kader.providers import GoogleProvider, MistralProvider, OllamaProvider
 from kader.providers.base import BaseLLMProvider, ModelConfig
 
 
@@ -31,6 +31,7 @@ class LLMProviderFactory:
     PROVIDERS: dict[str, type[BaseLLMProvider]] = {
         "ollama": OllamaProvider,
         "google": GoogleProvider,
+        "mistral": MistralProvider,
     }
 
     # Default provider when no prefix is specified
@@ -110,6 +111,13 @@ class LLMProviderFactory:
             models["google"] = [f"google:{m}" for m in google_models]
         except Exception:
             models["google"] = []
+
+        # Get Mistral models
+        try:
+            mistral_models = MistralProvider.get_supported_models()
+            models["mistral"] = [f"mistral:{m}" for m in mistral_models]
+        except Exception:
+            models["mistral"] = []
 
         return models
 

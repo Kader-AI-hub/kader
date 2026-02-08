@@ -1,0 +1,55 @@
+flowchart TB
+    subgraph CLI["KaderApp (Textual App)"]
+        direction TB
+        
+        subgraph UI["UI Components"]
+            HEADER["Header"]
+            
+            subgraph Sidebar["Sidebar"]
+                TREE["ASCIITree<br/>(Directory View)"]
+                TODO_LIST["TodoList Widget"]
+            end
+            
+            subgraph Content["Content Area"]
+                CONV["ConversationView"]
+                SPINNER["LoadingSpinner"]
+                INPUT["ModeAwareInput"]
+            end
+            
+            FOOTER["Footer"]
+        end
+        
+        subgraph State["App State"]
+            MODEL["_current_model"]
+            SESSION["_current_session_id"]
+            PROCESSING["_is_processing"]
+        end
+        
+        subgraph Threading["Threading"]
+            MAIN["Main Thread<br/>(Event Loop)"]
+            EXECUTOR["ThreadPoolExecutor<br/>(agent_executor)"]
+            CONFIRM_EVENT["confirmation_event"]
+        end
+    end
+    
+    subgraph Workflow["PlannerExecutorWorkflow"]
+        PLANNER["PlanningAgent"]
+        TOOLS["TodoTool + AgentTool"]
+    end
+    
+    subgraph Factory["LLMProviderFactory"]
+        PROVIDERS["OpenAI / Ollama /<br/>Google / Moonshot"]
+    end
+    
+    CLI --> Workflow
+    Workflow --> Factory
+    
+    classDef ui fill:#3182ce,stroke:#2b6cb0,color:#fff
+    classDef state fill:#805ad5,stroke:#6b46c1,color:#fff
+    classDef thread fill:#dd6b20,stroke:#c05621,color:#fff
+    classDef workflow fill:#38a169,stroke:#2f855a,color:#fff
+    
+    class UI,Sidebar,Content ui
+    class State state
+    class Threading thread
+    class Workflow workflow

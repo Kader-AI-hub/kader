@@ -1,0 +1,73 @@
+sequenceDiagram
+    autonumber
+    
+    participant User
+    participant Workflow as PlannerExecutorWorkflow
+    participant Planner as PlanningAgent
+    participant Memory as SlidingWindowConversationManager
+    participant Todo as TodoTool
+    participant Agent as AgentTool
+    participant Executor as ReActAgent (Executor)
+    participant ExecMem as Executor Memory
+    participant Ckpt as Checkpointer
+    participant FS as FileSystem (~/.kader/memory)
+    
+    User->>Workflow: run(task)
+    
+    rect rgb(45, 55, 72)
+        Note over Workflow,FS: Initialization Phase
+        Workflow->>FS: _load_checkpoint_context()
+        FS-->>Workflow: checkpoint.md (if exists)
+        Workflow->>Planner: _build_planner()
+        Workflow->>Memory: create(window_size=20)
+        Workflow->>Todo: register()
+        Workflow->>Agent: register()
+    end
+    
+    Workflow->>Planner: invoke(task)
+    Planner->>Memory: add_message(user_task)
+    
+    rect rgb(49, 130, 206)
+        Note over Planner,Todo: Planning Phase
+        Planner->>Planner: Reason about task
+        Planner->>Todo: add_item("subtask-1")
+        Todo-->>Planner: Todo updated
+        Planner->>Todo: add_item("subtask-2")
+        Todo-->>Planner: Todo updated
+    end
+    
+    rect rgb(56, 161, 105)
+        Note over Planner,ExecMem: Execution Phase (per subtask)
+        loop For each subtask
+            Planner->>Agent: execute(task, context)
+            
+            Agent->>FS: Load aggregated context
+            FS-->>Agent: executors/checkpoint.md
+            
+            Agent->>Executor: spawn with ExecutorAgentPrompt
+            Executor->>ExecMem: create(window_size=20)
+            
+            Executor->>Executor: Execute tools until complete
+            
+            Executor-->>Agent: Response
+            
+            Agent->>Ckpt: generate_checkpoint()
+            Ckpt->>FS: Save executor checkpoint
+            
+            Agent-->>Planner: Executor result
+            
+            Planner->>Memory: add_message(executor_output)
+            Planner->>Todo: update_status("done")
+        end
+    end
+    
+    rect rgb(128, 90, 213)
+        Note over Planner,FS: Checkpoint Phase
+        Planner-->>Workflow: Final response
+        Workflow->>Ckpt: _create_checkpoint()
+        Ckpt->>Memory: get_messages()
+        Memory-->>Ckpt: conversation history
+        Ckpt->>FS: write(checkpoint.md)
+    end
+    
+    Workflow-->>User: Result
