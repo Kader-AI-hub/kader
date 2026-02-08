@@ -1,0 +1,25 @@
+flowchart LR
+    subgraph Session["Session Directory"]
+        direction TB
+        CONV["conversation.json"]
+        CKPT["checkpoint.md"]
+        
+        subgraph Executors["executors/"]
+            E1["executor-uuid1/<br/>conversation.json"]
+            E2["executor-uuid2/<br/>conversation.json"]
+            AGG["checkpoint.md<br/>(aggregated)"]
+        end
+    end
+    
+    PLANNER["Planner Memory"] --> CONV
+    CONV --> CKPT
+    
+    EXEC1["Executor 1"] --> E1
+    EXEC2["Executor 2"] --> E2
+    E1 --> AGG
+    E2 --> AGG
+    
+    AGG -.->|"ContextAggregator"| CKPT
+    
+    style Session fill:#1a202c,stroke:#4a5568,color:#fff
+    style Executors fill:#2d3748,stroke:#4a5568,color:#fff

@@ -1,0 +1,38 @@
+sequenceDiagram
+    autonumber
+    
+    participant User
+    participant Input as ModeAwareInput
+    participant App as KaderApp
+    participant Conv as ConversationView
+    participant Spinner as LoadingSpinner
+    participant Pool as ThreadPoolExecutor
+    participant Workflow as PlannerExecutorWorkflow
+    participant Planner as PlanningAgent
+    
+    User->>Input: Type message + Enter
+    Input->>App: on_input_submitted()
+    
+    App->>App: _is_processing = True
+    App->>Input: disabled = True
+    App->>Conv: add_message(user_msg)
+    App->>Spinner: start()
+    
+    App->>Pool: run_worker(_invoke_agent_worker)
+    
+    Pool->>Workflow: run(message)
+    Workflow->>Planner: invoke(message)
+    
+    Note over Planner: Agent reasoning loop...
+    
+    Planner-->>Workflow: response
+    Workflow-->>Pool: result
+    
+    Pool->>Spinner: stop()
+    Pool->>Conv: add_message(response, model, cost)
+    
+    Pool->>App: _is_processing = False
+    Pool->>Input: disabled = False
+    Pool->>Input: focus()
+    
+    App-->>User: Response displayed

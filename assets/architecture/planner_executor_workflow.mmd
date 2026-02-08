@@ -1,0 +1,68 @@
+flowchart TB
+    subgraph Workflow["PlannerExecutorWorkflow"]
+        direction TB
+        
+        subgraph Init["Initialization"]
+            WF_INIT[/"User Task"/]
+            LOAD_CKPT["_load_checkpoint_context()"]
+            BUILD_PLANNER["_build_planner()"]
+        end
+        
+        subgraph PlannerAgent["PlanningAgent"]
+            direction TB
+            PLANNER["PlanningAgent"]
+            MEMORY["SlidingWindowConversationManager<br/>(window_size=20)"]
+            PROMPT["KaderPlannerPrompt"]
+            
+            subgraph Tools["Registered Tools"]
+                TODO["TodoTool"]
+                AGENT["AgentTool(s)"]
+            end
+        end
+        
+        subgraph Execution["Execution Loop"]
+            INVOKE["planner.invoke(task)"]
+            PLAN["Create/Update Plan"]
+            DELEGATE["Delegate Sub-task"]
+            UPDATE["Update Todo Status"]
+            COMPLETE{"All Tasks Complete?"}
+        end
+        
+        subgraph Persistence["Memory & Persistence"]
+            CKPT["Checkpointer"]
+            CONV_JSON["conversation.json"]
+            CKPT_MD["checkpoint.md"]
+        end
+    end
+    
+    WF_INIT --> LOAD_CKPT
+    LOAD_CKPT --> BUILD_PLANNER
+    BUILD_PLANNER --> PLANNER
+    
+    PLANNER --> MEMORY
+    PLANNER --> PROMPT
+    PLANNER --> Tools
+    
+    INVOKE --> PLAN
+    PLAN --> TODO
+    TODO --> DELEGATE
+    DELEGATE --> AGENT
+    AGENT --> UPDATE
+    UPDATE --> COMPLETE
+    COMPLETE -- No --> PLAN
+    COMPLETE -- Yes --> CKPT
+    
+    CKPT --> CONV_JSON
+    CKPT --> CKPT_MD
+    
+    classDef workflow fill:#2d3748,stroke:#4a5568,color:#fff
+    classDef agent fill:#3182ce,stroke:#2b6cb0,color:#fff
+    classDef tool fill:#38a169,stroke:#2f855a,color:#fff
+    classDef memory fill:#805ad5,stroke:#6b46c1,color:#fff
+    classDef decision fill:#dd6b20,stroke:#c05621,color:#fff
+    
+    class Workflow workflow
+    class PLANNER,PlannerAgent agent
+    class TODO,AGENT tool
+    class MEMORY,CONV_JSON,CKPT_MD,CKPT memory
+    class COMPLETE decision
