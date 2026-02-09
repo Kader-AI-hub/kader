@@ -27,6 +27,7 @@ from kader.memory import (
 )
 from kader.workflows import PlannerExecutorWorkflow
 
+from .commands import InitializeCommand
 from .llm_factory import LLMProviderFactory
 from .utils import (
     DEFAULT_MODEL,
@@ -558,6 +559,9 @@ Please resize your terminal."""
             self.notify("Directory tree refreshed!", severity="information")
         elif cmd == "/cost":
             self._handle_cost(conversation)
+        elif cmd == "/init":
+            init_cmd = InitializeCommand(self)
+            await init_cmd.execute()
         elif cmd == "/exit":
             self.exit()
         else:

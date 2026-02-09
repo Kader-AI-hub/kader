@@ -17,6 +17,7 @@ HELP_TEXT = """## Kader CLI Commands
 | `/sessions` | List saved sessions |
 | `/cost` | Show usage costs |
 | `/refresh` | Refresh file tree |
+| `/init` | Initialize .kader directory with KADER.md |
 | `/exit` | Exit the CLI |
 | `!cmd` | Run terminal command |
 
