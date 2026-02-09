@@ -182,7 +182,7 @@ class PlannerExecutorWorkflow(BaseWorkflow):
             return None
 
         try:
-            checkpointer = Checkpointer()
+            checkpointer = Checkpointer(provider=self._planner.provider)
             memory_path = f"{self.session_id}/conversation.json"
             checkpoint_path = checkpointer.generate_checkpoint(memory_path)
             return checkpoint_path

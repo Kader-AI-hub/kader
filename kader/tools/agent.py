@@ -284,13 +284,15 @@ class AgentTool(BaseTool[str]):
 
             # Generate checkpoint and aggregate it
             try:
-                checkpointer = Checkpointer()
+                checkpointer = Checkpointer(provider=agent.provider)
                 checkpoint_path = checkpointer.generate_checkpoint(str(memory_file))
                 checkpoint_content = Path(checkpoint_path).read_text(encoding="utf-8")
 
                 # Aggregate the checkpoint into the main executors checkpoint
                 if main_session_id != "standalone":
-                    aggregator = ContextAggregator(session_id=main_session_id)
+                    aggregator = ContextAggregator(
+                        session_id=main_session_id, provider=agent.provider
+                    )
                     # Use relative path from executors directory
                     relative_path = f"{self.name}-{execution_id}/checkpoint.md"
                     aggregator.aggregate(relative_path, subagent_name=self.name)
@@ -399,7 +401,7 @@ class AgentTool(BaseTool[str]):
 
             # Generate checkpoint and aggregate it
             try:
-                checkpointer = Checkpointer()
+                checkpointer = Checkpointer(provider=agent.provider)
                 checkpoint_path = await checkpointer.agenerate_checkpoint(
                     str(memory_file)
                 )
@@ -407,7 +409,9 @@ class AgentTool(BaseTool[str]):
 
                 # Aggregate the checkpoint into the main executors checkpoint
                 if main_session_id != "standalone":
-                    aggregator = ContextAggregator(session_id=main_session_id)
+                    aggregator = ContextAggregator(
+                        session_id=main_session_id, provider=agent.provider
+                    )
                     # Use relative path from executors directory
                     relative_path = f"{self.name}-{execution_id}/checkpoint.md"
                     await aggregator.aaggregate(relative_path, subagent_name=self.name)
