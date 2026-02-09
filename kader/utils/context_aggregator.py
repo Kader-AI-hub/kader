@@ -8,8 +8,7 @@ in the main session's executors directory.
 from pathlib import Path
 
 from kader.memory.types import aread_text, awrite_text, get_default_memory_dir
-from kader.providers.base import Message
-from kader.providers.ollama import OllamaProvider
+from kader.providers.base import BaseLLMProvider, Message
 
 AGGREGATOR_SYSTEM_PROMPT = """You are an assistant that aggregates and merges checkpoint summaries from multiple sub-agents.
 Given checkpoint summaries from different sub-agents, create a unified summary that combines all information.
@@ -50,27 +49,21 @@ class ContextAggregator:
     into a unified checkpoint.md in the executors directory.
 
     Example:
-        aggregator = ContextAggregator(session_id="main-session-id")
+        aggregator = ContextAggregator(session_id="main-session-id", provider=llm_provider)
         md_path = aggregator.aggregate("/path/to/subagent/checkpoint.md")
         print(f"Aggregated checkpoint saved to: {md_path}")
     """
 
-    def __init__(
-        self,
-        session_id: str,
-        model: str = "gpt-oss:120b-cloud",
-        host: str | None = None,
-    ) -> None:
+    def __init__(self, session_id: str, provider: BaseLLMProvider) -> None:
         """
         Initialize the ContextAggregator.
 
         Args:
             session_id: The main session ID for the executors directory
-            model: Ollama model identifier (default: "gpt-oss:120b-cloud")
-            host: Optional Ollama server host
+            provider: LLM provider to use for merging checkpoints
         """
         self._session_id = session_id
-        self._provider = OllamaProvider(model=model, host=host)
+        self._provider = provider
 
     def _get_executors_dir(self) -> Path:
         """

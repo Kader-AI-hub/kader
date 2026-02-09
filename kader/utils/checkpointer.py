@@ -1,7 +1,7 @@
 """
 Checkpointer module for generating step-by-step summaries of agent memory.
 
-Uses OllamaProvider to analyze conversation history and produce
+Uses an LLM provider to analyze conversation history and produce
 human-readable markdown summaries.
 """
 
@@ -15,8 +15,7 @@ from kader.memory.types import (
     get_default_memory_dir,
     load_json,
 )
-from kader.providers.base import Message
-from kader.providers.ollama import OllamaProvider
+from kader.providers.base import BaseLLMProvider, Message
 
 CHECKPOINT_SYSTEM_PROMPT = """You are an assistant that summarizes agent conversation histories.
 Given a conversation between a user and an AI agent, create a structured summary in markdown format.
@@ -51,28 +50,23 @@ class Checkpointer:
     """
     Generates step-by-step markdown summaries of agent memory.
 
-    Uses OllamaProvider to analyze conversation history from memory files
+    Uses an LLM provider to analyze conversation history from memory files
     and produce human-readable checkpoint summaries.
 
     Example:
-        checkpointer = Checkpointer()
+        checkpointer = Checkpointer(provider=llm_provider)
         md_path = checkpointer.generate_checkpoint("session-id/conversation.json")
         print(f"Checkpoint saved to: {md_path}")
     """
 
-    def __init__(
-        self,
-        model: str = "gpt-oss:120b-cloud",
-        host: str | None = None,
-    ) -> None:
+    def __init__(self, provider: BaseLLMProvider) -> None:
         """
         Initialize the Checkpointer.
 
         Args:
-            model: Ollama model identifier (default: "gpt-oss:120b-cloud")
-            host: Optional Ollama server host
+            provider: LLM provider to use for generating summaries
         """
-        self._provider = OllamaProvider(model=model, host=host)
+        self._provider = provider
 
     def _load_memory(self, memory_path: Path) -> dict[str, Any]:
         """
