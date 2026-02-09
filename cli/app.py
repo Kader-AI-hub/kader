@@ -535,9 +535,9 @@ Please resize your terminal."""
             conversation.clear_messages()
             self._workflow.planner.memory.clear()
             self._workflow.planner.provider.reset_tracking()  # Reset usage/cost tracking
-            self._current_session_id = None
+            self._current_session_id = self._workflow.session_id  # Start new session
             try:
-                self.query_one("#todo-list", TodoList).set_session_id(None)
+                self.query_one("#todo-list", TodoList).set_session_id(self._current_session_id)
             except Exception:
                 pass
             self.notify("Conversation cleared!", severity="information")
