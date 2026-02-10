@@ -14,7 +14,7 @@ from kader.tools.agent import AgentTool
 from .base import BaseCommand
 
 if TYPE_CHECKING:
-    from ..app import KaderApp
+    pass
 
 
 class InitializeCommand(BaseCommand):
