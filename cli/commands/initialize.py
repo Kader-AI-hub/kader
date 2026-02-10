@@ -6,38 +6,19 @@ KADER.md file using an AgentTool to analyze the codebase.
 
 import asyncio
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING
 
 from kader.prompts.cli_prompts import InitCommandPrompt
 from kader.tools.agent import AgentTool
 
+from .base import BaseCommand
+
 if TYPE_CHECKING:
-    from ..app import KaderApp
+    pass
 
 
-class InitializeCommand:
+class InitializeCommand(BaseCommand):
     """Handles the /init command for Kader CLI."""
-
-    def __init__(self, app: "KaderApp") -> None:
-        """Initialize the command handler.
-
-        Args:
-            app: The KaderApp instance to interact with.
-        """
-        self.app = app
-
-    def _tool_confirmation_callback(self, message: str) -> Tuple[bool, Optional[str]]:
-        """Callback for tool confirmation from agent.
-
-        Args:
-            message: The tool execution message.
-
-        Returns:
-            Tuple of (should_execute, additional_context).
-        """
-        # Auto-approve tools for init command - the agent needs to read files
-        # and write the KADER.md file
-        return (True, None)
 
     async def execute(self) -> None:
         """Execute the initialization command.
