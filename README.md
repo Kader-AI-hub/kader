@@ -225,12 +225,29 @@ uv run ruff format .
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Run the test suite
-6. Submit a pull request
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on:
+
+- Setting up your development environment
+- Code style guidelines
+- Running tests
+- Submitting pull requests
+
+### Quick Start for Contributors
+
+```bash
+# Fork and clone
+git clone https://github.com/your-username/kader.git
+cd kader
+
+# Install dependencies
+uv sync
+
+# Run tests
+uv run pytest
+
+# Run linter
+uv run ruff check .
+```
 
 ## License
 
