@@ -537,9 +537,10 @@ Please resize your terminal."""
             self._workflow.planner.provider.reset_tracking()  # Reset usage/cost tracking
             self._current_session_id = self._workflow.session_id  # Start new session
             try:
-                self.query_one("#todo-list", TodoList).set_session_id(
-                    self._current_session_id
-                )
+                if self._current_session_id:
+                    self.query_one("#todo-list", TodoList).set_session_id(
+                        self._current_session_id
+                    )
             except Exception:
                 pass
             self.notify("Conversation cleared!", severity="information")
@@ -743,6 +744,10 @@ Please resize your terminal."""
 
     def _handle_save_session(self, conversation: ConversationView) -> None:
         """Save the current session."""
+        import shutil
+
+        from kader.memory.types import get_default_memory_dir
+
         try:
             # Create a new session if none exists
             if not self._current_session_id:
@@ -757,11 +762,27 @@ Please resize your terminal."""
                 except Exception:
                     pass
 
-            # Get messages from planner memory and save
-            messages = [
-                msg.message for msg in self._workflow.planner.memory.get_messages()
-            ]
-            self._session_manager.save_conversation(self._current_session_id, messages)
+            # Get the planner agent's session directory
+            planner_session_dir = (
+                get_default_memory_dir() / "sessions" / self._current_session_id
+            )
+
+            # Get the CLI session manager's session directory
+            target_session_dir = (
+                self._session_manager.sessions_dir / self._current_session_id
+            )
+
+            # Copy the planner's session directory to CLI's session manager
+            if planner_session_dir.exists() and self._current_session_id:
+                # Create parent directories if needed
+                target_session_dir.parent.mkdir(parents=True, exist_ok=True)
+
+                # If target exists, remove it first to ensure clean copy
+                if target_session_dir.exists():
+                    shutil.rmtree(target_session_dir)
+
+                # Copy the entire session directory
+                shutil.copytree(planner_session_dir, target_session_dir)
 
             conversation.add_message(
                 f"(+) Session saved!\n\n**Session ID:** `{self._current_session_id}`",
