@@ -17,6 +17,7 @@ dependencies = [
     "outdated>=0.2.2",
     "aiofiles>=25.1.0",
     "google-genai>=1.61.0",
+    "google-api-core>=2.24.0",
     "mistralai>=1.12.0",
 ]
 
