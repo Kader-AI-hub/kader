@@ -93,6 +93,49 @@ Demonstrates an agent specialized for managing to-do lists and tasks with:
 - Reading and displaying the status of all items
 - YAML-based agent configuration
 
+### Google Provider Example
+```bash
+uv run python -m examples.google_example
+```
+Demonstrates how to use the Google provider for:
+- Basic LLM invocation with Gemini models
+- Streaming responses (sync and async)
+- Configuration options
+- Tool/function calling
+- Dynamic model listing
+- Token counting and cost estimation
+- Conversation history
+
+**Note**: To run the Google example, you need to set your `GEMINI_API_KEY` in `~/.kader/.env`. Get your API key from: https://aistudio.google.com/apikey
+
+### Mistral Provider Example
+```bash
+uv run python -m examples.mistral_example
+```
+Demonstrates how to use the Mistral provider for:
+- Basic LLM invocation with Mistral AI models
+- Streaming responses (sync and async)
+- Configuration options
+- Tool/function calling
+- Dynamic model listing
+- Token counting and cost estimation
+- Conversation history
+
+**Note**: To run the Mistral example, you need to set your `MISTRAL_API_KEY` in `~/.kader/.env`. Get your API key from: https://console.mistral.ai/api-keys
+
+### Planner-Executor Workflow Example
+```bash
+uv run python -m examples.planner_executor_example
+```
+Demonstrates the Planner-Executor workflow for:
+- Using PlanningAgent with TodoTool for task management
+- Delegating sub-tasks to executor agents via AgentTool
+- Creating structured plans for complex tasks
+- Tracking task progress and updating todo status
+- Interactive workflow with multiple executor agents
+
+**Note**: This example uses a planner model (qwen3-coder:480b-cloud by default) and executor agents. Configure the model via `OLLAMA_MODEL` environment variable or modify the code.
+
 ## Running Examples
 
 To run any example:
