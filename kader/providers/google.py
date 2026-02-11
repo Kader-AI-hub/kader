@@ -9,6 +9,7 @@ import os
 from typing import AsyncIterator, Iterator
 
 from google import genai
+from google.api_core import retry
 from google.genai import types
 
 # Import config to ensure ~/.kader/.env is loaded
@@ -24,6 +25,23 @@ from .base import (
     ModelPricing,
     StreamChunk,
     Usage,
+)
+
+# Retry configuration for transient errors
+GEMINI_RETRY_CONFIG = retry.Retry(
+    predicate=retry.if_transient_error,
+    initial=2.0,
+    maximum=64.0,
+    multiplier=2.0,
+    timeout=600,
+)
+
+GEMINI_RETRY_CONFIG_ASYNC = retry.AsyncRetry(
+    predicate=retry.if_transient_error,
+    initial=2.0,
+    maximum=64.0,
+    multiplier=2.0,
+    timeout=600,
 )
 
 # Pricing data for Gemini models (per 1M tokens, in USD)
@@ -388,6 +406,7 @@ class GoogleProvider(BaseLLMProvider):
     # Synchronous Methods
     # -------------------------------------------------------------------------
 
+    @GEMINI_RETRY_CONFIG
     def invoke(
         self,
         messages: list[Message],
@@ -440,11 +459,15 @@ class GoogleProvider(BaseLLMProvider):
             merged_config, system_instruction
         )
 
-        response_stream = self._client.models.generate_content_stream(
-            model=self._model,
-            contents=contents,
-            config=generate_config,
-        )
+        @GEMINI_RETRY_CONFIG
+        def _generate_with_retry():
+            return self._client.models.generate_content_stream(
+                model=self._model,
+                contents=contents,
+                config=generate_config,
+            )
+
+        response_stream = _generate_with_retry()
 
         accumulated_content = ""
         for chunk in response_stream:
@@ -469,6 +492,7 @@ class GoogleProvider(BaseLLMProvider):
     # Asynchronous Methods
     # -------------------------------------------------------------------------
 
+    @GEMINI_RETRY_CONFIG_ASYNC
     async def ainvoke(
         self,
         messages: list[Message],
@@ -521,11 +545,15 @@ class GoogleProvider(BaseLLMProvider):
             merged_config, system_instruction
         )
 
-        response_stream = await self._client.aio.models.generate_content_stream(
-            model=self._model,
-            contents=contents,
-            config=generate_config,
-        )
+        @GEMINI_RETRY_CONFIG_ASYNC
+        async def _generate_with_retry():
+            return await self._client.aio.models.generate_content_stream(
+                model=self._model,
+                contents=contents,
+                config=generate_config,
+            )
+
+        response_stream = await _generate_with_retry()
 
         accumulated_content = ""
         async for chunk in response_stream:
@@ -550,6 +578,7 @@ class GoogleProvider(BaseLLMProvider):
     # Token & Cost Methods
     # -------------------------------------------------------------------------
 
+    @GEMINI_RETRY_CONFIG
     def count_tokens(
         self,
         text: str | list[Message],
