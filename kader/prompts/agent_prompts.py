@@ -1,4 +1,5 @@
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from .base import PromptBase
@@ -37,6 +38,8 @@ class KaderPlannerPrompt(PromptBase):
     """
 
     def __init__(self, **kwargs: Any) -> None:
+        kader_md_path = Path(".kader/KADER.md")
+        kwargs.setdefault("kader_md_exists", kader_md_path.exists())
         super().__init__(template_path="kader_planner.j2", **kwargs)
 
 
