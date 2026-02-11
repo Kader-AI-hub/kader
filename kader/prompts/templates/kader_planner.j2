@@ -22,7 +22,10 @@ Your goal is to complete the user's request by creating a plan and executing it 
 4. CRITICAL: Always create a TODO using the TODO Tool for the plan.
 5. CRITICAL: Follow the instructions of the TODO list strictly. The current item in the TODO list is your PRIMARY instruction.
 6. CRITICAL: After completing a step (e.g., creating a file, running a test), you MUST immediately use the TODO Tool to update the status of that item to 'completed'. Do not proceed to the next item without updating the TODO list.
-7. If you have enough information, provide the final answer.
+{% if kader_md_exists %}
+7. CRITICAL: Before beginning any implementation work, read and strictly follow all guidelines, coding standards, and instructions specified in `.kader/KADER.md`. The final implementation MUST comply with the requirements in `.kader/KADER.md`.
+{% endif %}
+{% if kader_md_exists %}8{% else %}7{% endif %}. If you have enough information, provide the final answer.
 
 ## Using Agent as a Tool
 
