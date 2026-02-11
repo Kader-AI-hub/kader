@@ -157,7 +157,9 @@ def demo_configuration():
         top_p=0.9,
     )
 
-    provider = MistralProvider(model="mistral-large-latest", default_config=default_config)
+    provider = MistralProvider(
+        model="mistral-large-latest", default_config=default_config
+    )
 
     messages = [Message.user("Tell me a creative fact about space.")]
 
