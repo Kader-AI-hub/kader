@@ -165,14 +165,24 @@ class GoogleProvider(BaseLLMProvider):
                     parts.append(types.Part.from_text(text=msg.content))
                 if msg.tool_calls:
                     for tc in msg.tool_calls:
-                        parts.append(
-                            types.Part.from_function_call(
-                                name=tc["function"]["name"],
-                                args=tc["function"]["arguments"]
-                                if isinstance(tc["function"]["arguments"], dict)
-                                else {},
-                            )
+                        # Build function call part with thought_signature if available
+                        func_call = types.FunctionCall(
+                            name=tc["function"]["name"],
+                            args=tc["function"]["arguments"]
+                            if isinstance(tc["function"]["arguments"], dict)
+                            else {},
                         )
+                        # Include thought_signature if it was captured from the model response
+                        thought_sig = tc.get("thought_signature")
+                        if thought_sig:
+                            parts.append(
+                                types.Part(
+                                    function_call=func_call,
+                                    thought_signature=thought_sig,
+                                )
+                            )
+                        else:
+                            parts.append(types.Part(function_call=func_call))
                 contents.append(types.Content(role="model", parts=parts))
             elif msg.role == "tool":
                 contents.append(
@@ -286,16 +296,23 @@ class GoogleProvider(BaseLLMProvider):
                         text_parts.append(part.text)
                     if hasattr(part, "function_call") and part.function_call:
                         fc = part.function_call
-                        function_calls.append(
-                            {
-                                "id": f"call_{len(function_calls)}",
-                                "type": "function",
-                                "function": {
-                                    "name": fc.name,
-                                    "arguments": dict(fc.args) if fc.args else {},
-                                },
-                            }
-                        )
+                        function_call_data = {
+                            "id": f"call_{len(function_calls)}",
+                            "type": "function",
+                            "function": {
+                                "name": fc.name,
+                                "arguments": dict(fc.args) if fc.args else {},
+                            },
+                        }
+                        # Capture thought_signature if present (required for resending)
+                        if (
+                            hasattr(part, "thought_signature")
+                            and part.thought_signature
+                        ):
+                            function_call_data["thought_signature"] = (
+                                part.thought_signature
+                            )
+                        function_calls.append(function_call_data)
 
                 content = "".join(text_parts)
                 if function_calls:
@@ -360,16 +377,21 @@ class GoogleProvider(BaseLLMProvider):
                         delta = part.text
                     if hasattr(part, "function_call") and part.function_call:
                         fc = part.function_call
-                        tool_calls = [
-                            {
-                                "id": "call_0",
-                                "type": "function",
-                                "function": {
-                                    "name": fc.name,
-                                    "arguments": dict(fc.args) if fc.args else {},
-                                },
-                            }
-                        ]
+                        tool_call_data = {
+                            "id": "call_0",
+                            "type": "function",
+                            "function": {
+                                "name": fc.name,
+                                "arguments": dict(fc.args) if fc.args else {},
+                            },
+                        }
+                        # Capture thought_signature if present (required for resending)
+                        if (
+                            hasattr(part, "thought_signature")
+                            and part.thought_signature
+                        ):
+                            tool_call_data["thought_signature"] = part.thought_signature
+                        tool_calls = [tool_call_data]
 
         # Extract usage from final chunk
         usage = None
