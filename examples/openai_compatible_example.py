@@ -6,6 +6,7 @@ Demonstrates how to use the Kader OpenAI-Compatible provider for:
 - Moonshot AI models (kimi-k2.5)
 - Z.ai models (GLM-5)
 - OpenRouter (access to 200+ models from various providers)
+- OpenCode Zen (Claude, Gemini, GPT, GLM, Kimi, and more)
 - Other OpenAI-compatible providers
 - Basic LLM invocation
 - Streaming responses
@@ -20,12 +21,14 @@ API Key Setup:
     MOONSHOT_API_KEY='your-moonshot-api-key-here'
     ZAI_API_KEY='your-zai-api-key-here'
     OPENROUTER_API_KEY='your-openrouter-api-key-here'
+    OPENCODE_API_KEY='your-opencode-api-key-here'
 
     Get your API keys from:
     - OpenAI: https://platform.openai.com/api-keys
     - Moonshot AI: https://platform.moonshot.cn
     - Z.ai: https://open.bigmodel.cn
     - OpenRouter: https://openrouter.ai/keys
+    - OpenCode Zen: https://opencode.ai/zen
 """
 
 import asyncio
@@ -173,6 +176,45 @@ def demo_openrouter():
     except Exception as e:
         print(f"Error during OpenRouter invocation: {e}")
         print("Make sure OPENROUTER_API_KEY is set.")
+
+
+def demo_opencode_zen():
+    """Demonstrate OpenCode Zen invocation with Claude Sonnet 4.5."""
+    print("\n=== OpenCode Zen Demo ===")
+
+    # Initialize the provider with OpenCode Zen configuration
+    provider = OpenAICompatibleProvider(
+        model="kimi-k2.5-free",
+        provider_config=OpenAIProviderConfig(
+            api_key=os.environ.get("OPENCODE_API_KEY", ""),
+            base_url="https://opencode.ai/zen/v1",
+        ),
+    )
+
+    messages = [
+        Message.system(
+            "You are an expert coding agent. Your role is to:\n"
+            "1. Understand the user's coding requirements\n"
+            "2. Write clean, efficient, and well-documented code\n"
+            "3. Explain your approach and any trade-offs\n"
+            "4. Suggest improvements and best practices"
+        ),
+        Message.user("Create a Python function to merge two sorted lists"),
+    ]
+
+    try:
+        response = provider.invoke(messages)
+
+        print(f"Model: {response.model}")
+        print(f"Content: {response.content}")
+        print(f"Tokens: {response.usage.total_tokens}")
+
+        if response.cost:
+            print(f"Cost: {response.cost.format()}")
+
+    except Exception as e:
+        print(f"Error during OpenCode Zen invocation: {e}")
+        print("Make sure OPENCODE_API_KEY is set.")
 
 
 def demo_streaming():
@@ -434,11 +476,13 @@ def main():
     print("  MOONSHOT_API_KEY='your-moonshot-api-key-here'")
     print("  ZAI_API_KEY='your-zai-api-key-here'")
     print("  OPENROUTER_API_KEY='your-openrouter-api-key-here'")
+    print("  OPENCODE_API_KEY='your-opencode-api-key-here'")
     print("\n  Get your API keys from:")
     print("  - OpenAI: https://platform.openai.com/api-keys")
     print("  - Moonshot AI: https://platform.moonshot.cn")
     print("  - Z.ai: https://open.bigmodel.cn")
     print("  - OpenRouter: https://openrouter.ai/keys")
+    print("  - OpenCode Zen: https://opencode.ai/zen")
 
     demo_openai_basic()
     demo_streaming()
@@ -454,6 +498,7 @@ def main():
     demo_moonshot_ai()
     demo_zai_glm5()
     demo_openrouter()
+    demo_opencode_zen()
 
     print("\n[OK] All OpenAI-Compatible demos completed!")
 
