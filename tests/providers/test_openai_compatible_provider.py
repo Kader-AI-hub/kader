@@ -10,6 +10,7 @@ from kader.providers.base import (
 from kader.providers.openai_compatible import (
     MOONSHOT_PRICING,
     OPENAI_PRICING,
+    OPENCODE_PRICING,
     OPENROUTER_PRICING,
     ZAI_PRICING,
     OpenAICompatibleProvider,
@@ -93,6 +94,10 @@ class TestProviderDetection:
         assert _detect_provider(None, "anthropic/claude-3.5-sonnet") == "openrouter"
         assert _detect_provider(None, "openai/gpt-4o") == "openrouter"
         assert _detect_provider(None, "google/gemini-1.5-pro") == "openrouter"
+
+    def test_detect_opencode_by_url(self):
+        """Test detecting OpenCode by base URL."""
+        assert _detect_provider("https://opencode.ai/zen/v1", "model") == "opencode"
 
     def test_detect_unknown(self):
         """Test unknown provider detection."""
@@ -291,6 +296,28 @@ class TestOpenAICompatibleProviderEstimateCost:
         assert abs(cost.output_cost - expected_output) < 1e-9
         assert abs(cost.total_cost - expected_total) < 1e-9
 
+    def test_estimate_cost_opencode_model(self):
+        """Test estimating cost for OpenCode Zen model."""
+        provider = OpenAICompatibleProvider(
+            model="claude-sonnet-4-5",
+            provider_config=OpenAIProviderConfig(
+                api_key="test",
+                base_url="https://opencode.ai/zen/v1",
+            ),
+        )
+        usage = Usage(prompt_tokens=1000, completion_tokens=500)
+
+        cost = provider.estimate_cost(usage)
+
+        # claude-sonnet-4-5: $3.00/M input, $15.00/M output
+        expected_input = (1000 / 1_000_000) * 3.00
+        expected_output = (500 / 1_000_000) * 15.00
+        expected_total = expected_input + expected_output
+
+        assert abs(cost.input_cost - expected_input) < 1e-9
+        assert abs(cost.output_cost - expected_output) < 1e-9
+        assert abs(cost.total_cost - expected_total) < 1e-9
+
     def test_estimate_cost_zero_usage(self):
         """Test estimating cost with zero usage."""
         provider = OpenAICompatibleProvider(model="gpt-4o")
@@ -377,6 +404,23 @@ class TestOpenAICompatibleProviderModelInfo:
         assert model_info.supports_tools is True
         assert model_info.supports_streaming is True
 
+    def test_get_model_info_opencode(self):
+        """Test getting model info for OpenCode Zen model."""
+        provider = OpenAICompatibleProvider(
+            model="claude-sonnet-4-5",
+            provider_config=OpenAIProviderConfig(
+                api_key="test",
+                base_url="https://opencode.ai/zen/v1",
+            ),
+        )
+        model_info = provider.get_model_info()
+
+        assert model_info is not None
+        assert model_info.name == "claude-sonnet-4-5"
+        assert model_info.provider == "opencode"
+        assert model_info.supports_tools is True
+        assert model_info.supports_streaming is True
+
     def test_get_model_info_context_window(self):
         """Test context window sizes."""
         # Test GPT-4 32k
@@ -453,6 +497,15 @@ class TestPricingData:
         assert "google/gemini-1.5-pro" in OPENROUTER_PRICING
         assert "meta-llama/llama-3.3-70b-instruct" in OPENROUTER_PRICING
         assert "deepseek/deepseek-chat" in OPENROUTER_PRICING
+
+    def test_opencode_pricing_exists(self):
+        """Test that OpenCode Zen pricing data exists for known models."""
+        assert "claude-sonnet-4-5" in OPENCODE_PRICING
+        assert "claude-opus-4-6" in OPENCODE_PRICING
+        assert "gpt-5.2" in OPENCODE_PRICING
+        assert "gemini-3-pro" in OPENCODE_PRICING
+        assert "kimi-k2.5" in OPENCODE_PRICING
+        assert "glm-4.7" in OPENCODE_PRICING
 
     def test_pricing_format(self):
         """Test that pricing data has correct format."""
