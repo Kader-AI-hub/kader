@@ -72,6 +72,14 @@ class TestLLMProviderFactoryParseModelName:
         assert provider == "opencode"
         assert model == "claude-sonnet-4-5"
 
+    def test_parse_groq_model(self):
+        """Test parsing Groq model string."""
+        provider, model = LLMProviderFactory.parse_model_name(
+            "groq:llama-3.3-70b-versatile"
+        )
+        assert provider == "groq"
+        assert model == "llama-3.3-70b-versatile"
+
     def test_parse_default_provider(self):
         """Test parsing without provider prefix (defaults to ollama)."""
         provider, model = LLMProviderFactory.parse_model_name("llama3.2")
@@ -178,6 +186,12 @@ class TestLLMProviderFactoryProviderConfigs:
         assert config["env_key"] == "OPENCODE_API_KEY"
         assert config["base_url"] == "https://opencode.ai/zen/v1"
 
+    def test_groq_config(self):
+        """Test Groq provider configuration."""
+        config = LLMProviderFactory.PROVIDER_CONFIGS["groq"]
+        assert config["env_key"] == "GROQ_API_KEY"
+        assert config["base_url"] == "https://api.groq.com/openai/v1"
+
 
 class TestLLMProviderFactorySupportedProviders:
     """Test cases for supported providers."""
@@ -193,13 +207,21 @@ class TestLLMProviderFactorySupportedProviders:
             "zai",
             "openrouter",
             "opencode",
+            "groq",
         ]
         for provider in expected_providers:
             assert provider in LLMProviderFactory.PROVIDERS
 
     def test_openai_compatible_providers_use_same_class(self):
         """Test that OpenAI-compatible providers use OpenAICompatibleProvider."""
-        openai_compatible = ["openai", "moonshot", "zai", "openrouter", "opencode"]
+        openai_compatible = [
+            "openai",
+            "moonshot",
+            "zai",
+            "openrouter",
+            "opencode",
+            "groq",
+        ]
         for provider in openai_compatible:
             assert LLMProviderFactory.PROVIDERS[provider] == OpenAICompatibleProvider
 

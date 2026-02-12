@@ -8,6 +8,7 @@ from kader.providers.base import (
     Usage,
 )
 from kader.providers.openai_compatible import (
+    GROQ_PRICING,
     MOONSHOT_PRICING,
     OPENAI_PRICING,
     OPENCODE_PRICING,
@@ -98,6 +99,10 @@ class TestProviderDetection:
     def test_detect_opencode_by_url(self):
         """Test detecting OpenCode by base URL."""
         assert _detect_provider("https://opencode.ai/zen/v1", "model") == "opencode"
+
+    def test_detect_groq_by_url(self):
+        """Test detecting Groq by base URL."""
+        assert _detect_provider("https://api.groq.com/openai/v1", "model") == "groq"
 
     def test_detect_unknown(self):
         """Test unknown provider detection."""
@@ -318,6 +323,28 @@ class TestOpenAICompatibleProviderEstimateCost:
         assert abs(cost.output_cost - expected_output) < 1e-9
         assert abs(cost.total_cost - expected_total) < 1e-9
 
+    def test_estimate_cost_groq_model(self):
+        """Test estimating cost for Groq model."""
+        provider = OpenAICompatibleProvider(
+            model="llama-3.3-70b-versatile",
+            provider_config=OpenAIProviderConfig(
+                api_key="test",
+                base_url="https://api.groq.com/openai/v1",
+            ),
+        )
+        usage = Usage(prompt_tokens=1000, completion_tokens=500)
+
+        cost = provider.estimate_cost(usage)
+
+        # llama-3.3-70b-versatile: $0.59/M input, $0.79/M output
+        expected_input = (1000 / 1_000_000) * 0.59
+        expected_output = (500 / 1_000_000) * 0.79
+        expected_total = expected_input + expected_output
+
+        assert abs(cost.input_cost - expected_input) < 1e-9
+        assert abs(cost.output_cost - expected_output) < 1e-9
+        assert abs(cost.total_cost - expected_total) < 1e-9
+
     def test_estimate_cost_zero_usage(self):
         """Test estimating cost with zero usage."""
         provider = OpenAICompatibleProvider(model="gpt-4o")
@@ -421,6 +448,23 @@ class TestOpenAICompatibleProviderModelInfo:
         assert model_info.supports_tools is True
         assert model_info.supports_streaming is True
 
+    def test_get_model_info_groq(self):
+        """Test getting model info for Groq model."""
+        provider = OpenAICompatibleProvider(
+            model="llama-3.3-70b-versatile",
+            provider_config=OpenAIProviderConfig(
+                api_key="test",
+                base_url="https://api.groq.com/openai/v1",
+            ),
+        )
+        model_info = provider.get_model_info()
+
+        assert model_info is not None
+        assert model_info.name == "llama-3.3-70b-versatile"
+        assert model_info.provider == "groq"
+        assert model_info.supports_tools is True
+        assert model_info.supports_streaming is True
+
     def test_get_model_info_context_window(self):
         """Test context window sizes."""
         # Test GPT-4 32k
@@ -506,6 +550,15 @@ class TestPricingData:
         assert "gemini-3-pro" in OPENCODE_PRICING
         assert "kimi-k2.5" in OPENCODE_PRICING
         assert "glm-4.7" in OPENCODE_PRICING
+
+    def test_groq_pricing_exists(self):
+        """Test that Groq pricing data exists for known models."""
+        assert "llama-3.3-70b-versatile" in GROQ_PRICING
+        assert "meta-llama/llama-4-scout-17b-16e-instruct" in GROQ_PRICING
+        assert "meta-llama/llama-4-maverick-17b-128e-instruct" in GROQ_PRICING
+        assert "qwen-3-32b" in GROQ_PRICING
+        assert "gpt-oss-20b" in GROQ_PRICING
+        assert "kimi-k2-0905" in GROQ_PRICING
 
     def test_pricing_format(self):
         """Test that pricing data has correct format."""
