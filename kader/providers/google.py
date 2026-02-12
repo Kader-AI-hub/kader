@@ -9,6 +9,7 @@ import os
 from typing import AsyncIterator, Iterator
 
 from google import genai
+from google.api_core import exceptions as google_exceptions
 from google.api_core import retry
 from google.genai import types
 
@@ -27,19 +28,49 @@ from .base import (
     Usage,
 )
 
-# Retry configuration for transient errors
+
+def _is_retryable_error(exc: Exception) -> bool:
+    """
+    Check if an exception is retryable.
+
+    Retries on transient errors (network issues, 500s, 503s)
+    and rate limit errors (429).
+    """
+    # Check for standard transient errors
+    if retry.if_transient_error(exc):
+        return True
+
+    # Check for rate limit errors (429)
+    # The error message contains 'RESOURCE_EXHAUSTED' or '429'
+    if isinstance(exc, google_exceptions.GoogleAPIError):
+        error_message = str(exc).lower()
+        if any(
+            keyword in error_message
+            for keyword in ["resource_exhausted", "429", "quota", "rate limit"]
+        ):
+            return True
+
+    # Check for ClientError from google.genai with 429 status
+    error_str = str(exc).lower()
+    if "429" in error_str or "resource_exhausted" in error_str:
+        return True
+
+    return False
+
+
+# Retry configuration for transient and rate limit errors
 GEMINI_RETRY_CONFIG = retry.Retry(
-    predicate=retry.if_transient_error,
-    initial=2.0,
-    maximum=64.0,
+    predicate=_is_retryable_error,
+    initial=5.0,
+    maximum=60.0,
     multiplier=2.0,
     timeout=600,
 )
 
 GEMINI_RETRY_CONFIG_ASYNC = retry.AsyncRetry(
-    predicate=retry.if_transient_error,
-    initial=2.0,
-    maximum=64.0,
+    predicate=_is_retryable_error,
+    initial=5.0,
+    maximum=60.0,
     multiplier=2.0,
     timeout=600,
 )
