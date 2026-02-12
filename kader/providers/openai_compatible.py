@@ -435,6 +435,56 @@ OPENCODE_PRICING: dict[str, ModelPricing] = {
     ),
 }
 
+# Pricing data for Groq models (per 1M tokens, in USD)
+# Source: https://groq.com/pricing
+GROQ_PRICING: dict[str, ModelPricing] = {
+    # Llama 4 models
+    "meta-llama/llama-4-scout-17b-16e-instruct": ModelPricing(
+        input_cost_per_million=0.11,
+        output_cost_per_million=0.34,
+    ),
+    "meta-llama/llama-4-maverick-17b-128e-instruct": ModelPricing(
+        input_cost_per_million=0.20,
+        output_cost_per_million=0.60,
+    ),
+    # Llama 3 models
+    "llama-3.3-70b-versatile": ModelPricing(
+        input_cost_per_million=0.59,
+        output_cost_per_million=0.79,
+    ),
+    "llama-3.1-8b-instant": ModelPricing(
+        input_cost_per_million=0.05,
+        output_cost_per_million=0.08,
+    ),
+    "llama-guard-4-12b": ModelPricing(
+        input_cost_per_million=0.20,
+        output_cost_per_million=0.20,
+    ),
+    # Qwen models
+    "qwen-3-32b": ModelPricing(
+        input_cost_per_million=0.29,
+        output_cost_per_million=0.59,
+    ),
+    # GPT OSS models
+    "gpt-oss-20b": ModelPricing(
+        input_cost_per_million=0.075,
+        output_cost_per_million=0.30,
+    ),
+    "gpt-oss-120b": ModelPricing(
+        input_cost_per_million=0.15,
+        output_cost_per_million=0.60,
+    ),
+    "gpt-oss-safeguard-20b": ModelPricing(
+        input_cost_per_million=0.075,
+        output_cost_per_million=0.30,
+    ),
+    # Kimi models
+    "kimi-k2-0905": ModelPricing(
+        input_cost_per_million=1.00,
+        output_cost_per_million=3.00,
+    ),
+}
+
 # Combine all pricing data
 PROVIDER_PRICING: dict[str, dict[str, ModelPricing]] = {
     "openai": OPENAI_PRICING,
@@ -442,6 +492,7 @@ PROVIDER_PRICING: dict[str, dict[str, ModelPricing]] = {
     "zai": ZAI_PRICING,
     "openrouter": OPENROUTER_PRICING,
     "opencode": OPENCODE_PRICING,
+    "groq": GROQ_PRICING,
 }
 
 
@@ -453,7 +504,7 @@ def _detect_provider(base_url: str | None, model: str) -> str:
         model: The model identifier
 
     Returns:
-        Provider identifier ("openai", "moonshot", "zai", "openrouter", "opencode", or "unknown")
+        Provider identifier ("openai", "moonshot", "zai", "openrouter", "opencode", "groq", or "unknown")
     """
     if base_url:
         base_url_lower = base_url.lower()
@@ -465,6 +516,8 @@ def _detect_provider(base_url: str | None, model: str) -> str:
             return "openrouter"
         elif "opencode" in base_url_lower:
             return "opencode"
+        elif "groq" in base_url_lower:
+            return "groq"
 
     # Try to detect from model name
     model_lower = model.lower()
@@ -490,6 +543,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
     - Z.ai (GLM-5, GLM-4 series)
     - OpenRouter (access to 200+ models from various providers)
     - OpenCode Zen (Claude, Gemini, GPT, GLM, Kimi, and more)
+    - Groq (Llama 4, Llama 3, Qwen, GPT OSS, and more with ultra-fast inference)
     - Any other provider implementing the OpenAI API specification
 
     The API key is loaded from (in order of priority):
@@ -539,6 +593,15 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             provider_config=OpenAIProviderConfig(
                 api_key="your-api-key",
                 base_url="https://opencode.ai/zen/v1",
+            )
+        )
+
+        # Groq (ultra-fast inference)
+        provider = OpenAICompatibleProvider(
+            model="llama-3.3-70b-versatile",
+            provider_config=OpenAIProviderConfig(
+                api_key="your-api-key",
+                base_url="https://api.groq.com/openai/v1",
             )
         )
 
