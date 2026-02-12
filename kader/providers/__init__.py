@@ -3,6 +3,7 @@ from .google import GoogleProvider
 from .mistral import MistralProvider
 from .mock import MockLLM
 from .ollama import OllamaProvider
+from .openai_compatible import OpenAICompatibleProvider, OpenAIProviderConfig
 
 __all__ = [
     "Message",
@@ -10,4 +11,6 @@ __all__ = [
     "GoogleProvider",
     "MistralProvider",
     "MockLLM",
+    "OpenAICompatibleProvider",
+    "OpenAIProviderConfig",
 ]
