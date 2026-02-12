@@ -4,9 +4,16 @@ Factory pattern implementation for creating LLM provider instances
 with automatic provider detection based on model name format.
 """
 
+import os
 from typing import Optional
 
-from kader.providers import GoogleProvider, MistralProvider, OllamaProvider
+from kader.providers import (
+    GoogleProvider,
+    MistralProvider,
+    OllamaProvider,
+    OpenAICompatibleProvider,
+    OpenAIProviderConfig,
+)
 from kader.providers.base import BaseLLMProvider, ModelConfig
 
 
@@ -19,12 +26,31 @@ class LLMProviderFactory:
     - "provider:model" (e.g., "google:gemini-2.5-flash", "ollama:kimi-k2.5:cloud")
     - "model" (defaults to Ollama for backward compatibility)
 
+    Supported providers:
+    - ollama: Local models via Ollama
+    - google: Google Gemini models
+    - mistral: Mistral AI models
+    - openai: OpenAI models (GPT-4, GPT-4o, etc.)
+    - moonshot: Moonshot AI models (kimi-k2.5, etc.)
+    - zai: Z.ai models (GLM-5, GLM-4, etc.)
+    - openrouter: OpenRouter models (access to 200+ models)
+    - opencode: OpenCode Zen models (Claude, Gemini, GPT, and more)
+    - groq: Groq models (Llama 4, Llama 3, Qwen, GPT OSS with ultra-fast inference)
+
     Example:
         factory = LLMProviderFactory()
         provider = factory.create_provider("google:gemini-2.5-flash")
 
         # Or with default provider (Ollama)
         provider = factory.create_provider("kimi-k2.5:cloud")
+
+        # OpenAI-compatible providers
+        provider = factory.create_provider("openai:gpt-4o")
+        provider = factory.create_provider("moonshot:kimi-k2.5")
+        provider = factory.create_provider("zai:glm-5")
+        provider = factory.create_provider("openrouter:anthropic/claude-3.5-sonnet")
+        provider = factory.create_provider("opencode:claude-sonnet-4-5")
+        provider = factory.create_provider("groq:llama-3.3-70b-versatile")
     """
 
     # Registered provider classes
@@ -32,6 +58,40 @@ class LLMProviderFactory:
         "ollama": OllamaProvider,
         "google": GoogleProvider,
         "mistral": MistralProvider,
+        "openai": OpenAICompatibleProvider,
+        "moonshot": OpenAICompatibleProvider,
+        "zai": OpenAICompatibleProvider,
+        "openrouter": OpenAICompatibleProvider,
+        "opencode": OpenAICompatibleProvider,
+        "groq": OpenAICompatibleProvider,
+    }
+
+    # OpenAI-compatible provider configurations
+    PROVIDER_CONFIGS: dict[str, dict] = {
+        "openai": {
+            "base_url": None,  # Uses default OpenAI URL
+            "env_key": "OPENAI_API_KEY",
+        },
+        "moonshot": {
+            "base_url": "https://api.moonshot.cn/v1",
+            "env_key": "MOONSHOT_API_KEY",
+        },
+        "zai": {
+            "base_url": "https://api.z.ai/api/paas/v4/",
+            "env_key": "ZAI_API_KEY",
+        },
+        "openrouter": {
+            "base_url": "https://openrouter.ai/api/v1",
+            "env_key": "OPENROUTER_API_KEY",
+        },
+        "opencode": {
+            "base_url": "https://opencode.ai/zen/v1",
+            "env_key": "OPENCODE_API_KEY",
+        },
+        "groq": {
+            "base_url": "https://api.groq.com/openai/v1",
+            "env_key": "GROQ_API_KEY",
+        },
     }
 
     # Default provider when no prefix is specified
@@ -74,7 +134,7 @@ class LLMProviderFactory:
             Configured provider instance
 
         Raises:
-            ValueError: If provider is not supported
+            ValueError: If provider is not supported or API key is missing
         """
         provider_name, model_name = cls.parse_model_name(model_string)
 
@@ -85,7 +145,58 @@ class LLMProviderFactory:
                 f"Unknown provider: {provider_name}. Supported: {supported}"
             )
 
+        # Handle OpenAI-compatible providers
+        if provider_class == OpenAICompatibleProvider:
+            return cls._create_openai_compatible_provider(
+                provider_name, model_name, config
+            )
+
         return provider_class(model=model_name, default_config=config)
+
+    @classmethod
+    def _create_openai_compatible_provider(
+        cls,
+        provider_name: str,
+        model_name: str,
+        config: Optional[ModelConfig] = None,
+    ) -> OpenAICompatibleProvider:
+        """
+        Create an OpenAI-compatible provider with proper configuration.
+
+        Args:
+            provider_name: Name of the provider (openai, moonshot, zai, openrouter, opencode, groq)
+            model_name: The model identifier
+            config: Optional model configuration
+
+        Returns:
+            Configured OpenAICompatibleProvider instance
+
+        Raises:
+            ValueError: If API key is not configured
+        """
+        provider_config = cls.PROVIDER_CONFIGS.get(provider_name, {})
+        env_key = provider_config.get("env_key", "OPENAI_API_KEY")
+        base_url = provider_config.get("base_url")
+
+        # Get API key from environment
+        api_key = os.environ.get(env_key)
+        if not api_key:
+            raise ValueError(
+                f"{provider_name.upper()} API key not found. "
+                f"Please set {env_key} in your ~/.kader/.env file"
+            )
+
+        # Create provider configuration
+        openai_config = OpenAIProviderConfig(
+            api_key=api_key,
+            base_url=base_url,
+        )
+
+        return OpenAICompatibleProvider(
+            model=model_name,
+            provider_config=openai_config,
+            default_config=config,
+        )
 
     @classmethod
     def get_all_models(cls) -> dict[str, list[str]]:
@@ -119,6 +230,37 @@ class LLMProviderFactory:
         except Exception:
             models["mistral"] = []
 
+        # Get OpenAI-compatible provider models
+        for provider_name in [
+            "openai",
+            "moonshot",
+            "zai",
+            "openrouter",
+            "opencode",
+            "groq",
+        ]:
+            try:
+                provider_config = cls.PROVIDER_CONFIGS.get(provider_name, {})
+                env_key = provider_config.get("env_key", "OPENAI_API_KEY")
+                base_url = provider_config.get("base_url")
+
+                api_key = os.environ.get(env_key)
+                if api_key:
+                    config = OpenAIProviderConfig(
+                        api_key=api_key,
+                        base_url=base_url,
+                    )
+                    provider_models = OpenAICompatibleProvider.get_supported_models(
+                        config
+                    )
+                    models[provider_name] = [
+                        f"{provider_name}:{m}" for m in provider_models
+                    ]
+                else:
+                    models[provider_name] = []
+            except Exception:
+                models[provider_name] = []
+
         return models
 
     @classmethod
@@ -149,6 +291,26 @@ class LLMProviderFactory:
         provider_name = provider_name.lower()
         if provider_name not in cls.PROVIDERS:
             return False
+
+        # Handle OpenAI-compatible providers
+        if cls.PROVIDERS[provider_name] == OpenAICompatibleProvider:
+            try:
+                provider_config = cls.PROVIDER_CONFIGS.get(provider_name, {})
+                env_key = provider_config.get("env_key", "OPENAI_API_KEY")
+                base_url = provider_config.get("base_url")
+
+                api_key = os.environ.get(env_key)
+                if not api_key:
+                    return False
+
+                config = OpenAIProviderConfig(
+                    api_key=api_key,
+                    base_url=base_url,
+                )
+                models = OpenAICompatibleProvider.get_supported_models(config)
+                return len(models) > 0
+            except Exception:
+                return False
 
         # Try to get models to verify provider is working
         try:
