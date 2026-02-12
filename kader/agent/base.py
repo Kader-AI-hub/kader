@@ -5,6 +5,7 @@ Defines the BaseAgent class which serves as the foundation for creating specific
 with tools, memory, and LLM provider integration.
 """
 
+import json
 from pathlib import Path
 from typing import AsyncIterator, Iterator, Optional, Union
 
@@ -455,15 +456,20 @@ class BaseAgent:
                 # Create ToolCall object
                 # Some providers might differ in specific dict keys, relying on normalization
                 try:
+                    fn_info = tool_call_dict.get("function", {})
+                    raw_args = fn_info.get("arguments", {})
+                    # Parse arguments if they are a JSON string
+                    if isinstance(raw_args, str):
+                        parsed_args = json.loads(raw_args) if raw_args else {}
+                    else:
+                        parsed_args = raw_args
                     tool_call = ToolCall(
                         id=tool_call_dict.get("id", ""),
-                        name=tool_call_dict.get("function", {}).get("name", ""),
-                        arguments=tool_call_dict.get("function", {}).get(
-                            "arguments", {}
-                        ),
-                        raw_arguments=str(
-                            tool_call_dict.get("function", {}).get("arguments", {})
-                        ),
+                        name=fn_info.get("name", ""),
+                        arguments=parsed_args,
+                        raw_arguments=str(raw_args)
+                        if isinstance(raw_args, str)
+                        else json.dumps(raw_args),
                     )
                 except Exception:
                     # Fallback or simplified parsing if structure differs
@@ -526,10 +532,20 @@ class BaseAgent:
                     # Handle flat structure if any
                     fn_info = tool_call_dict
 
+                raw_args = fn_info.get("arguments", {})
+                # Parse arguments if they are a JSON string
+                if isinstance(raw_args, str):
+                    parsed_args = json.loads(raw_args) if raw_args else {}
+                else:
+                    parsed_args = raw_args
+
                 tool_call = ToolCall(
                     id=tool_call_dict.get("id", "call_default"),
                     name=fn_info.get("name", ""),
-                    arguments=fn_info.get("arguments", {}),
+                    arguments=parsed_args,
+                    raw_arguments=str(raw_args)
+                    if isinstance(raw_args, str)
+                    else json.dumps(raw_args),
                 )
 
                 # Execute tool async
