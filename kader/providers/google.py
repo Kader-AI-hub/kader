@@ -9,6 +9,8 @@ import os
 from typing import AsyncIterator, Iterator
 
 from google import genai
+from google.api_core import exceptions as google_exceptions
+from google.api_core import retry
 from google.genai import types
 
 # Import config to ensure ~/.kader/.env is loaded
@@ -24,6 +26,53 @@ from .base import (
     ModelPricing,
     StreamChunk,
     Usage,
+)
+
+
+def _is_retryable_error(exc: Exception) -> bool:
+    """
+    Check if an exception is retryable.
+
+    Retries on transient errors (network issues, 500s, 503s)
+    and rate limit errors (429).
+    """
+    # Check for standard transient errors
+    if retry.if_transient_error(exc):
+        return True
+
+    # Check for rate limit errors (429)
+    # The error message contains 'RESOURCE_EXHAUSTED' or '429'
+    if isinstance(exc, google_exceptions.GoogleAPIError):
+        error_message = str(exc).lower()
+        if any(
+            keyword in error_message
+            for keyword in ["resource_exhausted", "429", "quota", "rate limit"]
+        ):
+            return True
+
+    # Check for ClientError from google.genai with 429 status
+    error_str = str(exc).lower()
+    if "429" in error_str or "resource_exhausted" in error_str:
+        return True
+
+    return False
+
+
+# Retry configuration for transient and rate limit errors
+GEMINI_RETRY_CONFIG = retry.Retry(
+    predicate=_is_retryable_error,
+    initial=5.0,
+    maximum=60.0,
+    multiplier=2.0,
+    timeout=600,
+)
+
+GEMINI_RETRY_CONFIG_ASYNC = retry.AsyncRetry(
+    predicate=_is_retryable_error,
+    initial=5.0,
+    maximum=60.0,
+    multiplier=2.0,
+    timeout=600,
 )
 
 # Pricing data for Gemini models (per 1M tokens, in USD)
@@ -147,14 +196,24 @@ class GoogleProvider(BaseLLMProvider):
                     parts.append(types.Part.from_text(text=msg.content))
                 if msg.tool_calls:
                     for tc in msg.tool_calls:
-                        parts.append(
-                            types.Part.from_function_call(
-                                name=tc["function"]["name"],
-                                args=tc["function"]["arguments"]
-                                if isinstance(tc["function"]["arguments"], dict)
-                                else {},
-                            )
+                        # Build function call part with thought_signature if available
+                        func_call = types.FunctionCall(
+                            name=tc["function"]["name"],
+                            args=tc["function"]["arguments"]
+                            if isinstance(tc["function"]["arguments"], dict)
+                            else {},
                         )
+                        # Include thought_signature if it was captured from the model response
+                        thought_sig = tc.get("thought_signature")
+                        if thought_sig:
+                            parts.append(
+                                types.Part(
+                                    function_call=func_call,
+                                    thought_signature=thought_sig,
+                                )
+                            )
+                        else:
+                            parts.append(types.Part(function_call=func_call))
                 contents.append(types.Content(role="model", parts=parts))
             elif msg.role == "tool":
                 contents.append(
@@ -268,16 +327,23 @@ class GoogleProvider(BaseLLMProvider):
                         text_parts.append(part.text)
                     if hasattr(part, "function_call") and part.function_call:
                         fc = part.function_call
-                        function_calls.append(
-                            {
-                                "id": f"call_{len(function_calls)}",
-                                "type": "function",
-                                "function": {
-                                    "name": fc.name,
-                                    "arguments": dict(fc.args) if fc.args else {},
-                                },
-                            }
-                        )
+                        function_call_data = {
+                            "id": f"call_{len(function_calls)}",
+                            "type": "function",
+                            "function": {
+                                "name": fc.name,
+                                "arguments": dict(fc.args) if fc.args else {},
+                            },
+                        }
+                        # Capture thought_signature if present (required for resending)
+                        if (
+                            hasattr(part, "thought_signature")
+                            and part.thought_signature
+                        ):
+                            function_call_data["thought_signature"] = (
+                                part.thought_signature
+                            )
+                        function_calls.append(function_call_data)
 
                 content = "".join(text_parts)
                 if function_calls:
@@ -342,16 +408,21 @@ class GoogleProvider(BaseLLMProvider):
                         delta = part.text
                     if hasattr(part, "function_call") and part.function_call:
                         fc = part.function_call
-                        tool_calls = [
-                            {
-                                "id": "call_0",
-                                "type": "function",
-                                "function": {
-                                    "name": fc.name,
-                                    "arguments": dict(fc.args) if fc.args else {},
-                                },
-                            }
-                        ]
+                        tool_call_data = {
+                            "id": "call_0",
+                            "type": "function",
+                            "function": {
+                                "name": fc.name,
+                                "arguments": dict(fc.args) if fc.args else {},
+                            },
+                        }
+                        # Capture thought_signature if present (required for resending)
+                        if (
+                            hasattr(part, "thought_signature")
+                            and part.thought_signature
+                        ):
+                            tool_call_data["thought_signature"] = part.thought_signature
+                        tool_calls = [tool_call_data]
 
         # Extract usage from final chunk
         usage = None
@@ -388,6 +459,7 @@ class GoogleProvider(BaseLLMProvider):
     # Synchronous Methods
     # -------------------------------------------------------------------------
 
+    @GEMINI_RETRY_CONFIG
     def invoke(
         self,
         messages: list[Message],
@@ -440,11 +512,15 @@ class GoogleProvider(BaseLLMProvider):
             merged_config, system_instruction
         )
 
-        response_stream = self._client.models.generate_content_stream(
-            model=self._model,
-            contents=contents,
-            config=generate_config,
-        )
+        @GEMINI_RETRY_CONFIG
+        def _generate_with_retry():
+            return self._client.models.generate_content_stream(
+                model=self._model,
+                contents=contents,
+                config=generate_config,
+            )
+
+        response_stream = _generate_with_retry()
 
         accumulated_content = ""
         for chunk in response_stream:
@@ -469,6 +545,7 @@ class GoogleProvider(BaseLLMProvider):
     # Asynchronous Methods
     # -------------------------------------------------------------------------
 
+    @GEMINI_RETRY_CONFIG_ASYNC
     async def ainvoke(
         self,
         messages: list[Message],
@@ -521,11 +598,15 @@ class GoogleProvider(BaseLLMProvider):
             merged_config, system_instruction
         )
 
-        response_stream = await self._client.aio.models.generate_content_stream(
-            model=self._model,
-            contents=contents,
-            config=generate_config,
-        )
+        @GEMINI_RETRY_CONFIG_ASYNC
+        async def _generate_with_retry():
+            return await self._client.aio.models.generate_content_stream(
+                model=self._model,
+                contents=contents,
+                config=generate_config,
+            )
+
+        response_stream = await _generate_with_retry()
 
         accumulated_content = ""
         async for chunk in response_stream:
@@ -550,6 +631,7 @@ class GoogleProvider(BaseLLMProvider):
     # Token & Cost Methods
     # -------------------------------------------------------------------------
 
+    @GEMINI_RETRY_CONFIG
     def count_tokens(
         self,
         text: str | list[Message],
