@@ -35,6 +35,7 @@ class LLMProviderFactory:
     - zai: Z.ai models (GLM-5, GLM-4, etc.)
     - openrouter: OpenRouter models (access to 200+ models)
     - opencode: OpenCode Zen models (Claude, Gemini, GPT, and more)
+    - groq: Groq models (Llama 4, Llama 3, Qwen, GPT OSS with ultra-fast inference)
 
     Example:
         factory = LLMProviderFactory()
@@ -49,6 +50,7 @@ class LLMProviderFactory:
         provider = factory.create_provider("zai:glm-5")
         provider = factory.create_provider("openrouter:anthropic/claude-3.5-sonnet")
         provider = factory.create_provider("opencode:claude-sonnet-4-5")
+        provider = factory.create_provider("groq:llama-3.3-70b-versatile")
     """
 
     # Registered provider classes
@@ -61,6 +63,7 @@ class LLMProviderFactory:
         "zai": OpenAICompatibleProvider,
         "openrouter": OpenAICompatibleProvider,
         "opencode": OpenAICompatibleProvider,
+        "groq": OpenAICompatibleProvider,
     }
 
     # OpenAI-compatible provider configurations
@@ -84,6 +87,10 @@ class LLMProviderFactory:
         "opencode": {
             "base_url": "https://opencode.ai/zen/v1",
             "env_key": "OPENCODE_API_KEY",
+        },
+        "groq": {
+            "base_url": "https://api.groq.com/openai/v1",
+            "env_key": "GROQ_API_KEY",
         },
     }
 
@@ -157,7 +164,7 @@ class LLMProviderFactory:
         Create an OpenAI-compatible provider with proper configuration.
 
         Args:
-            provider_name: Name of the provider (openai, moonshot, zai, openrouter, opencode)
+            provider_name: Name of the provider (openai, moonshot, zai, openrouter, opencode, groq)
             model_name: The model identifier
             config: Optional model configuration
 
@@ -224,7 +231,14 @@ class LLMProviderFactory:
             models["mistral"] = []
 
         # Get OpenAI-compatible provider models
-        for provider_name in ["openai", "moonshot", "zai", "openrouter", "opencode"]:
+        for provider_name in [
+            "openai",
+            "moonshot",
+            "zai",
+            "openrouter",
+            "opencode",
+            "groq",
+        ]:
             try:
                 provider_config = cls.PROVIDER_CONFIGS.get(provider_name, {})
                 env_key = provider_config.get("env_key", "OPENAI_API_KEY")
