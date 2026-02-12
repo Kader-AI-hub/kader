@@ -7,6 +7,7 @@ Demonstrates how to use the Kader OpenAI-Compatible provider for:
 - Z.ai models (GLM-5)
 - OpenRouter (access to 200+ models from various providers)
 - OpenCode Zen (Claude, Gemini, GPT, GLM, Kimi, and more)
+- Groq (Llama 4, Llama 3, Qwen, GPT OSS with ultra-fast inference)
 - Other OpenAI-compatible providers
 - Basic LLM invocation
 - Streaming responses
@@ -22,6 +23,7 @@ API Key Setup:
     ZAI_API_KEY='your-zai-api-key-here'
     OPENROUTER_API_KEY='your-openrouter-api-key-here'
     OPENCODE_API_KEY='your-opencode-api-key-here'
+    GROQ_API_KEY='your-groq-api-key-here'
 
     Get your API keys from:
     - OpenAI: https://platform.openai.com/api-keys
@@ -29,6 +31,7 @@ API Key Setup:
     - Z.ai: https://open.bigmodel.cn
     - OpenRouter: https://openrouter.ai/keys
     - OpenCode Zen: https://opencode.ai/zen
+    - Groq: https://console.groq.com/keys
 """
 
 import asyncio
@@ -215,6 +218,42 @@ def demo_opencode_zen():
     except Exception as e:
         print(f"Error during OpenCode Zen invocation: {e}")
         print("Make sure OPENCODE_API_KEY is set.")
+
+
+def demo_groq():
+    """Demonstrate Groq invocation with Llama 3.3 70B."""
+    print("\n=== Groq Demo ===")
+
+    # Initialize the provider with Groq configuration
+    provider = OpenAICompatibleProvider(
+        model="llama-3.3-70b-versatile",
+        provider_config=OpenAIProviderConfig(
+            api_key=os.environ.get("GROQ_API_KEY", ""),
+            base_url="https://api.groq.com/openai/v1",
+        ),
+    )
+
+    messages = [
+        Message.system(
+            "You are a helpful AI assistant powered by Groq's ultra-fast inference. "
+            "You provide quick, accurate, and efficient responses."
+        ),
+        Message.user("What are the benefits of using Groq for AI inference?"),
+    ]
+
+    try:
+        response = provider.invoke(messages)
+
+        print(f"Model: {response.model}")
+        print(f"Content: {response.content}")
+        print(f"Tokens: {response.usage.total_tokens}")
+
+        if response.cost:
+            print(f"Cost: {response.cost.format()}")
+
+    except Exception as e:
+        print(f"Error during Groq invocation: {e}")
+        print("Make sure GROQ_API_KEY is set.")
 
 
 def demo_streaming():
@@ -477,12 +516,14 @@ def main():
     print("  ZAI_API_KEY='your-zai-api-key-here'")
     print("  OPENROUTER_API_KEY='your-openrouter-api-key-here'")
     print("  OPENCODE_API_KEY='your-opencode-api-key-here'")
+    print("  GROQ_API_KEY='your-groq-api-key-here'")
     print("\n  Get your API keys from:")
     print("  - OpenAI: https://platform.openai.com/api-keys")
     print("  - Moonshot AI: https://platform.moonshot.cn")
     print("  - Z.ai: https://open.bigmodel.cn")
     print("  - OpenRouter: https://openrouter.ai/keys")
     print("  - OpenCode Zen: https://opencode.ai/zen")
+    print("  - Groq: https://console.groq.com/keys")
 
     demo_openai_basic()
     demo_streaming()
@@ -499,6 +540,7 @@ def main():
     demo_zai_glm5()
     demo_openrouter()
     demo_opencode_zen()
+    demo_groq()
 
     print("\n[OK] All OpenAI-Compatible demos completed!")
 
