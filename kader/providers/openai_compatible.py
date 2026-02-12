@@ -2,8 +2,8 @@
 OpenAI-Compatible LLM Provider implementation.
 
 Provides synchronous and asynchronous access to OpenAI-compatible LLM providers
-including OpenAI, Moonshot AI (kimi-k2.5), Z.ai (GLM-5), OpenRouter, and other
-providers that implement the OpenAI API specification.
+including OpenAI, Moonshot AI (kimi-k2.5), Z.ai (GLM-5), OpenRouter, OpenCode Zen,
+and other providers that implement the OpenAI API specification.
 """
 
 import os
@@ -303,12 +303,145 @@ OPENROUTER_PRICING: dict[str, ModelPricing] = {
     ),
 }
 
+# Pricing data for OpenCode Zen models (per 1M tokens, in USD)
+# Source: https://opencode.ai/zen/pricing
+OPENCODE_PRICING: dict[str, ModelPricing] = {
+    # Claude models
+    "claude-opus-4-6": ModelPricing(
+        input_cost_per_million=15.00,
+        output_cost_per_million=75.00,
+    ),
+    "claude-opus-4-5": ModelPricing(
+        input_cost_per_million=15.00,
+        output_cost_per_million=75.00,
+    ),
+    "claude-opus-4-1": ModelPricing(
+        input_cost_per_million=15.00,
+        output_cost_per_million=75.00,
+    ),
+    "claude-sonnet-4": ModelPricing(
+        input_cost_per_million=3.00,
+        output_cost_per_million=15.00,
+    ),
+    "claude-sonnet-4-5": ModelPricing(
+        input_cost_per_million=3.00,
+        output_cost_per_million=15.00,
+    ),
+    "claude-3-5-haiku": ModelPricing(
+        input_cost_per_million=0.25,
+        output_cost_per_million=1.25,
+    ),
+    "claude-haiku-4-5": ModelPricing(
+        input_cost_per_million=0.25,
+        output_cost_per_million=1.25,
+    ),
+    # Gemini models
+    "gemini-3-pro": ModelPricing(
+        input_cost_per_million=1.25,
+        output_cost_per_million=5.00,
+    ),
+    "gemini-3-flash": ModelPricing(
+        input_cost_per_million=0.075,
+        output_cost_per_million=0.30,
+    ),
+    # GPT models
+    "gpt-5.2": ModelPricing(
+        input_cost_per_million=2.50,
+        output_cost_per_million=10.00,
+    ),
+    "gpt-5.2-codex": ModelPricing(
+        input_cost_per_million=2.50,
+        output_cost_per_million=10.00,
+    ),
+    "gpt-5.1": ModelPricing(
+        input_cost_per_million=2.00,
+        output_cost_per_million=8.00,
+    ),
+    "gpt-5.1-codex-max": ModelPricing(
+        input_cost_per_million=2.00,
+        output_cost_per_million=8.00,
+    ),
+    "gpt-5.1-codex": ModelPricing(
+        input_cost_per_million=1.50,
+        output_cost_per_million=6.00,
+    ),
+    "gpt-5.1-codex-mini": ModelPricing(
+        input_cost_per_million=0.50,
+        output_cost_per_million=2.00,
+    ),
+    "gpt-5": ModelPricing(
+        input_cost_per_million=1.50,
+        output_cost_per_million=6.00,
+    ),
+    "gpt-5-codex": ModelPricing(
+        input_cost_per_million=1.50,
+        output_cost_per_million=6.00,
+    ),
+    "gpt-5-nano": ModelPricing(
+        input_cost_per_million=0.10,
+        output_cost_per_million=0.40,
+    ),
+    # GLM models
+    "glm-4.7": ModelPricing(
+        input_cost_per_million=1.00,
+        output_cost_per_million=1.00,
+    ),
+    "glm-4.6": ModelPricing(
+        input_cost_per_million=0.50,
+        output_cost_per_million=0.50,
+    ),
+    "glm-4.7-free": ModelPricing(
+        input_cost_per_million=0.00,
+        output_cost_per_million=0.00,
+    ),
+    # MiniMax models
+    "minimax-m2.1": ModelPricing(
+        input_cost_per_million=0.15,
+        output_cost_per_million=0.15,
+    ),
+    "minimax-m2.1-free": ModelPricing(
+        input_cost_per_million=0.00,
+        output_cost_per_million=0.00,
+    ),
+    # Kimi models
+    "kimi-k2.5": ModelPricing(
+        input_cost_per_million=1.50,
+        output_cost_per_million=1.50,
+    ),
+    "kimi-k2.5-free": ModelPricing(
+        input_cost_per_million=0.00,
+        output_cost_per_million=0.00,
+    ),
+    "kimi-k2": ModelPricing(
+        input_cost_per_million=1.00,
+        output_cost_per_million=1.00,
+    ),
+    "kimi-k2-thinking": ModelPricing(
+        input_cost_per_million=1.00,
+        output_cost_per_million=1.00,
+    ),
+    # Other models
+    "trinity-large-preview-free": ModelPricing(
+        input_cost_per_million=0.00,
+        output_cost_per_million=0.00,
+    ),
+    "big-pickle": ModelPricing(
+        input_cost_per_million=0.50,
+        output_cost_per_million=0.50,
+    ),
+    "alpha-g5": ModelPricing(
+        input_cost_per_million=0.50,
+        output_cost_per_million=0.50,
+    ),
+}
+
 # Combine all pricing data
 PROVIDER_PRICING: dict[str, dict[str, ModelPricing]] = {
     "openai": OPENAI_PRICING,
     "moonshot": MOONSHOT_PRICING,
     "zai": ZAI_PRICING,
     "openrouter": OPENROUTER_PRICING,
+    "opencode": OPENCODE_PRICING,
 }
 
 
@@ -320,7 +453,7 @@ def _detect_provider(base_url: str | None, model: str) -> str:
         model: The model identifier
 
     Returns:
-        Provider identifier ("openai", "moonshot", "zai", "openrouter", or "unknown")
+        Provider identifier ("openai", "moonshot", "zai", "openrouter", "opencode", or "unknown")
     """
     if base_url:
         base_url_lower = base_url.lower()
@@ -330,6 +463,8 @@ def _detect_provider(base_url: str | None, model: str) -> str:
             return "zai"
         elif "openrouter" in base_url_lower:
             return "openrouter"
+        elif "opencode" in base_url_lower:
+            return "opencode"
 
     # Try to detect from model name
     model_lower = model.lower()
@@ -354,6 +489,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
     - Moonshot AI (kimi-k2.5, moonshot-v1 series)
     - Z.ai (GLM-5, GLM-4 series)
     - OpenRouter (access to 200+ models from various providers)
+    - OpenCode Zen (Claude, Gemini, GPT, GLM, Kimi, and more)
     - Any other provider implementing the OpenAI API specification
 
     The API key is loaded from (in order of priority):
@@ -394,6 +530,15 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             provider_config=OpenAIProviderConfig(
                 api_key="your-api-key",
                 base_url="https://openrouter.ai/api/v1",
+            )
+        )
+
+        # OpenCode Zen
+        provider = OpenAICompatibleProvider(
+            model="claude-sonnet-4-5",
+            provider_config=OpenAIProviderConfig(
+                api_key="your-api-key",
+                base_url="https://opencode.ai/zen/v1",
             )
         )
 
