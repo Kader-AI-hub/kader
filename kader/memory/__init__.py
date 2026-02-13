@@ -11,6 +11,13 @@ Memory is stored locally in $HOME/.kader/memory as directories and JSON files.
 
 # Core types
 # Conversation management
+# Compression
+from .compression import (
+    CompressionConfig,
+    CompressionStrategy,
+    ToolOutputCompressor,
+    compress_tool_output,
+)
 from .conversation import (
     ConversationManager,
     ConversationMessage,
@@ -63,4 +70,9 @@ __all__ = [
     "ConversationManager",
     "SlidingWindowConversationManager",
     "NullConversationManager",
+    # Compression
+    "CompressionConfig",
+    "CompressionStrategy",
+    "ToolOutputCompressor",
+    "compress_tool_output",
 ]
