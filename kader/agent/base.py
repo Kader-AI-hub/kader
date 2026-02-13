@@ -13,9 +13,11 @@ import yaml
 from tenacity import RetryError, stop_after_attempt, wait_exponential
 
 from kader.memory import (
+    CompressionConfig,
     ConversationManager,
     FileSessionManager,
     SlidingWindowConversationManager,
+    ToolOutputCompressor,
 )
 from kader.prompts.base import PromptBase
 from kader.providers.base import (
@@ -60,6 +62,8 @@ class BaseAgent:
         tool_confirmation_callback: Optional[callable] = None,
         direct_execution_callback: Optional[callable] = None,
         tool_execution_result_callback: Optional[callable] = None,
+        enable_compression: bool = True,
+        compression_config: Optional[CompressionConfig] = None,
     ) -> None:
         """
         Initialize the Base Agent.
@@ -78,6 +82,8 @@ class BaseAgent:
             tool_confirmation_callback: Optional callback function for tool confirmation.
                 Signature: (message: str) -> tuple[bool, Optional[str]]
                 Returns (should_execute, user_elaboration_if_declined).
+            enable_compression: If True, compresses tool outputs to reduce token usage (default: True).
+            compression_config: Optional custom compression configuration. If None, uses default rules.
         """
         self.name = name
         self.system_prompt = system_prompt
@@ -88,6 +94,18 @@ class BaseAgent:
         self.tool_confirmation_callback = tool_confirmation_callback
         self.direct_execution_callback = direct_execution_callback
         self.tool_execution_result_callback = tool_execution_result_callback
+
+        # Compression Configuration
+        self.enable_compression = enable_compression
+        if enable_compression:
+            if compression_config:
+                self._compressor = ToolOutputCompressor()
+                for tool_name in ToolOutputCompressor.COMPRESSION_RULES:
+                    self._compressor.set_config(tool_name, compression_config)
+            else:
+                self._compressor = ToolOutputCompressor()
+        else:
+            self._compressor = None
 
         # Persistence Configuration
         self.session_id = session_id
@@ -482,6 +500,14 @@ class BaseAgent:
                 # Execute tool
                 tool_result = self._tool_registry.run(tool_call)
 
+                # Compress tool output if compression is enabled
+                if self._compressor:
+                    compressed_content = self._compressor.compress(
+                        tool_name=tool_call.name,
+                        output=tool_result.content,
+                    )
+                    tool_result.content = compressed_content
+
                 # Notify about tool execution result if callback available
                 if self.tool_execution_result_callback:
                     # Handle both enum and string status
@@ -550,6 +576,14 @@ class BaseAgent:
 
                 # Execute tool async
                 tool_result = await self._tool_registry.arun(tool_call)
+
+                # Compress tool output if compression is enabled
+                if self._compressor:
+                    compressed_content = self._compressor.compress(
+                        tool_name=tool_call.name,
+                        output=tool_result.content,
+                    )
+                    tool_result.content = compressed_content
 
                 # Notify about tool execution result if callback available
                 if self.tool_execution_result_callback:

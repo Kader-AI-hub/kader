@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional, Tuple
 
 from kader.memory import SlidingWindowConversationManager
+from kader.memory.compression import CompressionConfig, ToolOutputCompressor
 from kader.memory.types import aread_text, save_json
 from kader.prompts import ExecutorAgentPrompt
 from kader.providers.base import BaseLLMProvider, Message
@@ -101,6 +102,8 @@ class AgentTool(BaseTool[str]):
         ] = None,
         direct_execution_callback: Optional[Callable[..., None]] = None,
         tool_execution_result_callback: Optional[Callable[..., None]] = None,
+        enable_compression: bool = True,
+        compression_config: Optional[CompressionConfig] = None,
     ) -> None:
         """
         Initialize the AgentTool.
@@ -116,6 +119,8 @@ class AgentTool(BaseTool[str]):
             tool_confirmation_callback: Callback function for tool confirmation.
                 Should return (should_execute: bool, additional_context: Optional[str]).
                 If not provided and interrupt_before_tool=True, uses stdin prompts.
+            enable_compression: If True, compresses sub-agent outputs to reduce token usage (default: True).
+            compression_config: Optional custom compression configuration. If None, uses default rules.
         """
         super().__init__(
             name=name,
@@ -142,6 +147,18 @@ class AgentTool(BaseTool[str]):
         self._tool_confirmation_callback = tool_confirmation_callback
         self._direct_execution_callback = direct_execution_callback
         self._tool_execution_result_callback = tool_execution_result_callback
+
+        # Compression Configuration
+        self._enable_compression = enable_compression
+        if enable_compression:
+            if compression_config:
+                self._compressor = ToolOutputCompressor()
+                for tool_name in ToolOutputCompressor.COMPRESSION_RULES:
+                    self._compressor.set_config(tool_name, compression_config)
+            else:
+                self._compressor = ToolOutputCompressor()
+        else:
+            self._compressor = None
 
     def _load_aggregated_context(self, main_session_id: str) -> str | None:
         """
@@ -309,15 +326,31 @@ class AgentTool(BaseTool[str]):
                 if response_content and response_content != "None":
                     checkpoint_content += f"\n\nResponse:\n{response_content}"
 
+                # Compress output if compression is enabled
+                if self._compressor:
+                    checkpoint_content = self._compressor.compress(
+                        tool_name="executor",
+                        output=checkpoint_content,
+                    )
+
                 return checkpoint_content
             except Exception:
                 # Fallback to raw response if checkpointing fails
+                result = ""
                 if hasattr(response, "content"):
-                    return str(response.content)
+                    result = str(response.content)
                 elif isinstance(response, dict):
-                    return str(response.get("content", str(response)))
+                    result = str(response.get("content", str(response)))
                 else:
-                    return str(response)
+                    result = str(response)
+
+                # Compress output if compression is enabled
+                if self._compressor:
+                    result = self._compressor.compress(
+                        tool_name="executor",
+                        output=result,
+                    )
+                return result
 
         except Exception as e:
             return f"Agent execution failed: {str(e)}"
@@ -428,15 +461,31 @@ class AgentTool(BaseTool[str]):
                 if response_content and response_content != "None":
                     checkpoint_content += f"\n\nResponse:\n{response_content}"
 
+                # Compress output if compression is enabled
+                if self._compressor:
+                    checkpoint_content = self._compressor.compress(
+                        tool_name="executor",
+                        output=checkpoint_content,
+                    )
+
                 return checkpoint_content
             except Exception:
                 # Fallback to raw response if checkpointing fails
+                result = ""
                 if hasattr(response, "content"):
-                    return str(response.content)
+                    result = str(response.content)
                 elif isinstance(response, dict):
-                    return str(response.get("content", str(response)))
+                    result = str(response.get("content", str(response)))
                 else:
-                    return str(response)
+                    result = str(response)
+
+                # Compress output if compression is enabled
+                if self._compressor:
+                    result = self._compressor.compress(
+                        tool_name="executor",
+                        output=result,
+                    )
+                return result
 
         except Exception as e:
             return f"Agent execution failed: {str(e)}"
