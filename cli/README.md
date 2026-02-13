@@ -13,13 +13,15 @@ A modern terminal-based AI coding assistant built with Python's [Textual](https:
 - 🔧 **Tool Confirmation** - Interactive approval for tool execution
 - 🤖 **Model Selection** - Dynamic model switching interface
 - 📝 **File Operations** - Integrated file system tools for coding tasks
+- ☁️ **Multi-Provider Support** - Ollama, Google Gemini, Mistral, OpenAI, Moonshot (Kimi), Z.ai (GLM), OpenRouter, OpenCode, Groq
+- 🖥️ **CLI Message Display** - Enhanced display showing agent reasoning and tool execution
 
 ## Prerequisites
 
-- [Ollama](https://ollama.ai/) running locally
-- Model `gpt-oss:120b-cloud` (or update `DEFAULT_MODEL` in `utils.py`)
+- [Ollama](https://ollama.ai/) running locally (for local models)
 - Python 3.11 or higher
 - [uv](https://docs.astral.sh/uv/) package manager (recommended) or [pip](https://pypi.org/project/pip/)
+- API keys for cloud providers (optional, based on model selection)
 
 ## Installation
 
@@ -129,10 +131,39 @@ cli/
 
 ## Changing the Model
 
-Edit `DEFAULT_MODEL` in `utils.py`:
+The default model is set in `utils.py`. Kader supports multiple providers with the format `provider:model`:
 
 ```python
-DEFAULT_MODEL = "gpt-oss:120b-cloud"
+DEFAULT_MODEL = "ollama:kimi-k2.5:cloud"  # Default model
+```
+
+### Supported Providers
+
+| Provider | Format | Example |
+|----------|--------|---------|
+| Ollama | `ollama:model` | `ollama:llama3` |
+| Google Gemini | `google:model` | `google:gemini-2.5-flash` |
+| Mistral | `mistral:model` | `mistral:small-3.1` |
+| OpenAI | `openai:model` | `openai:gpt-4o` |
+| Moonshot (Kimi) | `moonshot:model` | `moonshot:kimi-k2.5` |
+| Z.ai (GLM) | `zai:model` | `zai:glm-5` |
+| OpenRouter | `openrouter:model` | `openrouter:anthropic/claude-3.5-sonnet` |
+| OpenCode | `opencode:model` | `opencode:claude-3.5-sonnet` |
+| Groq | `groq:model` | `groq:llama-3.3-70b-versatile` |
+
+### Environment Variables
+
+Set API keys for cloud providers:
+
+```bash
+export GOOGLE_API_KEY="your-google-api-key"
+export MISTRAL_API_KEY="your-mistral-api-key"
+export OPENAI_API_KEY="your-openai-api-key"
+export MOONSHOT_API_KEY="your-kimi-api-key"
+export ZAI_API_KEY="your-glm-api-key"
+export OPENROUTER_API_KEY="your-openrouter-api-key"
+export OPENCODE_API_KEY="your-opencode-api-key"
+export GROQ_API_KEY="your-groq-api-key"
 ```
 
 ## Development
