@@ -145,7 +145,7 @@ class KaderApp(App):
         try:
             conversation = self.query_one("#conversation-view", ConversationView)
             # User-friendly message showing the tool is executing
-            friendly_message = f"[>] Executing {tool_name}..."
+            friendly_message = message
             conversation.add_message(friendly_message, "assistant")
             conversation.scroll_end()
         except Exception:
