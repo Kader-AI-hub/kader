@@ -449,9 +449,9 @@ class GrepTool(BaseTool[list[dict[str, Any]]]):
         """Async version of execute."""
         return await asyncio.to_thread(self.execute, pattern, path, glob)
 
-    def get_interruption_message(self, **kwargs) -> str:
+    def get_interruption_message(self, pattern: str, path: str, **kwargs) -> str:
         """Get interruption message for user confirmation."""
-        return "execute grep"
+        return f"execute grep: pattern='{pattern}', path='{path}'"
 
 
 class GlobTool(BaseTool[list[dict[str, Any]]]):
@@ -526,9 +526,9 @@ class GlobTool(BaseTool[list[dict[str, Any]]]):
         """Async version of execute."""
         return await asyncio.to_thread(self.execute, pattern, path)
 
-    def get_interruption_message(self, **kwargs) -> str:
+    def get_interruption_message(self, pattern: str, path: str, **kwargs) -> str:
         """Get interruption message for user confirmation."""
-        return "execute glob"
+        return f"execute glob: pattern='{pattern}', path='{path}'"
 
 
 class SearchInDirectoryTool(BaseTool[list[dict[str, Any]]]):
