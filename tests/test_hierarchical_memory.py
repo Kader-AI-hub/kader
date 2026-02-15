@@ -38,9 +38,7 @@ class TestConversationSummary(unittest.TestCase):
         self.assertEqual(restored.summary_text, "Task involved editing files.")
         self.assertEqual(restored.key_decisions, ["Use extraction approach"])
         self.assertEqual(restored.files_modified, ["src/main.py"])
-        self.assertEqual(
-            restored.errors_encountered, ["FileNotFoundError: missing.py"]
-        )
+        self.assertEqual(restored.errors_encountered, ["FileNotFoundError: missing.py"])
         self.assertEqual(restored.current_state, "In progress")
         self.assertEqual(restored.pending_tasks, ["Write tests"])
 

@@ -221,9 +221,7 @@ class HierarchicalConversationManager(SlidingWindowConversationManager):
             current_state=current_state,
         )
 
-    def _extract_files_modified(
-        self, messages: list[ConversationMessage]
-    ) -> list[str]:
+    def _extract_files_modified(self, messages: list[ConversationMessage]) -> list[str]:
         """Extract file paths from tool calls that modify files.
 
         Scans assistant messages with tool_calls for write_file, edit_file,
@@ -299,9 +297,7 @@ class HierarchicalConversationManager(SlidingWindowConversationManager):
 
         return errors
 
-    def _extract_key_decisions(
-        self, messages: list[ConversationMessage]
-    ) -> list[str]:
+    def _extract_key_decisions(self, messages: list[ConversationMessage]) -> list[str]:
         """Extract key decisions from user messages.
 
         Looks for user messages that contain decision-related keywords
@@ -470,7 +466,6 @@ class HierarchicalConversationManager(SlidingWindowConversationManager):
             "summarization_threshold", self.summarization_threshold
         )
         self._summaries = [
-            ConversationSummary.from_dict(s)
-            for s in state.get("summaries", [])
+            ConversationSummary.from_dict(s) for s in state.get("summaries", [])
         ]
         self._last_summarized_count = state.get("last_summarized_count", 0)
