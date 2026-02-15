@@ -8,7 +8,10 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable, Optional, Tuple
 
-from kader.memory import SlidingWindowConversationManager
+from kader.memory import (
+    HierarchicalConversationManager,
+    SlidingWindowConversationManager,
+)
 from kader.memory.compression import CompressionConfig, ToolOutputCompressor
 from kader.memory.types import aread_text, save_json
 from kader.prompts import ExecutorAgentPrompt
@@ -62,6 +65,52 @@ class PersistentSlidingWindowConversationManager(SlidingWindowConversationManage
         return result
 
 
+class PersistentHierarchicalConversationManager(HierarchicalConversationManager):
+    """
+    HierarchicalConversationManager with JSON persistence.
+
+    Saves the entire message history (dict format) to a JSON file
+    after every add_message(s) call.
+    """
+
+    def __init__(
+        self,
+        file_path: Path,
+        window_size: int = 20,
+        full_context_window: int = 5,
+        provider: Any = None,
+    ) -> None:
+        """
+        Initialize with a file path for persistence.
+        """
+        super().__init__(
+            window_size=window_size,
+            full_context_window=full_context_window,
+            provider=provider,
+        )
+        self.file_path = file_path
+
+    def _save(self) -> None:
+        """Save entire history to JSON."""
+        try:
+            messages_dicts = [msg.message for msg in self._messages]
+            data = {"messages": messages_dicts}
+            self.file_path.parent.mkdir(parents=True, exist_ok=True)
+            save_json(self.file_path, data)
+        except Exception:
+            pass
+
+    def add_message(self, message: Any) -> Any:
+        result = super().add_message(message)
+        self._save()
+        return result
+
+    def add_messages(self, messages: list[Any]) -> list[Any]:
+        result = super().add_messages(messages)
+        self._save()
+        return result
+
+
 class AgentTool(BaseTool[str]):
     """
     Tool that spawns a ReActAgent to execute a specific task.
@@ -104,6 +153,7 @@ class AgentTool(BaseTool[str]):
         tool_execution_result_callback: Optional[Callable[..., None]] = None,
         enable_compression: bool = True,
         compression_config: Optional[CompressionConfig] = None,
+        memory_manager_type: str = "sliding_window",
     ) -> None:
         """
         Initialize the AgentTool.
@@ -121,6 +171,7 @@ class AgentTool(BaseTool[str]):
                 If not provided and interrupt_before_tool=True, uses stdin prompts.
             enable_compression: If True, compresses sub-agent outputs to reduce token usage (default: True).
             compression_config: Optional custom compression configuration. If None, uses default rules.
+            memory_manager_type: Type of memory manager ("sliding_window" or "hierarchical").
         """
         super().__init__(
             name=name,
@@ -147,6 +198,7 @@ class AgentTool(BaseTool[str]):
         self._tool_confirmation_callback = tool_confirmation_callback
         self._direct_execution_callback = direct_execution_callback
         self._tool_execution_result_callback = tool_execution_result_callback
+        self._memory_manager_type = memory_manager_type
 
         # Compression Configuration
         self._enable_compression = enable_compression
@@ -258,9 +310,17 @@ class AgentTool(BaseTool[str]):
         )
         memory_file = memory_dir / "conversation.json"
 
-        memory = PersistentSlidingWindowConversationManager(
-            file_path=memory_file, window_size=20
-        )
+        if self._memory_manager_type == "hierarchical":
+            memory = PersistentHierarchicalConversationManager(
+                file_path=memory_file,
+                window_size=20,
+                full_context_window=5,
+                provider=self._provider,
+            )
+        else:
+            memory = PersistentSlidingWindowConversationManager(
+                file_path=memory_file, window_size=20
+            )
 
         # Load aggregated context from previous executors
         aggregated_context = self._load_aggregated_context(main_session_id)
@@ -391,9 +451,17 @@ class AgentTool(BaseTool[str]):
         )
         memory_file = memory_dir / "conversation.json"
 
-        memory = PersistentSlidingWindowConversationManager(
-            file_path=memory_file, window_size=20
-        )
+        if self._memory_manager_type == "hierarchical":
+            memory = PersistentHierarchicalConversationManager(
+                file_path=memory_file,
+                window_size=20,
+                full_context_window=5,
+                provider=self._provider,
+            )
+        else:
+            memory = PersistentSlidingWindowConversationManager(
+                file_path=memory_file, window_size=20
+            )
 
         # Load aggregated context from previous executors (async)
         aggregated_context = await self._aload_aggregated_context(main_session_id)
