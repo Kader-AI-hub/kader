@@ -153,7 +153,7 @@ class AgentTool(BaseTool[str]):
         tool_execution_result_callback: Optional[Callable[..., None]] = None,
         enable_compression: bool = True,
         compression_config: Optional[CompressionConfig] = None,
-        memory_manager_type: str = "sliding_window",
+        memory_manager_type: str = "hierarchical",
     ) -> None:
         """
         Initialize the AgentTool.
