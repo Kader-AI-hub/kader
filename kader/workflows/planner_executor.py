@@ -8,7 +8,10 @@ and delegate sub-tasks to executor agents.
 from typing import Callable, Optional, Tuple
 
 from kader.agent.agents import PlanningAgent
-from kader.memory import SlidingWindowConversationManager
+from kader.memory import (
+    HierarchicalConversationManager,
+    SlidingWindowConversationManager,
+)
 from kader.memory.types import get_default_memory_dir
 from kader.prompts import KaderPlannerPrompt
 from kader.providers.base import BaseLLMProvider, Message
@@ -48,6 +51,7 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         use_persistence: bool = False,
         session_id: Optional[str] = None,
         executor_names: Optional[list[str]] = None,
+        memory_manager_type: str = "hierarchical",
     ) -> None:
         """
         Initialize the Planner-Executor workflow.
@@ -61,6 +65,7 @@ class PlannerExecutorWorkflow(BaseWorkflow):
             use_persistence: Enable session persistence.
             session_id: Optional session ID to resume.
             executor_names: Names for executor sub-agents (default: ["executor"]).
+            memory_manager_type: Type of memory manager ("sliding_window" or "hierarchical").
         """
         super().__init__(
             name=name,
@@ -74,6 +79,7 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         self.use_persistence = use_persistence
         self.session_id = session_id
         self.executor_names = executor_names or ["executor"]
+        self.memory_manager_type = memory_manager_type
 
         # Build the planner agent with tools
         self._planner = self._build_planner()
@@ -122,11 +128,19 @@ class PlannerExecutorWorkflow(BaseWorkflow):
                 tool_confirmation_callback=self.tool_confirmation_callback,
                 direct_execution_callback=self.direct_execution_callback,
                 tool_execution_result_callback=self.tool_execution_result_callback,
+                memory_manager_type=self.memory_manager_type,
             )
             registry.register(agent_tool)
 
-        # Create memory for the planner
-        memory = SlidingWindowConversationManager(window_size=20)
+        # Create memory for the planner based on configured type
+        if self.memory_manager_type == "hierarchical":
+            memory = HierarchicalConversationManager(
+                window_size=20,
+                full_context_window=5,
+                provider=self.provider,
+            )
+        else:
+            memory = SlidingWindowConversationManager(window_size=20)
 
         # Load checkpoint context if it exists from previous iterations
         checkpoint_context = self._load_checkpoint_context()
