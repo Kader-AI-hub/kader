@@ -48,6 +48,7 @@ from .rag import (
     RAGSearchTool,
     SearchResult,
 )
+from .skills import Skill, SkillLoader, SkillsTool
 from .todo import TodoTool
 from .web import (
     WebFetchTool,
@@ -81,6 +82,9 @@ def get_default_registry() -> ToolRegistry:
         registry.register(WebFetchTool())
     except ImportError:
         pass
+
+    # 4. Skills Tool
+    registry.register(SkillsTool())
 
     return registry
 
@@ -148,6 +152,10 @@ __all__ = [
     "CommandExecutorTool",
     # Todo Tool
     "TodoTool",
+    # Skills Tool
+    "SkillsTool",
+    "SkillLoader",
+    "Skill",
     # Agent Tool
     "AgentTool",
     # Helpers
