@@ -14,7 +14,7 @@ from kader.tools.skills import SkillLoader, SkillsTool
 
 def main():
     # Define the skills directory
-    skills_dir = Path(__file__).parent
+    skills_dir = Path(__file__).parent / "skills"
 
     # Create a SkillLoader
     loader = SkillLoader([skills_dir])

@@ -27,7 +27,7 @@ async def main():
     print("Type '/exit' or '/close' to quit.\n")
 
     # Get skills directory (parent of react_agent directory)
-    skills_dir = Path(__file__).parent
+    skills_dir = Path(__file__).parent / "skills"
 
     # Initialize Tool Registry with default tools and skills
     registry = get_default_registry(skills_dirs=[skills_dir])
