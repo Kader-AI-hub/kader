@@ -123,6 +123,19 @@ Demonstrates how to use the Mistral provider for:
 
 **Note**: To run the Mistral example, you need to set your `MISTRAL_API_KEY` in `~/.kader/.env`. Get your API key from: https://console.mistral.ai/api-keys
 
+### Skills Example
+```bash
+uv run python -m examples.skills.react_agent
+```
+Demonstrates agent skills functionality with:
+- Loading and using skills from the skills directory
+- Automatic skill injection into system prompts
+- Dynamic skill loading with the `skills_tool`
+- Pre-defined skills: `hello` (greeting instructions) and `calculator` (math calculations)
+- Interactive agent with access to specialized domain knowledge
+
+The skills are loaded from `examples/skills/` directory with priority for `~/.kader/skills`.
+
 ### Planner-Executor Workflow Example
 ```bash
 uv run python -m examples.planner_executor_example
