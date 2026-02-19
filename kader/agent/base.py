@@ -31,6 +31,7 @@ from kader.providers.base import (
 from kader.providers.google import GoogleProvider
 from kader.providers.ollama import OllamaProvider
 from kader.tools import BaseTool, ToolRegistry
+from kader.tools.skills import SkillLoader
 
 from .logger import agent_logger
 
@@ -64,6 +65,7 @@ class BaseAgent:
         tool_execution_result_callback: Optional[callable] = None,
         enable_compression: bool = True,
         compression_config: Optional[CompressionConfig] = None,
+        skills_dirs: Optional[list[Path]] = None,
     ) -> None:
         """
         Initialize the Base Agent.
@@ -145,6 +147,16 @@ class BaseAgent:
             elif isinstance(tools, list):
                 for tool in tools:
                     self._tool_registry.register(tool)
+
+        # Initialize Skills
+        self._skill_loader = SkillLoader(skills_dirs)
+        self._skills_description = self._skill_loader.get_description()
+
+        # Add skills tool to registry if skills exist
+        # Note: This is now handled in _inject_into_system_prompt
+
+        # Inject tools and skills into system prompt
+        self._inject_into_system_prompt()
 
         if self.use_persistence:
             self._load_session()
@@ -231,6 +243,33 @@ class BaseAgent:
         # from here without accessing protected members, strict encapsulation might prevent this.
         # However, for this implementation, we will pass tools during invoke if they exist.
         pass
+
+    def _inject_into_system_prompt(self) -> None:
+        """Inject skills info into the system prompt and register skills tool if needed."""
+        # Register skills tool if skills exist and not already registered
+        if (
+            self._skills_description
+            and self._skills_description != "No skills available."
+            and "skills_tool" not in self._tool_registry
+        ):
+            from kader.tools.skills import SkillsTool
+
+            skills_dir_paths = self._skill_loader.skills_dirs
+            skills_tool = SkillsTool(skills_dir_paths)
+            self._tool_registry.register(skills_tool)
+
+        # Inject skills into system prompt if skills are available
+        if (
+            self._skills_description
+            and self._skills_description != "No skills available."
+        ):
+            sys_prompt_content = (
+                self.system_prompt.resolve_prompt()
+                if isinstance(self.system_prompt, PromptBase)
+                else str(self.system_prompt)
+            )
+            skills_prompt = f"\n\nYou have the following skills available which you can load with the skills_tool:\n{self._skills_description}"
+            self.system_prompt = sys_prompt_content + skills_prompt
 
     def _get_run_config(self, config: Optional[ModelConfig] = None) -> ModelConfig:
         """Prepare execution config with tools."""
@@ -387,6 +426,7 @@ class BaseAgent:
             "edit_file",
             "web_search",
             "web_fetch",
+            "skills_tool",
         }
 
         # Direct execution for specific tools - applies regardless of callback

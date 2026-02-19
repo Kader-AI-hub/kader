@@ -2,6 +2,7 @@
 Specific Agent Implementations.
 """
 
+from pathlib import Path
 from typing import Optional, Union
 
 from kader.agent.base import BaseAgent
@@ -33,6 +34,7 @@ class ReActAgent(BaseAgent):
         tool_confirmation_callback: Optional[callable] = None,
         direct_execution_callback: Optional[callable] = None,
         tool_execution_result_callback: Optional[callable] = None,
+        skills_dirs: Optional[list[Path]] = None,
     ) -> None:
         # Resolve tools for prompt context if necessary
         # The base agent handles tool registration, but for the prompt template
@@ -48,7 +50,7 @@ class ReActAgent(BaseAgent):
         elif isinstance(tools, ToolRegistry):
             _tools_list = tools.tools
 
-        tool_names = ", ".join([t.name for t in _tools_list])
+            tool_names = ", ".join([t.name for t in _tools_list])
 
         if system_prompt is None:
             system_prompt = ReActAgentPrompt(
@@ -71,6 +73,7 @@ class ReActAgent(BaseAgent):
             tool_confirmation_callback=tool_confirmation_callback,
             direct_execution_callback=direct_execution_callback,
             tool_execution_result_callback=tool_execution_result_callback,
+            skills_dirs=skills_dirs,
         )
 
 
@@ -96,6 +99,7 @@ class PlanningAgent(BaseAgent):
         tool_confirmation_callback: Optional[callable] = None,
         direct_execution_callback: Optional[callable] = None,
         tool_execution_result_callback: Optional[callable] = None,
+        skills_dirs: Optional[list[Path]] = None,
     ) -> None:
         # Ensure TodoTool is available
         _todo_tool = TodoTool()
@@ -131,4 +135,5 @@ class PlanningAgent(BaseAgent):
             tool_confirmation_callback=tool_confirmation_callback,
             direct_execution_callback=direct_execution_callback,
             tool_execution_result_callback=tool_execution_result_callback,
+            skills_dirs=skills_dirs,
         )

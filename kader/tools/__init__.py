@@ -5,6 +5,8 @@ This module provides a provider-agnostic base class for defining tools
 that can be used with any LLM provider.
 """
 
+from pathlib import Path
+
 from kader.tools.exec_commands import (
     CommandExecutorTool,
 )
@@ -48,6 +50,7 @@ from .rag import (
     RAGSearchTool,
     SearchResult,
 )
+from .skills import Skill, SkillLoader, SkillsTool
 from .todo import TodoTool
 from .web import (
     WebFetchTool,
@@ -55,7 +58,9 @@ from .web import (
 )
 
 
-def get_default_registry() -> ToolRegistry:
+def get_default_registry(
+    skills_dirs: list[Path] | None = None,
+) -> ToolRegistry:
     """
     Get a registry populated with all standard tools.
 
@@ -63,6 +68,11 @@ def get_default_registry() -> ToolRegistry:
     - Filesystem tools
     - Command executor
     - Web tools (search, fetch)
+    - Skills tool (if skills are available)
+
+    Args:
+        skills_dirs: Optional list of directories to load skills from.
+                    If None, defaults to ~/.kader/skills and ./.kader/
     """
     registry = ToolRegistry()
 
@@ -70,7 +80,6 @@ def get_default_registry() -> ToolRegistry:
     for t in get_filesystem_tools():
         registry.register(t)
 
-    # 2. Command Execution
     # 2. Command Execution
     registry.register(CommandExecutorTool())
 
@@ -81,6 +90,12 @@ def get_default_registry() -> ToolRegistry:
         registry.register(WebFetchTool())
     except ImportError:
         pass
+
+    # 4. Skills Tool (only register if skills are available)
+    skill_loader = SkillLoader(skills_dirs)
+    skills_description = skill_loader.get_description()
+    if skills_description and skills_description != "No skills available.":
+        registry.register(SkillsTool(skills_dirs))
 
     return registry
 
@@ -148,6 +163,10 @@ __all__ = [
     "CommandExecutorTool",
     # Todo Tool
     "TodoTool",
+    # Skills Tool
+    "SkillsTool",
+    "SkillLoader",
+    "Skill",
     # Agent Tool
     "AgentTool",
     # Helpers
