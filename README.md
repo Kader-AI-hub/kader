@@ -18,6 +18,7 @@ Kader is an intelligent coding agent designed to assist with software developmen
 - 🔄 **Planner-Executor Framework** - Sophisticated reasoning and acting architecture using task planning and delegation.
 - 🗂️ **File System Tools** - Read, write, search, and edit files.
 - 🤝 **Agent-As-Tool** - Spawn sub-agents for specific tasks with isolated memory and automated context aggregation.
+- 🎯 **Agent Skills** - Modular skill system for specialized domain knowledge and task-specific instructions.
 
 ## Installation
 
@@ -137,6 +138,10 @@ kader/
 │   ├── memory_example.py  # Memory management examples
 │   ├── google_example.py  # Google Gemini provider examples
 │   ├── planner_executor_example.py # Advanced workflow examples
+│   ├── skills/           # Agent skills examples
+│   │   ├── hello/        # Greeting skill with instructions
+│   │   ├── calculator/   # Math calculation skill
+│   │   └── react_agent.py # Skills demo with ReAct agent
 │   └── README.md         # Examples documentation
 ├── kader/                # Core framework
 │   ├── agent/            # Agent implementations (Planning, ReAct)
@@ -171,6 +176,42 @@ Kader supports multiple backends:
 The `AgentTool` allows a `PlanningAgent` (Architect) to delegate work to a `ReActAgent` (Worker). It features:
 - **Persistent Memory**: Sub-agent conversations are saved to JSON.
 - **Context Aggregation**: Sub-agent research and actions are automatically merged into the main session's `checkpoint.md` via `ContextAggregator`.
+
+### Agent Skills
+
+Kader supports a modular skill system for domain-specific knowledge and specialized instructions:
+
+- **Skill Structure**: Skills are defined as directories containing `SKILL.md` files with YAML frontmatter
+- **Skill Loading**: Skills are loaded from `~/.kader/skills` (high priority) and `./.kader/` directories
+- **Skill Injection**: Available skills are automatically injected into the system prompt
+- **Skills Tool**: Agents can load skills dynamically using the `skills_tool`
+
+Example skill structure:
+```
+~/.kader/skills/hello/
+├── SKILL.md
+└── scripts/
+    └── hello.py
+```
+
+Example skill (`SKILL.md`):
+```yaml
+---
+name: hello
+description: Skill for ALL greeting requests
+---
+
+# Hello Skill
+
+This skill provides the greeting format you must follow.
+
+## How to greet
+
+Always greet the user with:
+- A warm welcome
+- Their name if mentioned
+- A friendly emoji
+```
 
 ### Memory Management
 
