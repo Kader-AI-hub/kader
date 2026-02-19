@@ -426,6 +426,7 @@ class BaseAgent:
             "edit_file",
             "web_search",
             "web_fetch",
+            "skills_tool",
         }
 
         # Direct execution for specific tools - applies regardless of callback
