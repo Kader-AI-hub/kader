@@ -15,6 +15,7 @@ HELP_TEXT = """## Kader CLI Commands
 | `/save` | Save current session |
 | `/load <id>` | Load a saved session |
 | `/sessions` | List saved sessions |
+| `/skills` | List loaded skills |
 | `/cost` | Show usage costs |
 | `/refresh` | Refresh file tree |
 | `/init` | Initialize .kader directory with KADER.md |

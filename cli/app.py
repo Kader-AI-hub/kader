@@ -548,6 +548,8 @@ Please resize your terminal."""
             self._handle_save_session(conversation)
         elif cmd == "/sessions":
             self._handle_list_sessions(conversation)
+        elif cmd == "/skills":
+            self._handle_skills(conversation)
         elif cmd.startswith("/load"):
             parts = command.strip().split(maxsplit=1)
             if len(parts) < 2:
@@ -869,6 +871,26 @@ Please resize your terminal."""
         except Exception as e:
             conversation.add_message(f"❌ Error listing sessions: {e}", "assistant")
             self.notify(f"Error: {e}", severity="error")
+
+    def _handle_skills(self, conversation: ConversationView) -> None:
+        """Handle the /skills command to display loaded skills."""
+        try:
+            from kader.tools.skills import SkillLoader
+            loader = SkillLoader()
+            skills = loader.list_skills()
+            
+            if not skills:
+                conversation.add_message(
+                    "## Loaded Skills\n\n*No skills found in `~/.kader/skills` or `./.kader/skills`*", 
+                    "assistant"
+                )
+            else:
+                lines = ["## Loaded Skills\n"]
+                for s in skills:
+                    lines.append(f"- **{s.name}**: {s.description}")
+                conversation.add_message("\n".join(lines), "assistant")
+        except Exception as e:
+            conversation.add_message(f"(-) Error loading skills: {e}", "assistant")
 
     def _handle_cost(self, conversation: ConversationView) -> None:
         """Display LLM usage costs."""
