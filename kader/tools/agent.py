@@ -18,7 +18,21 @@ from kader.prompts import ExecutorAgentPrompt
 from kader.providers.base import BaseLLMProvider, Message
 from kader.utils import Checkpointer, ContextAggregator
 
-from .base import BaseTool, ParameterSchema, ToolCategory
+from .base import BaseTool, ParameterSchema, ToolCategory, ToolRegistry
+
+
+def get_cached_default_registry():
+    """Thin wrapper around kader.tools.get_cached_default_registry.
+
+    Defined at module level so tests can patch it via
+    ``kader.tools.agent.get_cached_default_registry`` without triggering
+    circular imports (the real function lives in __init__.py which imports
+    AgentTool from this very module).
+    """
+    from kader.tools import get_cached_default_registry as _fn
+
+    return _fn()
+
 
 
 class PersistentSlidingWindowConversationManager(SlidingWindowConversationManager):
@@ -154,6 +168,8 @@ class AgentTool(BaseTool[str]):
         enable_compression: bool = True,
         compression_config: Optional[CompressionConfig] = None,
         memory_manager_type: str = "hierarchical",
+        skills_dirs: list[Path] | None = None,
+        priority_dir: Path | None = None,
     ) -> None:
         """
         Initialize the AgentTool.
@@ -172,6 +188,9 @@ class AgentTool(BaseTool[str]):
             enable_compression: If True, compresses sub-agent outputs to reduce token usage (default: True).
             compression_config: Optional custom compression configuration. If None, uses default rules.
             memory_manager_type: Type of memory manager ("sliding_window" or "hierarchical").
+            skills_dirs: Optional list of custom skill directories for sub-agents.
+                        If None, uses default directories (~/.kader/skills and ./.kader/).
+            priority_dir: Optional directory checked first (higher priority) for skills.
         """
         super().__init__(
             name=name,
@@ -199,6 +218,8 @@ class AgentTool(BaseTool[str]):
         self._direct_execution_callback = direct_execution_callback
         self._tool_execution_result_callback = tool_execution_result_callback
         self._memory_manager_type = memory_manager_type
+        self._skills_dirs = skills_dirs
+        self._priority_dir = priority_dir
 
         # Compression Configuration
         self._enable_compression = enable_compression
@@ -333,9 +354,21 @@ class AgentTool(BaseTool[str]):
         memory.add_message(Message.user(full_context))
 
         # Get default tools (filesystem, web, command executor) - use cached version
-        from kader.tools import get_cached_default_registry
+        from kader.tools.skills import SkillLoader, SkillsTool
 
         tools = get_cached_default_registry()
+
+        # Inject SkillsTool with the requested dirs into the sub-agent registry.
+        # Filter out any existing skills_tool first to avoid double-registration
+        # (the cached default registry may already include one for default dirs).
+        skill_loader = SkillLoader(self._skills_dirs, self._priority_dir)
+        if skill_loader.list_skills():
+            sub_registry = ToolRegistry()
+            for t in tools.tools:
+                if t.name != "skills_tool":
+                    sub_registry.register(t)
+            sub_registry.register(SkillsTool(self._skills_dirs, self._priority_dir))
+            tools = sub_registry
 
         # Create ExecutorAgentPrompt with tool descriptions
         system_prompt = ExecutorAgentPrompt(tools=tools.tools)
@@ -474,9 +507,21 @@ class AgentTool(BaseTool[str]):
         memory.add_message(Message.user(full_context))
 
         # Get default tools (filesystem, web, command executor) - use cached version
-        from kader.tools import get_cached_default_registry
+        from kader.tools.skills import SkillLoader, SkillsTool
 
         tools = get_cached_default_registry()
+
+        # Inject SkillsTool with the requested dirs into the sub-agent registry.
+        # Filter out any existing skills_tool first to avoid double-registration
+        # (the cached default registry may already include one for default dirs).
+        skill_loader = SkillLoader(self._skills_dirs, self._priority_dir)
+        if skill_loader.list_skills():
+            sub_registry = ToolRegistry()
+            for t in tools.tools:
+                if t.name != "skills_tool":
+                    sub_registry.register(t)
+            sub_registry.register(SkillsTool(self._skills_dirs, self._priority_dir))
+            tools = sub_registry
 
         # Create ExecutorAgentPrompt with tool descriptions
         system_prompt = ExecutorAgentPrompt(tools=tools.tools)
