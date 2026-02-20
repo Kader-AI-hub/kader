@@ -166,7 +166,7 @@ class TestSkillsTool:
         tool = SkillsTool([temp_skills_dir])
         message = tool.get_interruption_message(name="hello")
 
-        assert message == "execute skills_tool: hello"
+        assert message == "execute skill: hello"
 
     def test_skills_tool_schema(self, temp_skills_dir):
         """Test that the tool has correct schema."""
