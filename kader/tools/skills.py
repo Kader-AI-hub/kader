@@ -35,7 +35,7 @@ class SkillLoader:
 
         if skills_dirs is None:
             home_skills = Path.home() / ".kader" / "skills"
-            cwd_skills = Path.cwd() / ".kader"
+            cwd_skills = Path.cwd() / ".kader" / "skills"
             skills_dirs = [home_skills, cwd_skills]
 
         if priority_dir is not None:
