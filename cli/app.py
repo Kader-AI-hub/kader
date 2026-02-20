@@ -876,13 +876,14 @@ Please resize your terminal."""
         """Handle the /skills command to display loaded skills."""
         try:
             from kader.tools.skills import SkillLoader
+
             loader = SkillLoader()
             skills = loader.list_skills()
 
             if not skills:
                 conversation.add_message(
                     "## Loaded Skills\n\n*No skills found in `~/.kader/skills` or `./.kader/skills`*",
-                    "assistant"
+                    "assistant",
                 )
             else:
                 lines = ["## Loaded Skills\n"]

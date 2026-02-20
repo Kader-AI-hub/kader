@@ -34,7 +34,6 @@ def get_cached_default_registry():
     return _fn()
 
 
-
 class PersistentSlidingWindowConversationManager(SlidingWindowConversationManager):
     """
     SlidingWindowConversationManager with JSON persistence.

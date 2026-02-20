@@ -75,7 +75,9 @@ class TestAgentToolSkillsExecution:
 
             # Checkpointer: raise so we fall back to raw response (simpler)
             mock_cp_instance = MagicMock()
-            mock_cp_instance.generate_checkpoint.side_effect = Exception("no checkpoint")
+            mock_cp_instance.generate_checkpoint.side_effect = Exception(
+                "no checkpoint"
+            )
             mock_checkpointer.return_value = mock_cp_instance
 
             tool = AgentTool(name="test_agent", skills_dirs=[skills_dir])
@@ -118,7 +120,9 @@ class TestAgentToolSkillsExecution:
             mock_react_agent.return_value = mock_agent_instance
 
             mock_cp_instance = MagicMock()
-            mock_cp_instance.generate_checkpoint.side_effect = Exception("no checkpoint")
+            mock_cp_instance.generate_checkpoint.side_effect = Exception(
+                "no checkpoint"
+            )
             mock_checkpointer.return_value = mock_cp_instance
 
             tool = AgentTool(name="test_agent", skills_dirs=[empty_skills_dir])
@@ -158,7 +162,9 @@ class TestAgentToolSkillsExecution:
             mock_react_agent.return_value = mock_agent_instance
 
             mock_cp_instance = MagicMock()
-            mock_cp_instance.generate_checkpoint.side_effect = Exception("no checkpoint")
+            mock_cp_instance.generate_checkpoint.side_effect = Exception(
+                "no checkpoint"
+            )
             mock_checkpointer.return_value = mock_cp_instance
 
             tool = AgentTool(name="test_agent", skills_dirs=[skills_dir])
@@ -206,7 +212,9 @@ class TestAgentToolSkillsAsyncExecution:
             mock_react_agent.return_value = mock_agent_instance
 
             mock_cp_instance = MagicMock()
-            mock_cp_instance.agenerate_checkpoint.side_effect = Exception("no checkpoint")
+            mock_cp_instance.agenerate_checkpoint.side_effect = Exception(
+                "no checkpoint"
+            )
             mock_checkpointer.return_value = mock_cp_instance
 
             tool = AgentTool(name="test_agent", skills_dirs=[skills_dir])
