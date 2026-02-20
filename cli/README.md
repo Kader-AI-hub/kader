@@ -64,7 +64,9 @@ python -m cli
 | `/save` | Save current session |
 | `/load <id>` | Load a saved session |
 | `/sessions` | List saved sessions |
+| `/skills` | List loaded skills |
 | `/refresh` | Refresh file tree |
+| `/cost` | Show usage costs |
 | `/exit` | Exit the CLI |
 
 ## Keyboard Shortcuts
@@ -103,6 +105,28 @@ Kader includes an interactive tool confirmation system that prompts for approval
 - Interactive approval with arrow keys and Enter
 - Quick confirmation with Y/N keys
 - Visual feedback during tool execution
+
+## Skills System
+
+Kader supports skills - specialized instructions for specific domains or tasks. Skills are loaded from:
+
+- `~/.kader/skills/` (user-level skills)
+- `./.kader/skills/` (project-level skills)
+
+Use `/skills` to list all available skills. Each skill is a directory containing a `SKILL.md` file with YAML frontmatter:
+
+```markdown
+---
+name: python-expert
+description: Expert in Python programming and best practices
+---
+
+# Python Expert Skill
+
+You are an expert Python developer...
+```
+
+Agents can load skills dynamically using the SkillsTool to get specialized instructions for specific domains.
 
 ## Model Selection Interface
 

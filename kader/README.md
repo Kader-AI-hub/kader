@@ -504,6 +504,75 @@ response = parent_agent.invoke(
 )
 ```
 
+### Skills Tool
+
+Load specialized instructions (skills) for specific domains or tasks:
+
+```python
+from kader.tools import SkillsTool
+from kader.agent import BaseAgent
+from kader.providers import OllamaProvider
+
+# Create skills tool (loads from ~/.kader/skills and ./.kader/skills)
+skills_tool = SkillsTool()
+
+# Or specify custom skill directories
+from pathlib import Path
+skills_tool = SkillsTool(
+    skills_dirs=[Path("./custom_skills")],
+    priority_dir=Path("./project_skills"),  # Check this directory first
+)
+
+# Use it within an agent
+agent = BaseAgent(
+    name="SkillfulAgent",
+    tools=[skills_tool],
+    provider=OllamaProvider(model="llama3.2"),
+)
+
+# Load a specific skill
+result = skills_tool.execute(name="python-expert")
+print(result["content"])  # The skill's instructions
+```
+
+#### Skill File Format
+
+Skills are stored in directories named after the skill, each containing a `SKILL.md` file with YAML frontmatter:
+
+```markdown
+---
+name: python-expert
+description: Expert in Python programming and best practices
+---
+
+# Python Expert Skill
+
+You are an expert Python developer with deep knowledge of:
+- PEP 8 style guide
+- Type hints and annotations
+- Async/await patterns
+- Performance optimization
+
+When writing Python code:
+1. Use type hints whenever possible
+2. Follow PEP 8 conventions
+3. Write docstrings in Google style
+4. Prefer list comprehensions over loops
+```
+
+#### Available Methods
+
+```python
+# Load a specific skill by name
+skill = skill_loader.load_skill("python-expert")
+
+# List all available skills
+all_skills = skill_loader.list_skills()
+
+# Get formatted description of all skills
+description = skill_loader.get_description()
+```
+
 ### Custom Tools
 
 Create your own tools by subclassing `BaseTool`:
