@@ -878,10 +878,10 @@ Please resize your terminal."""
             from kader.tools.skills import SkillLoader
             loader = SkillLoader()
             skills = loader.list_skills()
-            
+
             if not skills:
                 conversation.add_message(
-                    "## Loaded Skills\n\n*No skills found in `~/.kader/skills` or `./.kader/skills`*", 
+                    "## Loaded Skills\n\n*No skills found in `~/.kader/skills` or `./.kader/skills`*",
                     "assistant"
                 )
             else:
