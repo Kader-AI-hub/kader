@@ -5,6 +5,7 @@ Orchestrates a PlanningAgent with TodoTool and AgentTool to break down tasks
 and delegate sub-tasks to executor agents.
 """
 
+from pathlib import Path
 from typing import Callable, Optional, Tuple
 
 from kader.agent.agents import PlanningAgent
@@ -52,6 +53,8 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         session_id: Optional[str] = None,
         executor_names: Optional[list[str]] = None,
         memory_manager_type: str = "hierarchical",
+        skills_dirs: list[Path] | None = None,
+        priority_dir: Path | None = None,
     ) -> None:
         """
         Initialize the Planner-Executor workflow.
@@ -66,6 +69,9 @@ class PlannerExecutorWorkflow(BaseWorkflow):
             session_id: Optional session ID to resume.
             executor_names: Names for executor sub-agents (default: ["executor"]).
             memory_manager_type: Type of memory manager ("sliding_window" or "hierarchical").
+            skills_dirs: Optional list of custom skill directories for sub-agents.
+                        If None, uses default directories (~/.kader/skills and ./.kader/).
+            priority_dir: Optional directory checked first (higher priority) for skills.
         """
         super().__init__(
             name=name,
@@ -80,6 +86,8 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         self.session_id = session_id
         self.executor_names = executor_names or ["executor"]
         self.memory_manager_type = memory_manager_type
+        self.skills_dirs = skills_dirs
+        self.priority_dir = priority_dir
 
         # Build the planner agent with tools
         self._planner = self._build_planner()
@@ -129,6 +137,8 @@ class PlannerExecutorWorkflow(BaseWorkflow):
                 direct_execution_callback=self.direct_execution_callback,
                 tool_execution_result_callback=self.tool_execution_result_callback,
                 memory_manager_type=self.memory_manager_type,
+                skills_dirs=self.skills_dirs,
+                priority_dir=self.priority_dir,
             )
             registry.register(agent_tool)
 
