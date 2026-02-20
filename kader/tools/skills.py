@@ -218,4 +218,4 @@ class SkillsTool(BaseTool[dict[str, Any]]):
             Message describing the skill loading action
         """
         name = kwargs.get("name", "")
-        return f"execute skills_tool: {name}"
+        return f"execute skill: {name}"
