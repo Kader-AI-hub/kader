@@ -3,7 +3,7 @@
 from .llm_factory import LLMProviderFactory
 
 # Default model (with provider prefix for clarity)
-DEFAULT_MODEL = "ollama:kimi-k2.5:cloud"
+DEFAULT_MODEL = "minimax-m2.5:cloud"
 
 HELP_TEXT = """## Kader CLI Commands
 
