@@ -307,6 +307,17 @@ uv run pytest
 uv run ruff check .
 ```
 
+### Coding with AI
+
+This project includes a specialized skill for AI coding agents. When working with AI assistants on this codebase, they should use the `contributing-to-kader` skill located in [`.kader/skills/contributing-to-kader`](.kader/skills/contributing-to-kader). This skill provides AI agents with essential guidelines including:
+
+- Core development rules (linting, formatting, testing)
+- Key commands for development workflow
+- Project structure overview
+- Best practices for contributing
+
+AI assistants can load this skill using the skills_tool to get specialized instructions for working with this project.
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
