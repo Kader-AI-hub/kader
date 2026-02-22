@@ -16,7 +16,7 @@ Kader is an intelligent coding agent designed to assist with software developmen
 - ⌨️ **Keyboard Shortcuts** - Efficient navigation and operations.
 - 📝 **YAML Configuration** - Agent configuration via YAML files.
 - 🔄 **Planner-Executor Framework** - Sophisticated reasoning and acting architecture using task planning and delegation.
-- 🗂️ **File System Tools** - Read, write, search, and edit files.
+- 🗂️ **File System Tools** - Read, write, search, and edit files with automatic `.gitignore` filtering.
 - 🤝 **Agent-As-Tool** - Spawn sub-agents for specific tasks with isolated memory and automated context aggregation.
 - 🎯 **Agent Skills** - Modular skill system for specialized domain knowledge and task-specific instructions.
 
@@ -185,6 +185,23 @@ Kader supports a modular skill system for domain-specific knowledge and speciali
 - **Skill Loading**: Skills are loaded from `~/.kader/skills` (high priority) and `./.kader/` directories
 - **Skill Injection**: Available skills are automatically injected into the system prompt
 - **Skills Tool**: Agents can load skills dynamically using the `skills_tool`
+
+### File System Tools with Gitignore Filtering
+
+The file system tools (`read_directory`, `grep`, `glob`) automatically filter out files and directories that match patterns defined in `.gitignore` files.
+
+You can disable this filtering by passing `apply_gitignore_filter=False` when creating tools:
+
+```python
+from pathlib import Path
+from kader.tools.filesys import get_filesystem_tools
+
+# With filtering (default)
+tools = get_filesystem_tools(base_path=Path.cwd())
+
+# Without filtering
+tools = get_filesystem_tools(base_path=Path.cwd(), apply_gitignore_filter=False)
+```
 
 Example skill structure:
 ```
