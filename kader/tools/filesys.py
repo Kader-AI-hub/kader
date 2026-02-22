@@ -111,12 +111,14 @@ class ReadDirectoryTool(BaseTool[list[dict[str, Any]]]):
     Tool to list the contents of a directory.
 
     Uses FilesystemBackend for secure directory listing.
+    Filters out files/directories matching .gitignore patterns.
     """
 
     def __init__(
         self,
         base_path: Path | None = None,
         virtual_mode: bool = False,
+        apply_gitignore_filter: bool = True,
     ) -> None:
         """
         Initialize the read directory tool.
@@ -124,6 +126,7 @@ class ReadDirectoryTool(BaseTool[list[dict[str, Any]]]):
         Args:
             base_path: Base path for file operations (defaults to CWD)
             virtual_mode: If True, use virtual path mode (sandboxed to base_path)
+            apply_gitignore_filter: If True, filter out .gitignore patterns
         """
         super().__init__(
             name="read_directory",
@@ -145,6 +148,8 @@ class ReadDirectoryTool(BaseTool[list[dict[str, Any]]]):
             root_dir=base_path,
             virtual_mode=virtual_mode,
         )
+        self._base_path = base_path
+        self._apply_gitignore_filter = apply_gitignore_filter
 
     def execute(
         self,
@@ -160,8 +165,15 @@ class ReadDirectoryTool(BaseTool[list[dict[str, Any]]]):
             List of file/directory information dictionaries
         """
         result: list[FileInfo] = self._backend.ls_info(path)
-        # Convert FileInfo TypedDict to regular dict for JSON serialization
-        return [dict(item) for item in result]
+        items = [dict(item) for item in result]
+
+        if self._apply_gitignore_filter:
+            from kader.utils.ignore import filter_by_gitignore
+
+            root_path = self._base_path if self._base_path else Path.cwd()
+            return filter_by_gitignore(items, root_path)
+
+        return items
 
     async def aexecute(
         self,
@@ -367,12 +379,14 @@ class GrepTool(BaseTool[list[dict[str, Any]]]):
     Tool to search for patterns in files using regex.
 
     Uses FilesystemBackend's grep_raw with ripgrep fallback to Python.
+    Filters out files matching .gitignore patterns from results.
     """
 
     def __init__(
         self,
         base_path: Path | None = None,
         virtual_mode: bool = False,
+        apply_gitignore_filter: bool = True,
     ) -> None:
         """
         Initialize the grep tool.
@@ -380,6 +394,7 @@ class GrepTool(BaseTool[list[dict[str, Any]]]):
         Args:
             base_path: Base path for search operations (defaults to CWD)
             virtual_mode: If True, use virtual path mode (sandboxed to base_path)
+            apply_gitignore_filter: If True, filter out .gitignore patterns
         """
         super().__init__(
             name="grep",
@@ -413,6 +428,8 @@ class GrepTool(BaseTool[list[dict[str, Any]]]):
             root_dir=base_path,
             virtual_mode=virtual_mode,
         )
+        self._base_path = base_path
+        self._apply_gitignore_filter = apply_gitignore_filter
 
     def execute(
         self,
@@ -434,11 +451,22 @@ class GrepTool(BaseTool[list[dict[str, Any]]]):
         result = self._backend.grep_raw(pattern, path, glob)
 
         if isinstance(result, str):
-            # Error message
             return [{"error": result}]
 
-        # Convert GrepMatch TypedDict to regular dict
-        return [dict(match) for match in result]
+        matches = [dict(match) for match in result]
+
+        if self._apply_gitignore_filter:
+            root_path = self._base_path if self._base_path else Path.cwd()
+            exclusion_patterns = _get_gitignore_exclusions(root_path)
+            filtered = []
+            for match in matches:
+                file_path = match.get("path", "")
+                file_name = Path(file_path).name
+                if file_name not in exclusion_patterns:
+                    filtered.append(match)
+            return filtered
+
+        return matches
 
     async def aexecute(
         self,
@@ -454,17 +482,28 @@ class GrepTool(BaseTool[list[dict[str, Any]]]):
         return f"execute grep: pattern='{pattern}', path='{path}'"
 
 
+def _get_gitignore_exclusions(root_path: Path | None) -> set[str]:
+    """Get file names to exclude based on .gitignore patterns."""
+    from kader.utils.ignore import get_gitignore_filter
+
+    if root_path is None:
+        root_path = Path.cwd()
+    return get_gitignore_filter(root_path)
+
+
 class GlobTool(BaseTool[list[dict[str, Any]]]):
     """
     Tool to find files matching a glob pattern.
 
     Uses FilesystemBackend's glob_info for pattern matching.
+    Filters out files matching .gitignore patterns from results.
     """
 
     def __init__(
         self,
         base_path: Path | None = None,
         virtual_mode: bool = False,
+        apply_gitignore_filter: bool = True,
     ) -> None:
         """
         Initialize the glob tool.
@@ -472,6 +511,7 @@ class GlobTool(BaseTool[list[dict[str, Any]]]):
         Args:
             base_path: Base path for search operations (defaults to CWD)
             virtual_mode: If True, use virtual path mode (sandboxed to base_path)
+            apply_gitignore_filter: If True, filter out .gitignore patterns
         """
         super().__init__(
             name="glob",
@@ -499,6 +539,8 @@ class GlobTool(BaseTool[list[dict[str, Any]]]):
             root_dir=base_path,
             virtual_mode=virtual_mode,
         )
+        self._base_path = base_path
+        self._apply_gitignore_filter = apply_gitignore_filter
 
     def execute(
         self,
@@ -516,7 +558,15 @@ class GlobTool(BaseTool[list[dict[str, Any]]]):
             List of file info dictionaries
         """
         result: list[FileInfo] = self._backend.glob_info(pattern, path)
-        return [dict(item) for item in result]
+        items = [dict(item) for item in result]
+
+        if self._apply_gitignore_filter:
+            from kader.utils.ignore import filter_by_gitignore
+
+            root_path = self._base_path if self._base_path else Path.cwd()
+            return filter_by_gitignore(items, root_path)
+
+        return items
 
     async def aexecute(
         self,
@@ -627,6 +677,7 @@ class SearchInDirectoryTool(BaseTool[list[dict[str, Any]]]):
 def get_filesystem_tools(
     base_path: Path | None = None,
     virtual_mode: bool = False,
+    apply_gitignore_filter: bool = True,
 ) -> list[BaseTool]:
     """
     Get all file system tools configured with the given base path.
@@ -634,6 +685,7 @@ def get_filesystem_tools(
     Args:
         base_path: Base path for all tools (defaults to CWD)
         virtual_mode: If True, use virtual path mode for security
+        apply_gitignore_filter: If True, filter out .gitignore patterns
 
     Returns:
         List of configured file system tools
@@ -641,10 +693,9 @@ def get_filesystem_tools(
     bp = base_path or Path.cwd()
     return [
         ReadFileTool(bp, virtual_mode),
-        ReadDirectoryTool(bp, virtual_mode),
+        ReadDirectoryTool(bp, virtual_mode, apply_gitignore_filter),
         WriteFileTool(bp, virtual_mode),
         EditFileTool(bp, virtual_mode),
-        GrepTool(bp, virtual_mode),
-        GlobTool(bp, virtual_mode),
-        # SearchInDirectoryTool(bp), #TODO: remove search in directory from file system tools
+        GrepTool(bp, virtual_mode, apply_gitignore_filter),
+        GlobTool(bp, virtual_mode, apply_gitignore_filter),
     ]
