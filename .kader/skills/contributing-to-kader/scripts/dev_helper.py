@@ -16,11 +16,11 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 
 def run_command(cmd: list[str], description: str) -> int:
     """Run a command and print its output."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"{description}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Running: {' '.join(cmd)}\n")
-    
+
     result = subprocess.run(cmd, cwd=PROJECT_ROOT)
     return result.returncode
 
@@ -38,8 +38,7 @@ def run_tests():
 def run_specific_test(test_path: str):
     """Run a specific test file or function."""
     return run_command(
-        ["uv", "run", "pytest", test_path, "-v"],
-        f"Running Test: {test_path}"
+        ["uv", "run", "pytest", test_path, "-v"], f"Running Test: {test_path}"
     )
 
 
@@ -51,8 +50,7 @@ def lint_code():
 def lint_fix():
     """Run Ruff with auto-fix."""
     return run_command(
-        ["uv", "run", "ruff", "check", ".", "--fix"],
-        "Fixing Lint Issues"
+        ["uv", "run", "ruff", "check", ".", "--fix"], "Fixing Lint Issues"
     )
 
 
@@ -64,8 +62,7 @@ def format_code():
 def format_check():
     """Check code formatting without modifying."""
     return run_command(
-        ["uv", "run", "ruff", "format", "--check", "."],
-        "Checking Code Format"
+        ["uv", "run", "ruff", "format", "--check", "."], "Checking Code Format"
     )
 
 
@@ -78,31 +75,31 @@ def dev_mode():
     """Run CLI in development mode with hot reload."""
     return run_command(
         ["uv", "run", "textual", "run", "--dev", "cli.app:KaderApp"],
-        "Running CLI in Dev Mode"
+        "Running CLI in Dev Mode",
     )
 
 
 def all_checks():
     """Run all checks: lint, format check, and tests."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("RUNNING ALL CHECKS")
-    print("="*60)
-    
+    print("=" * 60)
+
     commands = [
         (["uv", "run", "ruff", "check", ".", "--fix"], "Fixing Lint Issues"),
         (["uv", "run", "ruff", "format", "."], "Formatting Code"),
         (["uv", "run", "pytest", "-v"], "Running Tests"),
     ]
-    
+
     for cmd, desc in commands:
         result = run_command(cmd, desc)
         if result != 0:
             print(f"\n[ERROR] {desc} failed with exit code {result}")
             return result
-    
-    print("\n" + "="*60)
+
+    print("\n" + "=" * 60)
     print("ALL CHECKS PASSED!")
-    print("="*60)
+    print("=" * 60)
     return 0
 
 
@@ -139,13 +136,15 @@ def main():
     if len(sys.argv) < 2:
         show_help()
         return 0
-    
+
     command = sys.argv[1].lower()
-    
+
     # Map commands to functions
     commands = {
         "sync": sync_dependencies,
-        "test": lambda: run_specific_test(sys.argv[2]) if len(sys.argv) > 2 else run_tests(),
+        "test": lambda: run_specific_test(sys.argv[2])
+        if len(sys.argv) > 2
+        else run_tests(),
         "lint": lint_code,
         "lint-fix": lint_fix,
         "format": format_code,
@@ -155,12 +154,12 @@ def main():
         "all": all_checks,
         "help": show_help,
     }
-    
+
     if command not in commands:
         print(f"Unknown command: {command}")
         show_help()
         return 1
-    
+
     return commands[command]()
 
 
