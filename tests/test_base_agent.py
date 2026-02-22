@@ -226,7 +226,9 @@ def test_agent_with_prompt_base():
     # Create simple template
     p = PromptBase(template="You are a {{ role }}.", role="tester")
 
-    agent = BaseAgent(name="prompt_agent", system_prompt=p, provider=MockLLMProvider())
+    agent = BaseAgent(
+        name="prompt_agent", system_prompt=p, provider=MockLLMProvider(), skills_dirs=[]
+    )
 
     # Check string conversion
     assert str(agent.system_prompt) == "You are a tester."
