@@ -158,7 +158,7 @@ cli/
 The default model is set in `utils.py`. Kader supports multiple providers with the format `provider:model`:
 
 ```python
-DEFAULT_MODEL = "ollama:kimi-k2.5:cloud"  # Default model
+DEFAULT_MODEL = "minimax-m2.5:cloud"  # Default model
 ```
 
 ### Supported Providers
@@ -210,7 +210,7 @@ Kader automatically creates a `.kader` directory in your home directory on first
 
 ### Common Issues
 
-- **No models found**: Make sure Ollama is running and you have at least one model installed (e.g., `ollama pull gpt-oss:120b-cloud`)
+- **No models found**: Make sure Ollama is running and you have at least one model installed (e.g., `ollama pull minimax-m2.5:cloud`)
 - **Connection errors**: Verify that Ollama service is accessible at the configured endpoint
 - **Theme not changing**: Some terminal emulators may not support all color themes
 
