@@ -82,6 +82,10 @@ OLLAMA_API_KEY=''
 # Google Gemini API Key (for Google Gemini models)
 # Get your API key from: https://aistudio.google.com/apikey
 GEMINI_API_KEY=''
+
+# Anthropic API Key (for Claude models)
+# Get your API key from: https://console.anthropic.com/settings/keys
+ANTHROPIC_API_KEY=''
 """
         env_file.write_text(default_env_content, encoding="utf-8")
 
