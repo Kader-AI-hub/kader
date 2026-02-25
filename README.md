@@ -7,6 +7,7 @@ Kader is an intelligent coding agent designed to assist with software developmen
 - 🤖 **AI-powered Code Assistance** - Support for multiple LLM providers:
   - **Ollama**: Local LLM execution for privacy and speed.
   - **Google Gemini**: Cloud-based powerful models via the Google GenAI SDK.
+  - **Anthropic**: High-quality Claude models via the Anthropic SDK.
 - 🖥️ **Interactive CLI** - Modern TUI interface built with Textual:
   - **Lazy Loading**: Efficient directory tree loading for large projects.
   - **TODO Management**: Integrated TODO list widget with automatic updates.
@@ -87,6 +88,7 @@ When the kader module is imported for the first time, it automatically creates a
 The application automatically loads environment variables from `~/.kader/.env`:
 - `OLLAMA_API_KEY`: API key for Ollama service (if applicable).
 - `GOOGLE_API_KEY`: API key for Google Gemini (required for Google Provider).
+- `ANTHROPIC_API_KEY`: API key for Anthropic Claude (required for Anthropic Provider).
 - Additional variables can be added to the `.env` file and will be automatically loaded.
 
 ### Memory and Sessions
@@ -102,7 +104,7 @@ Kader stores data in `~/.kader/`:
 | Command | Description |
 |---------|-------------|
 | `/help` | Show command reference |
-| `/models` | Show available models (Ollama & Google) |
+| `/models` | Show available models (Ollama, Google & Anthropic) |
 | `/clear` | Clear conversation |
 | `/save` | Save current session |
 | `/load <id>` | Load a saved session |
@@ -137,6 +139,7 @@ kader/
 ├── examples/              # Example implementations
 │   ├── memory_example.py  # Memory management examples
 │   ├── google_example.py  # Google Gemini provider examples
+│   ├── anthropic_example.py # Anthropic Claude provider examples
 │   ├── planner_executor_example.py # Advanced workflow examples
 │   ├── skills/           # Agent skills examples
 │   │   ├── hello/        # Greeting skill with instructions
@@ -146,7 +149,7 @@ kader/
 ├── kader/                # Core framework
 │   ├── agent/            # Agent implementations (Planning, ReAct)
 │   ├── memory/           # Memory management & persistence
-│   ├── providers/        # LLM providers (Ollama, Google)
+│   ├── providers/        # LLM providers (Ollama, Google, Anthropic)
 │   ├── tools/            # Tools (File System, Web, Command, AgentTool)
 │   ├── prompts/          # Prompt templates (Jinja2)
 │   └── utils/            # Utilities (Checkpointer, ContextAggregator)
@@ -170,6 +173,7 @@ Kader provides a robust agent architecture:
 Kader supports multiple backends:
 - **OllamaProvider**: Connects to locally running Ollama instances.
 - **GoogleProvider**: High-performance access to Gemini models.
+- **AnthropicProvider**: Full support for Claude models.
 
 ### Agent-As-Tool (AgentTool)
 
@@ -278,7 +282,7 @@ uv run ruff format .
 
 ### Common Issues
 
-- **No models found**: Ensure your providers are correctly configured. For Ollama, run `ollama serve`. For Google, ensure `GOOGLE_API_KEY` is set.
+- **No models found**: Ensure your providers are correctly configured. For Ollama, run `ollama serve`. For Google, ensure `GOOGLE_API_KEY` is set. For Anthropic, ensure `ANTHROPIC_API_KEY` is set.
 - **Connection errors**: Verify internet access for cloud providers and local service availability for Ollama.
 
 ## Contributing
@@ -327,3 +331,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Built with [Textual](https://textual.textualize.io/) for the beautiful CLI interface.
 - Uses [Ollama](https://ollama.ai/) for local LLM execution.
 - Powered by [Google Gemini](https://ai.google.dev/) for advanced cloud-based reasoning.
+- Enhanced by [Anthropic Claude](https://www.anthropic.com/) for high-quality coding assistance.
