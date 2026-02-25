@@ -8,6 +8,7 @@ import os
 from typing import Optional
 
 from kader.providers import (
+    AnthropicProvider,
     GoogleProvider,
     MistralProvider,
     OllamaProvider,
@@ -30,6 +31,7 @@ class LLMProviderFactory:
     - ollama: Local models via Ollama
     - google: Google Gemini models
     - mistral: Mistral AI models
+    - anthropic: Anthropic Claude models
     - openai: OpenAI models (GPT-4, GPT-4o, etc.)
     - moonshot: Moonshot AI models (kimi-k2.5, etc.)
     - zai: Z.ai models (GLM-5, GLM-4, etc.)
@@ -58,6 +60,7 @@ class LLMProviderFactory:
         "ollama": OllamaProvider,
         "google": GoogleProvider,
         "mistral": MistralProvider,
+        "anthropic": AnthropicProvider,
         "openai": OpenAICompatibleProvider,
         "moonshot": OpenAICompatibleProvider,
         "zai": OpenAICompatibleProvider,
@@ -151,6 +154,20 @@ class LLMProviderFactory:
                 provider_name, model_name, config
             )
 
+        # Handle Anthropic provider (needs api_key from env)
+        if provider_class == AnthropicProvider:
+            api_key = os.environ.get("ANTHROPIC_API_KEY")
+            if not api_key:
+                raise ValueError(
+                    "ANTHROPIC API key not found. "
+                    "Please set ANTHROPIC_API_KEY in your ~/.kader/.env file"
+                )
+            return AnthropicProvider(
+                model=model_name,
+                api_key=api_key,
+                default_config=config,
+            )
+
         return provider_class(model=model_name, default_config=config)
 
     @classmethod
@@ -229,6 +246,13 @@ class LLMProviderFactory:
             models["mistral"] = [f"mistral:{m}" for m in mistral_models]
         except Exception:
             models["mistral"] = []
+
+        # Get Anthropic models
+        try:
+            anthropic_models = AnthropicProvider.get_supported_models()
+            models["anthropic"] = [f"anthropic:{m}" for m in anthropic_models]
+        except Exception:
+            models["anthropic"] = []
 
         # Get OpenAI-compatible provider models
         for provider_name in [
