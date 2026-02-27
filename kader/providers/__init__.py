@@ -1,3 +1,4 @@
+from .anthropic import AnthropicProvider
 from .base import Message
 from .google import GoogleProvider
 from .mistral import MistralProvider
@@ -10,6 +11,7 @@ __all__ = [
     "OllamaProvider",
     "GoogleProvider",
     "MistralProvider",
+    "AnthropicProvider",
     "MockLLM",
     "OpenAICompatibleProvider",
     "OpenAIProviderConfig",

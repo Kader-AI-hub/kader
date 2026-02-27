@@ -8,7 +8,7 @@ Kader is a flexible framework that enables developers to create AI agents capabl
 
 ### Key Features
 
-- **Multi-Provider Support**: Connect to Ollama, Google Gemini, Mistral, OpenAI, and any OpenAI-compatible API
+- **Multi-Provider Support**: Connect to Ollama, Google Gemini, Anthropic, Mistral, OpenAI, and any OpenAI-compatible API
 - **Agent Types**: BaseAgent, ReActAgent, and PlanningAgent for different reasoning patterns
 - **Tool System**: Build custom tools with automatic schema generation for any LLM provider
 - **Memory Management**: Persistent sessions, conversation history with sliding windows, and state management
@@ -46,6 +46,9 @@ GEMINI_API_KEY='your-api-key'
 
 # Mistral
 MISTRAL_API_KEY='your-api-key'
+
+# Anthropic
+ANTHROPIC_API_KEY='your-api-key'
 
 # OpenAI
 OPENAI_API_KEY='your-api-key'
@@ -337,6 +340,22 @@ provider = GoogleProvider(
 
 # Requires GEMINI_API_KEY in environment
 response = provider.invoke([Message.user("Hello from Gemini!")])
+```
+
+### AnthropicProvider
+
+Anthropic Claude models via the Anthropic SDK.
+
+```python
+from kader.providers import AnthropicProvider, Message
+
+provider = AnthropicProvider(
+    model="claude-3-5-sonnet-20241022",
+    temperature=0.7,
+)
+
+# Requires ANTHROPIC_API_KEY
+response = provider.invoke([Message.user("Hello from Claude!")])
 ```
 
 Configuration via environment or parameters:
@@ -772,6 +791,7 @@ See the `examples/` directory for complete working examples:
 | `ollama_example.py` | Local LLM with Ollama |
 | `google_example.py` | Google Gemini integration |
 | `mistral_example.py` | Mistral AI integration |
+| `anthropic_example.py` | Anthropic Claude integration |
 | `openai_compatible_example.py` | OpenAI, Groq, OpenRouter |
 | `memory_example.py` | Memory management |
 | `todo_agent/main.py` | Todo-based planning agent |
@@ -794,6 +814,7 @@ python ollama_example.py
 | `OllamaProvider` | Local LLM provider |
 | `GoogleProvider` | Google Gemini provider |
 | `MistralProvider` | Mistral AI provider |
+| `AnthropicProvider` | Anthropic Claude provider |
 | `OpenAICompatibleProvider` | OpenAI-compatible providers |
 | `FileSessionManager` | Session persistence |
 | `SlidingWindowConversationManager` | Conversation history |

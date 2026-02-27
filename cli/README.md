@@ -13,7 +13,7 @@ A modern terminal-based AI coding assistant built with Python's [Textual](https:
 - 🔧 **Tool Confirmation** - Interactive approval for tool execution
 - 🤖 **Model Selection** - Dynamic model switching interface
 - 📝 **File Operations** - Integrated file system tools for coding tasks
-- ☁️ **Multi-Provider Support** - Ollama, Google Gemini, Mistral, OpenAI, Moonshot (Kimi), Z.ai (GLM), OpenRouter, OpenCode, Groq
+- ☁️ **Multi-Provider Support** - Ollama, Google Gemini, Anthropic, Mistral, OpenAI, Moonshot (Kimi), Z.ai (GLM), OpenRouter, OpenCode, Groq
 - 🖥️ **CLI Message Display** - Enhanced display showing agent reasoning and tool execution
 
 ## Prerequisites
@@ -168,6 +168,7 @@ DEFAULT_MODEL = "minimax-m2.5:cloud"  # Default model
 | Ollama | `ollama:model` | `ollama:llama3` |
 | Google Gemini | `google:model` | `google:gemini-2.5-flash` |
 | Mistral | `mistral:model` | `mistral:small-3.1` |
+| Anthropic | `anthropic:model` | `anthropic:claude-3.5-sonnet` |
 | OpenAI | `openai:model` | `openai:gpt-4o` |
 | Moonshot (Kimi) | `moonshot:model` | `moonshot:kimi-k2.5` |
 | Z.ai (GLM) | `zai:model` | `zai:glm-5` |
@@ -181,6 +182,7 @@ Set API keys for cloud providers:
 
 ```bash
 export GOOGLE_API_KEY="your-google-api-key"
+export ANTHROPIC_API_KEY="your-anthropic-api-key"
 export MISTRAL_API_KEY="your-mistral-api-key"
 export OPENAI_API_KEY="your-openai-api-key"
 export MOONSHOT_API_KEY="your-kimi-api-key"
