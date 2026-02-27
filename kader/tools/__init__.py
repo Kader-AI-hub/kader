@@ -22,6 +22,8 @@ from .base import (
     ToolCall,
     # Enums
     ToolCategory,
+    # Exceptions
+    ToolExecutionRejected,
     ToolRegistry,
     ToolResult,
     ToolResultStatus,
@@ -134,6 +136,8 @@ __all__ = [
     "ToolResult",
     # Enums
     "ToolCategory",
+    # Exceptions
+    "ToolExecutionRejected",
     # Decorator
     "tool",
     # Type aliases

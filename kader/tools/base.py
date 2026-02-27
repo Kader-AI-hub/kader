@@ -38,6 +38,29 @@ class ToolCategory(str, Enum):
     CUSTOM = "custom"
 
 
+class ToolExecutionRejected(Exception):
+    """Raised when user rejects a tool execution in a sub-agent.
+
+    This exception is used to immediately stop sub-agent execution when
+    the user declines a tool confirmation prompt. It propagates up to
+    the AgentTool which catches it and returns a static rejection message
+    to the planner agent.
+
+    Attributes:
+        message: The rejection message.
+        user_context: Optional context/reason provided by the user for the rejection.
+    """
+
+    def __init__(
+        self,
+        message: str = "Tool execution was rejected by the user.",
+        user_context: str | None = None,
+    ) -> None:
+        self.message = message
+        self.user_context = user_context
+        super().__init__(self.message)
+
+
 @dataclass
 class ParameterSchema:
     """Schema for a single tool parameter."""

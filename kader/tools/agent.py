@@ -18,7 +18,13 @@ from kader.prompts import ExecutorAgentPrompt
 from kader.providers.base import BaseLLMProvider, Message
 from kader.utils import Checkpointer, ContextAggregator
 
-from .base import BaseTool, ParameterSchema, ToolCategory, ToolRegistry
+from .base import (
+    BaseTool,
+    ParameterSchema,
+    ToolCategory,
+    ToolExecutionRejected,
+    ToolRegistry,
+)
 
 
 def get_cached_default_registry():
@@ -232,6 +238,9 @@ class AgentTool(BaseTool[str]):
         else:
             self._compressor = None
 
+        # Rejection context (set when user rejects tool execution)
+        self._last_rejection_context: str | None = None
+
     def _load_aggregated_context(self, main_session_id: str) -> str | None:
         """
         Load the aggregated checkpoint from executors directory if it exists.
@@ -444,6 +453,15 @@ class AgentTool(BaseTool[str]):
                     )
                 return result
 
+        except ToolExecutionRejected as exc:
+            # Store user context for the planner to pick up
+            self._last_rejection_context = exc.user_context
+            return (
+                "[REJECTED] The user rejected the tool execution for this "
+                "sub-agent. The execution has been stopped. Please wait for "
+                "additional context from the user before proceeding."
+            )
+
         except Exception as e:
             return f"Agent execution failed: {str(e)}"
 
@@ -598,6 +616,15 @@ class AgentTool(BaseTool[str]):
                         output=result,
                     )
                 return result
+
+        except ToolExecutionRejected as exc:
+            # Store user context for the planner to pick up
+            self._last_rejection_context = exc.user_context
+            return (
+                "[REJECTED] The user rejected the tool execution for this "
+                "sub-agent. The execution has been stopped. Please wait for "
+                "additional context from the user before proceeding."
+            )
 
         except Exception as e:
             return f"Agent execution failed: {str(e)}"

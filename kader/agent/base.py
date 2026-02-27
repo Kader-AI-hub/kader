@@ -745,15 +745,15 @@ class BaseAgent:
 
                 # Check if user declined tool execution
                 if isinstance(tool_result, tuple) and tool_result[0] is False:
-                    # User declined - add their input as a new message and continue
+                    # User rejected - raise to stop the sub-agent
+                    from kader.tools.base import ToolExecutionRejected
+
                     user_elaboration = tool_result[1]
-                    if user_elaboration:
-                        self.memory.add_message(Message.user(user_elaboration))
-                    else:
-                        # User provided no elaboration, return current response
-                        final_response = response
-                        break
-                    continue
+                    raise ToolExecutionRejected(
+                        "User rejected the tool execution. "
+                        "Please wait for additional context.",
+                        user_context=user_elaboration,
+                    )
 
                 tool_msgs = tool_result
 
@@ -778,6 +778,24 @@ class BaseAgent:
                                         self.logger_id, tool_name, arguments
                                     )
                                     break
+
+                # Check for pending rejection user context from AgentTool
+                for tool_call_info in response.tool_calls:
+                    fn_info = tool_call_info.get("function", {})
+                    if not fn_info and "name" in tool_call_info:
+                        fn_info = tool_call_info
+                    called_tool_name = fn_info.get("name", "")
+                    called_tool = self._tool_registry.get(called_tool_name)
+                    if (
+                        called_tool
+                        and hasattr(called_tool, "_last_rejection_context")
+                        and called_tool._last_rejection_context
+                    ):
+                        # Add user's rejection context as a user message
+                        self.memory.add_message(
+                            Message.user(called_tool._last_rejection_context)
+                        )
+                        called_tool._last_rejection_context = None
 
                 # Save session update after tool results
                 if self.use_persistence:
@@ -921,14 +939,15 @@ class BaseAgent:
 
                 # Check if user declined tool execution
                 if isinstance(tool_result, tuple) and tool_result[0] is False:
-                    # User declined - add their input as a new message and continue
+                    # User rejected - raise to stop the sub-agent
+                    from kader.tools.base import ToolExecutionRejected
+
                     user_elaboration = tool_result[1]
-                    if user_elaboration:
-                        self.memory.add_message(Message.user(user_elaboration))
-                    else:
-                        final_response = response
-                        break
-                    continue
+                    raise ToolExecutionRejected(
+                        "User rejected the tool execution. "
+                        "Please wait for additional context.",
+                        user_context=user_elaboration,
+                    )
 
                 tool_msgs = tool_result
 
@@ -952,6 +971,24 @@ class BaseAgent:
                                         self.logger_id, tool_name, arguments
                                     )
                                     break
+
+                # Check for pending rejection user context from AgentTool
+                for tool_call_info in response.tool_calls:
+                    fn_info = tool_call_info.get("function", {})
+                    if not fn_info and "name" in tool_call_info:
+                        fn_info = tool_call_info
+                    called_tool_name = fn_info.get("name", "")
+                    called_tool = self._tool_registry.get(called_tool_name)
+                    if (
+                        called_tool
+                        and hasattr(called_tool, "_last_rejection_context")
+                        and called_tool._last_rejection_context
+                    ):
+                        # Add user's rejection context as a user message
+                        self.memory.add_message(
+                            Message.user(called_tool._last_rejection_context)
+                        )
+                        called_tool._last_rejection_context = None
 
                 # Save session update
                 if self.use_persistence:

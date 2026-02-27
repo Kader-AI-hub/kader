@@ -99,6 +99,9 @@ class KaderApp(App):
         self._inline_selector: Optional[InlineSelector] = None
         self._model_selector: Optional[ModelSelector] = None
         self._update_info: Optional[str] = None  # Latest version if update available
+        self._awaiting_rejection_context: bool = (
+            False  # Waiting for user context after tool rejection
+        )
 
         # Dedicated thread pool for agent invocation (isolated from default pool)
         self._agent_executor = ThreadPoolExecutor(
@@ -243,9 +246,6 @@ class KaderApp(App):
         """Handle confirmation from inline selector."""
         conversation = self.query_one("#conversation-view", ConversationView)
 
-        # Set result
-        self._confirmation_result = (event.confirmed, None)
-
         # Remove selector and show result message
         tool_message = None
         if self._inline_selector:
@@ -254,6 +254,9 @@ class KaderApp(App):
             self._inline_selector = None
 
         if event.confirmed:
+            # User approved - signal immediately
+            self._confirmation_result = (True, None)
+
             if tool_message:
                 conversation.add_message(tool_message, "assistant")
             # Show executing message - will be updated by result callback
@@ -264,17 +267,23 @@ class KaderApp(App):
                 spinner.start()
             except Exception:
                 pass
+
+            # Signal the waiting thread
+            if self._confirmation_event:
+                self._confirmation_event.set()
         else:
-            conversation.add_message("(-) Tool execution skipped.", "assistant")
+            # User rejected - don't signal yet, wait for context
+            conversation.add_message(
+                "(-) Tool execution rejected.\n\n"
+                "Please provide additional context or reason "
+                "for the rejection below:",
+                "assistant",
+            )
+            self._awaiting_rejection_context = True
 
         # Re-enable input
         prompt_input = self.query_one("#prompt-input", ModeAwareInput)
         prompt_input.disabled = False
-
-        # Signal the waiting thread BEFORE focusing input
-        # This ensures the agent thread can continue
-        if self._confirmation_event:
-            self._confirmation_event.set()
 
         # Now focus input
         prompt_input.focus()
@@ -513,6 +522,18 @@ Please resize your terminal."""
 
         # Clear the input
         event.input.value = ""
+
+        # Check if we're waiting for rejection context
+        if self._awaiting_rejection_context:
+            self._awaiting_rejection_context = False
+            conversation = self.query_one("#conversation-view", ConversationView)
+            conversation.add_message(user_input, "user")
+
+            # Set result with user's context and signal the waiting thread
+            self._confirmation_result = (False, user_input)
+            if self._confirmation_event:
+                self._confirmation_event.set()
+            return
 
         # Check if it's a command
         if user_input.startswith("/"):
