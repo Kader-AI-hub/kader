@@ -370,7 +370,9 @@ def demo_cost_estimation():
 
     usage = Usage(prompt_tokens=10_000, completion_tokens=2_000)
 
-    print(f"Estimated cost for {usage.prompt_tokens:,} input + {usage.completion_tokens:,} output tokens:\n")
+    print(
+        f"Estimated cost for {usage.prompt_tokens:,} input + {usage.completion_tokens:,} output tokens:\n"
+    )
 
     for model_id, label in models.items():
         provider = AnthropicProvider(model=model_id)

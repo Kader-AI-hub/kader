@@ -38,9 +38,7 @@ class TestAnthropicProviderInit:
     def test_repr(self):
         """Test string representation."""
         provider = AnthropicProvider(model="claude-3-5-sonnet-20241022")
-        assert (
-            repr(provider) == "AnthropicProvider(model='claude-3-5-sonnet-20241022')"
-        )
+        assert repr(provider) == "AnthropicProvider(model='claude-3-5-sonnet-20241022')"
 
 
 class TestAnthropicProviderConvertMessages:
@@ -232,9 +230,7 @@ class TestAnthropicProviderConvertConfig:
                     "description": "Perform a calculation",
                     "parameters": {
                         "type": "object",
-                        "properties": {
-                            "expression": {"type": "string"}
-                        },
+                        "properties": {"expression": {"type": "string"}},
                     },
                 },
             }
