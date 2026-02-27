@@ -273,3 +273,69 @@ class TestAgentToolAsyncExecution:
 
         finally:
             os.remove(path)
+
+
+class TestToolExecutionRejected:
+    """Test ToolExecutionRejected exception."""
+
+    def test_exception_default_message(self):
+        """Test that exception has a default message."""
+        from kader.tools.base import ToolExecutionRejected
+
+        exc = ToolExecutionRejected()
+        assert exc.message == "Tool execution was rejected by the user."
+        assert str(exc) == "Tool execution was rejected by the user."
+
+    def test_exception_custom_message(self):
+        """Test that exception accepts a custom message."""
+        from kader.tools.base import ToolExecutionRejected
+
+        exc = ToolExecutionRejected("Custom rejection reason")
+        assert exc.message == "Custom rejection reason"
+        assert str(exc) == "Custom rejection reason"
+
+
+class TestAgentToolRejection:
+    """Test AgentTool behavior when sub-agent raises ToolExecutionRejected."""
+
+    @patch("kader.agent.agents.ReActAgent")
+    @patch("kader.tools.get_default_registry")
+    def test_execute_tool_rejected(self, mock_registry, mock_react_agent):
+        """Test that execute returns [REJECTED] message when tool is rejected."""
+        from kader.tools.base import ToolExecutionRejected
+
+        mock_registry.return_value = MagicMock()
+        mock_agent_instance = MagicMock()
+        mock_agent_instance.invoke.side_effect = ToolExecutionRejected(
+            "User rejected the tool execution."
+        )
+        mock_react_agent.return_value = mock_agent_instance
+
+        tool = AgentTool(name="test_agent")
+        result = tool.execute(task="Test task", context="Test context")
+
+        assert "[REJECTED]" in result
+        assert "rejected the tool execution" in result
+        assert "stopped" in result
+
+    @patch("kader.agent.agents.ReActAgent")
+    @patch("kader.tools.get_default_registry")
+    async def test_aexecute_tool_rejected(self, mock_registry, mock_react_agent):
+        """Test that aexecute returns [REJECTED] message when tool is rejected."""
+        from kader.tools.base import ToolExecutionRejected
+
+        mock_registry.return_value = MagicMock()
+        mock_agent_instance = MagicMock()
+
+        async def async_invoke_rejected(task):
+            raise ToolExecutionRejected("User rejected the tool execution.")
+
+        mock_agent_instance.ainvoke = async_invoke_rejected
+        mock_react_agent.return_value = mock_agent_instance
+
+        tool = AgentTool(name="test_agent")
+        result = await tool.aexecute(task="Test task", context="Test context")
+
+        assert "[REJECTED]" in result
+        assert "rejected the tool execution" in result
+        assert "stopped" in result
