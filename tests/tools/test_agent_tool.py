@@ -302,7 +302,7 @@ class TestAgentToolRejection:
     @patch("kader.tools.get_default_registry")
     def test_execute_tool_rejected(self, mock_registry, mock_react_agent):
         """Test that execute returns [REJECTED] message when tool is rejected."""
-        from kader.tools.base import ToolExecutionRejected
+        from kader.tools.agent import ToolExecutionRejected
 
         mock_registry.return_value = MagicMock()
         mock_agent_instance = MagicMock()
@@ -322,7 +322,7 @@ class TestAgentToolRejection:
     @patch("kader.tools.get_default_registry")
     async def test_aexecute_tool_rejected(self, mock_registry, mock_react_agent):
         """Test that aexecute returns [REJECTED] message when tool is rejected."""
-        from kader.tools.base import ToolExecutionRejected
+        from kader.tools.agent import ToolExecutionRejected
 
         mock_registry.return_value = MagicMock()
         mock_agent_instance = MagicMock()
