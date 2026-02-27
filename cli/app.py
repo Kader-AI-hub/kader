@@ -99,7 +99,9 @@ class KaderApp(App):
         self._inline_selector: Optional[InlineSelector] = None
         self._model_selector: Optional[ModelSelector] = None
         self._update_info: Optional[str] = None  # Latest version if update available
-        self._awaiting_rejection_context: bool = False  # Waiting for user context after tool rejection
+        self._awaiting_rejection_context: bool = (
+            False  # Waiting for user context after tool rejection
+        )
 
         # Dedicated thread pool for agent invocation (isolated from default pool)
         self._agent_executor = ThreadPoolExecutor(
