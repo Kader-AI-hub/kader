@@ -1,4 +1,4 @@
-"""Kader CLI - Modern Vibe Coding CLI."""
+"""Kader CLI - Modern AI Coding CLI."""
 
 from .app import KaderApp, main
 

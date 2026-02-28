@@ -1,126 +1,111 @@
-"""Kader CLI - Modern Vibe Coding CLI with Textual."""
+"""Kader CLI - Modern AI Coding CLI with Rich.
+
+A Rich-based interactive CLI for the Kader AI coding agent. Uses Rich for
+beautiful terminal output and prompt_toolkit for async input handling.
+"""
 
 import asyncio
 import atexit
 import subprocess
 import threading
+import warnings
 from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import version as get_version
 from pathlib import Path
 from typing import Optional
 
-from textual.app import App, ComposeResult
-from textual.binding import Binding
-from textual.containers import Container, Horizontal, Vertical
-from textual.widgets import (
-    Footer,
-    Header,
-    Input,
-    Markdown,
-    Static,
-    Tree,
-)
+from prompt_toolkit import PromptSession
+from prompt_toolkit.formatted_text import HTML
+from prompt_toolkit.patch_stdout import patch_stdout
+from rich.console import Console
+from rich.live import Live
+from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.spinner import Spinner
+from rich.table import Table
+from rich.theme import Theme
 
-from kader.memory import (
-    FileSessionManager,
-    MemoryConfig,
-)
+from kader.memory import FileSessionManager, MemoryConfig
 from kader.workflows import PlannerExecutorWorkflow
 
 from .commands import InitializeCommand
 from .llm_factory import LLMProviderFactory
-from .utils import (
-    DEFAULT_MODEL,
-    HELP_TEXT,
-)
-from .widgets import (
-    ConversationView,
-    InlineSelector,
-    LoadingSpinner,
-    ModeAwareInput,
-    ModelSelector,
-    TodoList,
+from .utils import DEFAULT_MODEL, HELP_TEXT
+
+# Suppress warnings
+warnings.filterwarnings("ignore")
+
+# Custom Rich theme matching the Kader brand
+KADER_THEME = Theme(
+    {
+        "kader.primary": "bold magenta",
+        "kader.cyan": "bold cyan",
+        "kader.yellow": "bold yellow",
+        "kader.green": "bold green",
+        "kader.red": "bold red",
+        "kader.orange": "bold dark_orange",
+        "kader.muted": "dim",
+        "kader.user": "bold magenta",
+        "kader.assistant": "bold cyan",
+        "kader.success": "bold green",
+        "kader.error": "bold red",
+        "kader.info": "bold yellow",
+    }
 )
 
-WELCOME_MESSAGE = """
-```
+WELCOME_BANNER = """\
+[bold magenta]
   _  __    _    ____  _____ ____
  | |/ /   / \\  |  _ \\| ____|  _ \\
  | ' /   / _ \\ | | | |  _| | |_) |
  | . \\  / ___ \\| |_| | |___|  _ <
  |_|\\_\\/_/   \\_\\____/|_____|_| \\_\\
-```
-
-Type a message below to start chatting, or use `/help` to see available commands.
-
-"""
+[/bold magenta]"""
 
 
-# Minimum terminal size to prevent UI breakage
-MIN_WIDTH = 89
-MIN_HEIGHT = 29
-
-
-class ASCIITree(Tree):
-    """A Tree widget that uses no icons."""
-
-    ICON_NODE = ""
-    ICON_NODE_EXPANDED = ""
-
-
-class KaderApp(App):
-    """Main Kader CLI application."""
-
-    TITLE = "Kader CLI"
-    SUB_TITLE = f"v{get_version('kader')}"
-    CSS_PATH = "app.tcss"
-
-    BINDINGS = [
-        Binding("ctrl+q", "quit", "Quit"),
-        Binding("ctrl+l", "clear", "Clear"),
-        Binding("ctrl+s", "save_session", "Save"),
-        Binding("ctrl+r", "refresh_tree", "Refresh"),
-        Binding("tab", "focus_next", "Next", show=False),
-        Binding("shift+tab", "focus_previous", "Previous", show=False),
-    ]
+class KaderApp:
+    """Main Kader CLI application using Rich."""
 
     def __init__(self) -> None:
-        super().__init__()
+        self.console = Console(theme=KADER_THEME)
         self._is_processing = False
         self._current_model = DEFAULT_MODEL
         self._current_session_id: str | None = None
-        # Session manager with sessions stored in ~/.kader/sessions/
+        self._running = True
+
+        # Session manager
         self._session_manager = FileSessionManager(
             MemoryConfig(memory_dir=Path.home() / ".kader")
         )
+
         # Tool confirmation coordination
         self._confirmation_event: Optional[threading.Event] = None
         self._confirmation_result: tuple[bool, Optional[str]] = (True, None)
-        self._inline_selector: Optional[InlineSelector] = None
-        self._model_selector: Optional[ModelSelector] = None
-        self._update_info: Optional[str] = None  # Latest version if update available
-        self._awaiting_rejection_context: bool = (
-            False  # Waiting for user context after tool rejection
-        )
+        self._update_info: Optional[str] = None
+        self._awaiting_rejection_context: bool = False
 
-        # Dedicated thread pool for agent invocation (isolated from default pool)
+        # Spinner state for Live display
+        self._spinner_live: Optional[Live] = None
+
+        # Dedicated thread pool for agent invocation
         self._agent_executor = ThreadPoolExecutor(
             max_workers=2, thread_name_prefix="kader_agent"
         )
-        # Ensure executor is properly shut down on exit
         atexit.register(self._agent_executor.shutdown, wait=False)
 
         self._workflow = self._create_workflow(self._current_model)
 
+        # Prompt session for input
+        self._prompt_session: PromptSession = PromptSession()
+
     def _create_workflow(self, model_name: str) -> PlannerExecutorWorkflow:
         """Create a new PlannerExecutorWorkflow with the specified model."""
-        # Create provider using factory (supports provider:model format)
         provider = LLMProviderFactory.create_provider(model_name)
 
         workflow = PlannerExecutorWorkflow(
             name="kader_cli",
             provider=provider,
-            model_name=model_name,  # Keep for reference
+            model_name=model_name,
             interrupt_before_tool=True,
             tool_confirmation_callback=self._tool_confirmation_callback,
             direct_execution_callback=self._direct_execution_callback,
@@ -134,563 +119,297 @@ class KaderApp(App):
 
         return workflow
 
+    # ── Callbacks (called from agent thread) ───────────────────────────
+
     def _direct_execution_callback(self, message: str, tool_name: str) -> None:
-        """
-        Callback for direct execution tools - called from agent thread.
-
-        Shows a message in the conversation view without blocking for confirmation.
-        """
-        # Schedule message display on main thread
-        self.call_from_thread(self._show_direct_execution_message, message, tool_name)
-
-    def _show_direct_execution_message(self, message: str, tool_name: str) -> None:
-        """Show a direct execution message in the conversation view."""
-        try:
-            conversation = self.query_one("#conversation-view", ConversationView)
-            # User-friendly message showing the tool is executing
-            friendly_message = message
-            conversation.add_message(friendly_message, "assistant")
-            conversation.scroll_end()
-        except Exception:
-            pass
+        """Callback for direct execution tools - called from agent thread."""
+        self._stop_spinner()
+        self.console.print(f"  [kader.cyan]⚡ {tool_name}:[/kader.cyan] {message}")
+        self._start_spinner()
 
     def _tool_execution_result_callback(
         self, tool_name: str, success: bool, result: str
     ) -> None:
-        """
-        Callback for tool execution results - called from agent thread.
-
-        Updates the conversation view with the execution result.
-        """
-        # Schedule result display on main thread
-        self.call_from_thread(
-            self._show_tool_execution_result, tool_name, success, result
-        )
-
-    def _show_tool_execution_result(
-        self, tool_name: str, success: bool, result: str
-    ) -> None:
-        """Show the tool execution result in the conversation view."""
-        try:
-            conversation = self.query_one("#conversation-view", ConversationView)
-            if success:
-                # User-friendly success message
-                friendly_message = f"(+) {tool_name} completed successfully"
-            else:
-                # User-friendly error message with truncated result
-                error_preview = result[:100] + "..." if len(result) > 100 else result
-                friendly_message = f"(-) {tool_name} failed: {error_preview}"
-            conversation.add_message(friendly_message, "assistant")
-            conversation.scroll_end()
-
-            # Refresh directory tree if file operations occurred
-            self._refresh_directory_tree()
-
-            # Refresh TODO list if todo tool was used
-            if "todo" in tool_name.lower():
-                self._refresh_todo_list()
-        except Exception:
-            pass
+        """Callback for tool execution results - called from agent thread."""
+        self._stop_spinner()
+        if success:
+            self.console.print(
+                rf"  [kader.green]\[+] {tool_name}[/kader.green] completed successfully"
+            )
+        else:
+            error_preview = result[:100] + "..." if len(result) > 100 else result
+            self.console.print(
+                rf"  [kader.red]\[-] {tool_name}[/kader.red] failed: {error_preview}"
+            )
+        self._start_spinner()
 
     def _tool_confirmation_callback(self, message: str) -> tuple[bool, Optional[str]]:
-        """
-        Callback for tool confirmation - called from agent thread.
+        """Callback for tool confirmation - called from agent thread."""
+        self._stop_spinner()
+        self.console.print()
+        self.console.print(
+            Panel(
+                message,
+                title=r"[kader.yellow]\[?] Tool Confirmation[/kader.yellow]",
+                border_style="yellow",
+                padding=(0, 1),
+            )
+        )
 
-        Shows inline selector with arrow key navigation.
-        """
         # Set up synchronization
         self._confirmation_event = threading.Event()
-        self._confirmation_result = (True, None)  # Default
+        self._confirmation_result = (True, None)
 
-        # Schedule selector to be shown on main thread
-        # Use call_from_thread to safely call from background thread
-        self.call_from_thread(self._show_inline_selector, message)
+        # Prompt for confirmation in the main thread context
+        # We use an event to wait for the answer from the input loop
+        self._awaiting_confirmation = True
 
         # Wait for user response (blocking in agent thread)
-        # This is safe because we're in a background thread
-        # Timeout after 5 minutes to prevent indefinite blocking
         if not self._confirmation_event.wait(timeout=300):
-            # Timeout occurred - decline tool execution gracefully
             return (False, "Tool confirmation timed out after 5 minutes")
 
-        # Return the result
+        self._start_spinner()
         return self._confirmation_result
 
-    def _show_inline_selector(self, message: str) -> None:
-        """Show the inline selector in the conversation view."""
-        # Stop spinner while waiting for confirmation
-        try:
-            spinner = self.query_one(LoadingSpinner)
-            spinner.stop()
-        except Exception:
-            pass
+    # ── Spinner helpers ───────────────────────────────────────────────
 
-        conversation = self.query_one("#conversation-view", ConversationView)
-
-        # Create and mount the selector
-        self._inline_selector = InlineSelector(message, id="tool-selector")
-        conversation.mount(self._inline_selector)
-        conversation.scroll_end()
-
-        # Disable input and focus selector
-        prompt_input = self.query_one("#prompt-input", ModeAwareInput)
-        prompt_input.disabled = True
-
-        # Force focus on the selector widget
-        self.set_focus(self._inline_selector)
-
-        # Force refresh
-        self.refresh()
-
-    def on_inline_selector_confirmed(self, event: InlineSelector.Confirmed) -> None:
-        """Handle confirmation from inline selector."""
-        conversation = self.query_one("#conversation-view", ConversationView)
-
-        # Remove selector and show result message
-        tool_message = None
-        if self._inline_selector:
-            tool_message = self._inline_selector.message
-            self._inline_selector.remove()
-            self._inline_selector = None
-
-        if event.confirmed:
-            # User approved - signal immediately
-            self._confirmation_result = (True, None)
-
-            if tool_message:
-                conversation.add_message(tool_message, "assistant")
-            # Show executing message - will be updated by result callback
-            conversation.add_message("[>] Executing tool...", "assistant")
-            # Restart spinner
-            try:
-                spinner = self.query_one(LoadingSpinner)
-                spinner.start()
-            except Exception:
-                pass
-
-            # Signal the waiting thread
-            if self._confirmation_event:
-                self._confirmation_event.set()
-        else:
-            # User rejected - don't signal yet, wait for context
-            conversation.add_message(
-                "(-) Tool execution rejected.\n\n"
-                "Please provide additional context or reason "
-                "for the rejection below:",
-                "assistant",
+    def _start_spinner(self) -> None:
+        """Start the thinking spinner."""
+        if self._spinner_live is None:
+            spinner = Spinner("dots", text="[kader.yellow] Kader is thinking...[/]")
+            self._spinner_live = Live(
+                spinner, console=self.console, transient=True, refresh_per_second=10
             )
-            self._awaiting_rejection_context = True
+            self._spinner_live.start()
 
-        # Re-enable input
-        prompt_input = self.query_one("#prompt-input", ModeAwareInput)
-        prompt_input.disabled = False
+    def _stop_spinner(self) -> None:
+        """Stop the thinking spinner."""
+        if self._spinner_live is not None:
+            self._spinner_live.stop()
+            self._spinner_live = None
 
-        # Now focus input
-        prompt_input.focus()
+    # ── Display helpers ──────────────────────────────────────────────
 
-    async def _show_model_selector(self, conversation: ConversationView) -> None:
-        """Show the model selector widget."""
-        try:
-            # Get models from all available providers
-            models = LLMProviderFactory.get_flat_model_list()
-            if not models:
-                conversation.add_message(
-                    "## Models (^^)\n\n*No models found. Check provider configurations.*",
-                    "assistant",
-                )
-                return
-
-            # Create and mount the model selector
-            self._model_selector = ModelSelector(
-                models=models, current_model=self._current_model, id="model-selector"
+    def _print_user_message(self, message: str) -> None:
+        """Display a user message."""
+        self.console.print()
+        self.console.print(
+            Panel(
+                Markdown(message),
+                title=r"[kader.user]\[>] You[/kader.user]",
+                border_style="magenta",
+                padding=(0, 1),
             )
-            conversation.mount(self._model_selector)
-            conversation.scroll_end()
-
-            # Disable input and focus selector
-            prompt_input = self.query_one("#prompt-input", ModeAwareInput)
-            prompt_input.disabled = True
-            self.set_focus(self._model_selector)
-
-        except Exception as e:
-            conversation.add_message(
-                f"## Models (^^)\n\n*Error fetching models: {e}*", "assistant"
-            )
-
-    def on_model_selector_model_selected(
-        self, event: ModelSelector.ModelSelected
-    ) -> None:
-        """Handle model selection."""
-        conversation = self.query_one("#conversation-view", ConversationView)
-
-        # Remove selector
-        if self._model_selector:
-            self._model_selector.remove()
-            self._model_selector = None
-
-        # Update model and recreate agent
-        old_model = self._current_model
-        self._current_model = event.model
-        self._workflow = self._create_workflow(self._current_model)
-
-        conversation.add_message(
-            f"(+) Model changed from `{old_model}` to `{self._current_model}`",
-            "assistant",
         )
 
-        # Re-enable input
-        prompt_input = self.query_one("#prompt-input", ModeAwareInput)
-        prompt_input.disabled = False
-        prompt_input.focus()
-
-    def on_model_selector_model_cancelled(
-        self, event: ModelSelector.ModelCancelled
+    def _print_assistant_message(
+        self,
+        message: str,
+        model_name: str | None = None,
+        usage_cost: float | None = None,
     ) -> None:
-        """Handle model selection cancelled."""
-        conversation = self.query_one("#conversation-view", ConversationView)
+        """Display an assistant message."""
+        subtitle_parts = []
+        if model_name:
+            subtitle_parts.append(f"[dim]{model_name}[/dim]")
+        if usage_cost is not None:
+            subtitle_parts.append(f"[kader.green]${usage_cost:.6f}[/kader.green]")
+        subtitle = " · ".join(subtitle_parts) if subtitle_parts else None
 
-        # Remove selector
-        if self._model_selector:
-            self._model_selector.remove()
-            self._model_selector = None
-
-        conversation.add_message(
-            f"Model selection cancelled. Current model: `{self._current_model}`",
-            "assistant",
+        self.console.print()
+        self.console.print(
+            Panel(
+                Markdown(message),
+                title=r"[kader.assistant]\[=] Kader[/kader.assistant]",
+                subtitle=subtitle,
+                border_style="cyan",
+                padding=(0, 1),
+            )
         )
 
-        # Re-enable input
-        prompt_input = self.query_one("#prompt-input", ModeAwareInput)
-        prompt_input.disabled = False
-        prompt_input.focus()
+    def _print_system_message(self, message: str, style: str = "kader.info") -> None:
+        """Display a system/info message."""
+        self.console.print(rf"  [{style}]\[>][/{style}] {message}")
 
-    def compose(self) -> ComposeResult:
-        """Create the application layout."""
-        yield Header()
-
-        with Horizontal(id="main-container"):
-            # Sidebar with directory tree and todo list
-            with Vertical(id="sidebar"):
-                with Vertical(id="tree-container", classes="sidebar-section"):
-                    yield Static("Files", id="sidebar-title")
-                    yield ASCIITree(str(Path.cwd().name), id="directory-tree")
-
-                with Vertical(id="todo-container", classes="sidebar-section"):
-                    yield Static("Plan", id="todo-title")
-                    yield TodoList(id="todo-list")
-
-            # Main content area
-            with Vertical(id="content-area"):
-                # Conversation view
-                with Container(id="conversation"):
-                    yield ConversationView(id="conversation-view")
-                    yield LoadingSpinner()
-
-                # Input area
-                yield ModeAwareInput(id="prompt-input")
-
-        yield Footer()
-
-    def on_mount(self) -> None:
-        """Initialize the app when mounted."""
-        # Show welcome message
-        conversation = self.query_one("#conversation-view", ConversationView)
-        conversation.mount(Markdown(WELCOME_MESSAGE, id="welcome"))
-
-        # Focus the input
-        self.query_one("#prompt-input", ModeAwareInput).focus()
-
-        # Check initial size
-        self._check_terminal_size()
-
-        # Start background update check
-        # Start background update check
-        threading.Thread(target=self._check_for_updates, daemon=True).start()
-
-        # Initial tree population
-        self._refresh_directory_tree()
-
-    def _populate_tree(self, node, path: Path) -> None:
-        """Populate tree with immediate children only (lazy loading).
-
-        Directories are added with a placeholder child to indicate they can be expanded.
-        Actual contents are loaded when the user expands the directory.
-        """
-        try:
-            # Sort: directories first, then files
-            items = sorted(
-                path.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())
-            )
-            for child in items:
-                if child.name.startswith((".", "__pycache__")):
-                    continue
-
-                if child.is_dir():
-                    # Add directory with path data for lazy loading
-                    new_node = node.add(f"[+] {child.name}", expand=False, data=child)
-                    # Add placeholder child to indicate expandable
-                    new_node.add("[...]")
-                else:
-                    node.add(f"{child.name}", data=child)
-        except Exception:
-            pass
-
-    def on_tree_node_expanded(self, event: Tree.NodeExpanded) -> None:
-        """Handle tree node expansion for lazy loading.
-
-        When a directory node is expanded, check if it has only a placeholder child.
-        If so, remove the placeholder and populate with actual directory contents.
-        """
-        node = event.node
-        path = node.data
-
-        # Skip if no path data or not a directory
-        if not path or not isinstance(path, Path) or not path.is_dir():
-            return
-
-        # Check if node has only a placeholder child (lazy loading)
-        children = list(node.children)
-        if len(children) == 1 and children[0].data is None:
-            # Remove placeholder and populate with actual contents
-            children[0].remove()
-            self._populate_tree(node, path)
-
-    def _check_for_updates(self) -> None:
-        """Check for package updates in background thread."""
-        try:
-            from outdated import check_outdated
-
-            current_version = get_version("kader")
-            is_outdated, latest_version = check_outdated("kader", current_version)
-
-            if is_outdated:
-                self._update_info = latest_version
-                # Schedule UI update on main thread
-                self.call_from_thread(self._show_update_notification)
-        except Exception:
-            # Silently ignore update check failures
-            pass
-
-    def _show_update_notification(self) -> None:
-        """Show update notification as a toast."""
-        if not self._update_info:
-            return
-
-        try:
-            current = get_version("kader")
-            message = (
-                f">> Update available! v{current} → v{self._update_info} "
-                f"Run: uv tool upgrade kader"
-            )
-            self.notify(message, severity="information", timeout=10)
-        except Exception:
-            pass
-
-    def on_resize(self) -> None:
-        """Handle terminal resize events."""
-        self._check_terminal_size()
-
-    def _check_terminal_size(self) -> None:
-        """Check if terminal is large enough and show warning if not."""
-        width = self.console.size.width
-        height = self.console.size.height
-
-        # Check if we need to show/hide the size warning
-        too_small = width < MIN_WIDTH or height < MIN_HEIGHT
-
-        try:
-            warning = self.query_one("#size-warning", Static)
-            if not too_small:
-                warning.remove()
-        except Exception:
-            if too_small:
-                # Show warning overlay
-                warning_text = f"""<!>  Terminal Too Small
-
-Current: {width}x{height}
-Minimum: {MIN_WIDTH}x{MIN_HEIGHT}
-
-Please resize your terminal."""
-                warning = Static(warning_text, id="size-warning")
-                self.mount(warning)
-
-    async def on_input_submitted(self, event: Input.Submitted) -> None:
-        """Handle user input submission."""
-        user_input = event.value.strip()
-        if not user_input:
-            return
-
-        # Clear the input
-        event.input.value = ""
-
-        # Check if we're waiting for rejection context
-        if self._awaiting_rejection_context:
-            self._awaiting_rejection_context = False
-            conversation = self.query_one("#conversation-view", ConversationView)
-            conversation.add_message(user_input, "user")
-
-            # Set result with user's context and signal the waiting thread
-            self._confirmation_result = (False, user_input)
-            if self._confirmation_event:
-                self._confirmation_event.set()
-            return
-
-        # Check if it's a command
-        if user_input.startswith("/"):
-            await self._handle_command(user_input)
-        elif user_input.startswith("!"):
-            await self._handle_terminal_command(user_input[1:])
-        else:
-            await self._handle_chat(user_input)
+    # ── Command handlers ─────────────────────────────────────────────
 
     async def _handle_command(self, command: str) -> None:
         """Handle CLI commands."""
         cmd = command.lower().strip()
-        conversation = self.query_one("#conversation-view", ConversationView)
 
         if cmd == "/help":
-            conversation.add_message(HELP_TEXT, "assistant")
+            self.console.print()
+            self.console.print(Markdown(HELP_TEXT))
+
         elif cmd == "/models":
-            await self._show_model_selector(conversation)
+            await self._handle_models()
+
         elif cmd == "/clear":
-            conversation.clear_messages()
             self._workflow.planner.memory.clear()
-            self._workflow.planner.provider.reset_tracking()  # Reset usage/cost tracking
-            self._current_session_id = self._workflow.session_id  # Start new session
-            try:
-                if self._current_session_id:
-                    self.query_one("#todo-list", TodoList).set_session_id(
-                        self._current_session_id
-                    )
-            except Exception:
-                pass
-            self.notify("Conversation cleared!", severity="information")
+            self._workflow.planner.provider.reset_tracking()
+            self._current_session_id = self._workflow.session_id
+            self.console.clear()
+            self._print_welcome()
+            self._print_system_message("Conversation cleared!", "kader.green")
+
         elif cmd == "/save":
-            self._handle_save_session(conversation)
+            self._handle_save_session()
+
         elif cmd == "/sessions":
-            self._handle_list_sessions(conversation)
+            self._handle_list_sessions()
+
         elif cmd == "/skills":
-            self._handle_skills(conversation)
+            self._handle_skills()
+
         elif cmd.startswith("/load"):
             parts = command.strip().split(maxsplit=1)
             if len(parts) < 2:
-                conversation.add_message(
-                    "❌ Usage: `/load <session_id>`\n\nUse `/sessions` to see available sessions.",
-                    "assistant",
+                self.console.print(
+                    r"  [kader.red]\[-][/kader.red] Usage: `/load <session_id>` "
+                    "— Use `/sessions` to see available sessions."
                 )
             else:
-                self._handle_load_session(parts[1], conversation)
-        elif cmd == "/refresh":
-            self._refresh_directory_tree()
-            self.notify("Directory tree refreshed!", severity="information")
+                self._handle_load_session(parts[1])
+
         elif cmd == "/cost":
-            self._handle_cost(conversation)
+            self._handle_cost()
+
         elif cmd == "/init":
             init_cmd = InitializeCommand(self)
             await init_cmd.execute()
+
         elif cmd == "/exit":
-            self.exit()
+            self._running = False
+            self.console.print("  [kader.muted]Goodbye! [!][/kader.muted]")
+
         else:
-            conversation.add_message(
-                f"❌ Unknown command: `{command}`\n\nType `/help` to see available commands.",
-                "assistant",
+            self.console.print(
+                rf"  [kader.red]\[-][/kader.red] Unknown command: `{command}` "
+                "— Type `/help` to see available commands."
             )
+
+    async def _handle_models(self) -> None:
+        """Handle the /models command with interactive selection."""
+        try:
+            models = LLMProviderFactory.get_flat_model_list()
+            if not models:
+                self.console.print(
+                    r"  [kader.red]\[-][/kader.red] No models found. "
+                    "Check provider configurations."
+                )
+                return
+
+            # Display models as a numbered list
+            table = Table(
+                title="[kader.cyan]Available Models[/kader.cyan]",
+                border_style="cyan",
+                show_header=True,
+                header_style="bold cyan",
+                padding=(0, 1),
+            )
+            table.add_column("#", style="dim", width=4, justify="right")
+            table.add_column("Model", style="white")
+            table.add_column("Status", justify="center")
+
+            for i, model in enumerate(models, 1):
+                marker = (
+                    "[kader.green]● current[/kader.green]"
+                    if model == self._current_model
+                    else "[dim]available[/dim]"
+                )
+                table.add_row(str(i), model, marker)
+
+            self.console.print()
+            self.console.print(table)
+            self.console.print(
+                "  [dim]Enter model number to switch, or press Enter to cancel:[/dim]"
+            )
+
+            # Get selection
+            try:
+                choice = await self._prompt_session.prompt_async(
+                    HTML("<ansicyan>  model> </ansicyan>")
+                )
+                choice = choice.strip()
+                if not choice:
+                    self._print_system_message(
+                        f"Model selection cancelled. Current: `{self._current_model}`"
+                    )
+                    return
+
+                idx = int(choice) - 1
+                if 0 <= idx < len(models):
+                    old_model = self._current_model
+                    self._current_model = models[idx]
+                    self._workflow = self._create_workflow(self._current_model)
+                    self._print_system_message(
+                        f"[kader.green]Model changed from "
+                        f"`{old_model}` to `{self._current_model}`[/kader.green]"
+                    )
+                else:
+                    self.console.print("  [kader.red]✗[/kader.red] Invalid selection.")
+            except (ValueError, EOFError, KeyboardInterrupt):
+                self._print_system_message(
+                    f"Model selection cancelled. Current: `{self._current_model}`"
+                )
+
+        except Exception as e:
+            self.console.print(f"  [kader.red]✗[/kader.red] Error fetching models: {e}")
 
     async def _handle_chat(self, message: str) -> None:
         """Handle regular chat messages with PlannerExecutorWorkflow."""
         if self._is_processing:
-            self.notify("Please wait for the current response...", severity="warning")
+            self.console.print(
+                r"  [kader.yellow]\[!][/kader.yellow] "
+                "Please wait for the current response..."
+            )
             return
 
         self._is_processing = True
-        conversation = self.query_one("#conversation-view", ConversationView)
-        spinner = self.query_one(LoadingSpinner)
-
-        # Disable input while processing
-        prompt_input = self.query_one("#prompt-input", ModeAwareInput)
-        prompt_input.disabled = True
-
-        # Add user message to UI
-        conversation.add_message(message, "user")
-
-        # Show loading spinner
-        spinner.start()
-
-        # Use run_worker to run agent in background without blocking event loop
-        self.run_worker(
-            self._invoke_agent_worker(message),
-            name="agent_worker",
-            exclusive=True,
-        )
-
-    async def _invoke_agent_worker(self, message: str) -> None:
-        """Worker to invoke agent in background."""
-        conversation = self.query_one("#conversation-view", ConversationView)
-        spinner = self.query_one(LoadingSpinner)
+        self._print_user_message(message)
 
         try:
-            # Run the workflow in a dedicated thread pool
+            # Start spinner
+            self._start_spinner()
+
+            # Run the workflow in the dedicated thread pool
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 self._agent_executor, lambda: self._workflow.run(message)
             )
 
-            # Hide spinner and show response (this runs on main thread via await)
-            spinner.stop()
+            # Stop spinner and show response
+            self._stop_spinner()
             if response:
-                conversation.add_message(
+                self._print_assistant_message(
                     response,
-                    "assistant",
                     model_name=self._workflow.planner.provider.model,
                     usage_cost=self._workflow.planner.provider.total_cost.total_cost,
                 )
 
         except Exception as e:
-            spinner.stop()
-            error_msg = f"(-) **Error:** {str(e)}\n\nMake sure the provider for `{self._current_model}` is configured and available."
-            conversation.add_message(error_msg, "assistant")
-            self.notify(f"Error: {e}", severity="error")
+            self._stop_spinner()
+            self.console.print(
+                f"\n  [kader.red]\\[-] Error:[/kader.red] {e}\n"
+                f"  Make sure the provider for `{self._current_model}` "
+                "is configured and available."
+            )
 
         finally:
             self._is_processing = False
-            # Re-enable input and focus
-            try:
-                prompt_input = self.query_one("#prompt-input", ModeAwareInput)
-                prompt_input.disabled = False
-                prompt_input.focus()
-            except Exception:
-                pass
-            # Auto-refresh directory tree in case agent created/modified files
-            self._refresh_directory_tree()
 
     async def _handle_terminal_command(self, command: str) -> None:
         """Handle terminal commands starting with !."""
-        conversation = self.query_one("#conversation-view", ConversationView)
-        spinner = self.query_one(LoadingSpinner)
-
-        # Strip command and whitespace
         cmd = command.strip()
         if not cmd:
             return
 
-        # Disable input while processing
-        prompt_input = self.query_one("#prompt-input", ModeAwareInput)
-        prompt_input.disabled = True
-
-        # Add user message
-        conversation.add_message(f"!{cmd}", "user")
-
-        # Show executing message
-        conversation.add_message(f"[>] Executing: `{cmd}`...", "assistant")
-        conversation.scroll_end()
-        spinner.start()
+        self.console.print(f"\n  [kader.orange]\\[>] Executing:[/kader.orange] `{cmd}`")
 
         try:
-            # executed command
             process = await asyncio.create_subprocess_shell(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
             )
-
             stdout, stderr = await process.communicate()
 
             output = ""
@@ -702,198 +421,126 @@ Please resize your terminal."""
                 output += f"Stderr:\n{stderr.decode().strip()}"
 
             if not output:
-                output = "*Command executed successfully with no output.*"
+                output = "Command executed successfully with no output."
 
-            # Format as code block if it looks like code/data, otherwise plain text
-            if "\n" in output or len(output) > 100:
-                formatted_output = f"```\n{output}\n```"
-            else:
-                formatted_output = output
-
-            conversation.add_message(formatted_output, "assistant")
-            conversation.scroll_end()
+            self.console.print()
+            self.console.print(
+                Panel(
+                    output,
+                    title="[kader.orange]Terminal Output[/kader.orange]",
+                    border_style="dark_orange",
+                    padding=(0, 1),
+                )
+            )
 
         except Exception as e:
-            conversation.add_message(f"(-) Error executing command: {e}", "assistant")
-            conversation.scroll_end()
+            self.console.print(
+                rf"  [kader.red]\[-][/kader.red] Error executing command: {e}"
+            )
 
-        finally:
-            spinner.stop()
-            # Re-enable input and focus
-            prompt_input.disabled = False
-            prompt_input.focus()
-            self._refresh_directory_tree()
-
-    def action_clear(self) -> None:
-        """Clear the conversation (Ctrl+L)."""
-
-        conversation = self.query_one("#conversation-view", ConversationView)
-        conversation.clear_messages()
-        self._workflow.planner.memory.clear()
-        self.notify("Conversation cleared!", severity="information")
-
-    def action_save_session(self) -> None:
-        """Save session (Ctrl+S)."""
-        conversation = self.query_one("#conversation-view", ConversationView)
-        self._handle_save_session(conversation)
-
-    def action_refresh_tree(self) -> None:
-        """Refresh directory tree (Ctrl+R)."""
-        self._refresh_directory_tree()
-        self.notify("Directory tree refreshed!", severity="information")
-
-    def _refresh_directory_tree(self) -> None:
-        """Refresh the directory tree with ASCII symbols."""
-        try:
-            tree = self.query_one("#directory-tree", ASCIITree)
-            tree.clear()
-            tree.root.label = str(Path.cwd().name)
-            self._populate_tree(tree.root, Path.cwd())
-            tree.root.expand()
-        except Exception:
-            pass  # Silently ignore if tree not found
-
-    def _refresh_todo_list(self) -> None:
-        """Refresh the TODO list widget."""
-        try:
-            todo_list = self.query_one("#todo-list", TodoList)
-            # Ensure session ID is set (might have been set during load/save)
-            if self._current_session_id and not todo_list._session_id:
-                todo_list.set_session_id(self._current_session_id)
-            else:
-                todo_list.refresh_todos()
-        except Exception:
-            pass
-
-    def _handle_save_session(self, conversation: ConversationView) -> None:
+    def _handle_save_session(self) -> None:
         """Save the current session."""
         import shutil
 
         from kader.memory.types import get_default_memory_dir
 
         try:
-            # Create a new session if none exists
             if not self._current_session_id:
                 session = self._session_manager.create_session("kader_cli")
                 self._current_session_id = session.session_id
 
-                # Update todo list with new session ID
-                try:
-                    self.query_one("#todo-list", TodoList).set_session_id(
-                        self._current_session_id
-                    )
-                except Exception:
-                    pass
-
-            # Get the planner agent's session directory
             planner_session_dir = (
                 get_default_memory_dir() / "sessions" / self._current_session_id
             )
-
-            # Get the CLI session manager's session directory
             target_session_dir = (
                 self._session_manager.sessions_dir / self._current_session_id
             )
 
-            # Copy the planner's session directory to CLI's session manager
             if planner_session_dir.exists() and self._current_session_id:
-                # Create parent directories if needed
                 target_session_dir.parent.mkdir(parents=True, exist_ok=True)
-
-                # If target exists, remove it first to ensure clean copy
                 if target_session_dir.exists():
                     shutil.rmtree(target_session_dir)
-
-                # Copy the entire session directory
                 shutil.copytree(planner_session_dir, target_session_dir)
 
-            conversation.add_message(
-                f"(+) Session saved!\n\n**Session ID:** `{self._current_session_id}`",
-                "assistant",
+            self._print_system_message(
+                f"[kader.green]Session saved! "
+                f"ID: `{self._current_session_id}`[/kader.green]"
             )
-            self.notify("Session saved!", severity="information")
         except Exception as e:
-            conversation.add_message(f"(-) Error saving session: {e}", "assistant")
-            self.notify(f"Error: {e}", severity="error")
+            self.console.print(f"  [kader.red]✗[/kader.red] Error saving session: {e}")
 
-    def _handle_load_session(
-        self, session_id: str, conversation: ConversationView
-    ) -> None:
+    def _handle_load_session(self, session_id: str) -> None:
         """Load a saved session by ID."""
         try:
-            # Check if session exists
             session = self._session_manager.get_session(session_id)
             if not session:
-                conversation.add_message(
-                    f"(-) Session `{session_id}` not found.\n\nUse `/sessions` to see available sessions.",
-                    "assistant",
+                self.console.print(
+                    rf"  [kader.red]\[-][/kader.red] Session `{session_id}` not found. "
+                    "Use `/sessions` to see available sessions."
                 )
                 return
 
-            # Load conversation history
             messages = self._session_manager.load_conversation(session_id)
-
-            # Clear current state
-            conversation.clear_messages()
             self._workflow.planner.memory.clear()
 
-            # Add loaded messages to memory and UI
             for msg in messages:
                 self._workflow.planner.memory.add_message(msg)
                 role = msg.get("role", "user")
                 content = msg.get("content", "")
                 if role in ["user", "assistant"] and content:
-                    conversation.add_message(content, role)
+                    if role == "user":
+                        self._print_user_message(content)
+                    else:
+                        self._print_assistant_message(content)
 
             self._current_session_id = session_id
-
-            # Update todo list with loaded session ID
-            try:
-                self.query_one("#todo-list", TodoList).set_session_id(
-                    self._current_session_id
-                )
-            except Exception:
-                pass
-
-            conversation.add_message(
-                f"(+) Session `{session_id}` loaded with {len(messages)} messages.",
-                "assistant",
+            self._print_system_message(
+                f"[kader.green]Session `{session_id}` loaded "
+                f"with {len(messages)} messages.[/kader.green]"
             )
-            self.notify("Session loaded!", severity="information")
         except Exception as e:
-            conversation.add_message(f"(-) Error loading session: {e}", "assistant")
-            self.notify(f"Error: {e}", severity="error")
+            self.console.print(f"  [kader.red]✗[/kader.red] Error loading session: {e}")
 
-    def _handle_list_sessions(self, conversation: ConversationView) -> None:
+    def _handle_list_sessions(self) -> None:
         """List all saved sessions."""
         try:
             sessions = self._session_manager.list_sessions()
 
             if not sessions:
-                conversation.add_message(
-                    "[ ] No saved sessions found.\n\nUse `/save` to save the current session.",
-                    "assistant",
+                self.console.print(
+                    "  [dim]No saved sessions found. "
+                    "Use `/save` to save the current session.[/dim]"
                 )
                 return
 
-            lines = [
-                "## Saved Sessions [=]\n",
-                "| Session ID | Created | Updated |",
-                "|------------|---------|---------|",
-            ]
+            table = Table(
+                title="[kader.cyan]Saved Sessions[/kader.cyan]",
+                border_style="cyan",
+                show_header=True,
+                header_style="bold cyan",
+            )
+            table.add_column("Session ID", style="white")
+            table.add_column("Created", style="dim")
+            table.add_column("Updated", style="dim")
+
             for session in sessions:
-                # Shorten UUID for display
-                created = session.created_at[:10]  # Just date
-                updated = session.updated_at[:10]
-                lines.append(f"| `{session.session_id}` | {created} | {updated} |")
+                table.add_row(
+                    session.session_id,
+                    session.created_at[:10],
+                    session.updated_at[:10],
+                )
 
-            lines.append("\n*Use `/load <session_id>` to load a session.*")
-            conversation.add_message("\n".join(lines), "assistant")
+            self.console.print()
+            self.console.print(table)
+            self.console.print(
+                "  [dim]Use `/load <session_id>` to load a session.[/dim]"
+            )
         except Exception as e:
-            conversation.add_message(f"❌ Error listing sessions: {e}", "assistant")
-            self.notify(f"Error: {e}", severity="error")
+            self.console.print(
+                rf"  [kader.red]\[-][/kader.red] Error listing sessions: {e}"
+            )
 
-    def _handle_skills(self, conversation: ConversationView) -> None:
+    def _handle_skills(self) -> None:
         """Handle the /skills command to display loaded skills."""
         try:
             from kader.tools.skills import SkillLoader
@@ -902,53 +549,218 @@ Please resize your terminal."""
             skills = loader.list_skills()
 
             if not skills:
-                conversation.add_message(
-                    "## Loaded Skills\n\n*No skills found in `~/.kader/skills` or `./.kader/skills`*",
-                    "assistant",
+                self.console.print(
+                    "  [dim]No skills found in `~/.kader/skills` "
+                    "or `./.kader/skills`[/dim]"
                 )
             else:
-                lines = ["## Loaded Skills\n"]
-                for s in skills:
-                    lines.append(f"- **{s.name}**: {s.description}")
-                conversation.add_message("\n".join(lines), "assistant")
-        except Exception as e:
-            conversation.add_message(f"(-) Error loading skills: {e}", "assistant")
+                table = Table(
+                    title="[kader.cyan]Loaded Skills[/kader.cyan]",
+                    border_style="cyan",
+                    show_header=True,
+                    header_style="bold cyan",
+                )
+                table.add_column("Name", style="bold white")
+                table.add_column("Description", style="dim")
 
-    def _handle_cost(self, conversation: ConversationView) -> None:
+                for s in skills:
+                    table.add_row(s.name, s.description)
+
+                self.console.print()
+                self.console.print(table)
+        except Exception as e:
+            self.console.print(f"  [kader.red]✗[/kader.red] Error loading skills: {e}")
+
+    def _handle_cost(self) -> None:
         """Display LLM usage costs."""
         try:
-            # Get cost and usage from the provider
             cost = self._workflow.planner.provider.total_cost
             usage = self._workflow.planner.provider.total_usage
             model = self._workflow.planner.provider.model
 
-            lines = [
-                "## Usage Costs ($)\n",
-                f"**Model:** `{model}`\n",
-                "### Cost Breakdown",
-                "| Type | Amount |",
-                "|------|--------|",
-                f"| Input Cost | ${cost.input_cost:.6f} |",
-                f"| Output Cost | ${cost.output_cost:.6f} |",
-                f"| **Total Cost** | **${cost.total_cost:.6f}** |",
-                "",
-                "### Token Usage",
-                "| Type | Tokens |",
-                "|------|--------|",
-                f"| Prompt Tokens | {usage.prompt_tokens:,} |",
-                f"| Completion Tokens | {usage.completion_tokens:,} |",
-                f"| **Total Tokens** | **{usage.total_tokens:,}** |",
-            ]
+            table = Table(
+                title=f"[kader.cyan]Usage Costs — {model}[/kader.cyan]",
+                border_style="cyan",
+                show_header=True,
+                header_style="bold cyan",
+            )
+            table.add_column("Metric", style="white")
+            table.add_column("Value", justify="right", style="bold")
+
+            table.add_row("Input Cost", f"${cost.input_cost:.6f}")
+            table.add_row("Output Cost", f"${cost.output_cost:.6f}")
+            table.add_row(
+                "[bold]Total Cost[/bold]",
+                f"[kader.green]${cost.total_cost:.6f}[/kader.green]",
+            )
+            table.add_row("", "")
+            table.add_row("Prompt Tokens", f"{usage.prompt_tokens:,}")
+            table.add_row("Completion Tokens", f"{usage.completion_tokens:,}")
+            table.add_row(
+                "[bold]Total Tokens[/bold]",
+                f"[bold]{usage.total_tokens:,}[/bold]",
+            )
+
+            self.console.print()
+            self.console.print(table)
 
             if cost.total_cost == 0.0:
-                lines.append(
-                    "\n> (!) *Note: Ollama runs locally, so there are no API costs.*"
-                )
-
-            conversation.add_message("\n".join(lines), "assistant")
+                self.console.print("  [dim]ℹ Ollama runs locally — no API costs.[/dim]")
         except Exception as e:
-            conversation.add_message(f"(-) Error getting costs: {e}", "assistant")
-            self.notify(f"Error: {e}", severity="error")
+            self.console.print(f"  [kader.red]✗[/kader.red] Error getting costs: {e}")
+
+    # ── Update check ─────────────────────────────────────────────────
+
+    def _check_for_updates(self) -> None:
+        """Check for package updates in background thread."""
+        try:
+            from outdated import check_outdated
+
+            current_version = get_version("kader")
+            is_outdated, latest_version = check_outdated("kader", current_version)
+
+            if is_outdated:
+                self._update_info = latest_version
+        except Exception:
+            pass
+
+    def _show_update_notification(self) -> None:
+        """Show update notification if available."""
+        if not self._update_info:
+            return
+        try:
+            current = get_version("kader")
+            self.console.print(
+                rf"  [kader.yellow]\[^] Update available! "
+                f"v{current} -> v{self._update_info} — "
+                f"Run: uv tool upgrade kader[/kader.yellow]"
+            )
+        except Exception:
+            pass
+
+    # ── Welcome banner ───────────────────────────────────────────────
+
+    def _print_welcome(self) -> None:
+        """Print the welcome banner."""
+        try:
+            version = get_version("kader")
+        except Exception:
+            version = "?"
+
+        self.console.print(WELCOME_BANNER)
+        self.console.print(
+            f"  [dim]v{version} · "
+            f"Model: {self._current_model} · "
+            f"Type /help for commands[/dim]\n"
+        )
+
+    # ── Main loop ────────────────────────────────────────────────────
+
+    def _get_prompt_text(self) -> HTML:
+        """Get the styled prompt text."""
+        return HTML("<ansimagenta><b>[>] </b></ansimagenta>")
+
+    def _get_confirmation_prompt(self) -> HTML:
+        """Get the confirmation prompt text."""
+        return HTML("<ansiyellow><b>  Approve? [Y/n/reason]: </b></ansiyellow>")
+
+    async def _run_async(self) -> None:
+        """Async main loop."""
+        self._print_welcome()
+
+        # Background update check
+        threading.Thread(target=self._check_for_updates, daemon=True).start()
+
+        # Show update notification after a short delay
+        await asyncio.sleep(2)
+        self._show_update_notification()
+
+        while self._running:
+            try:
+                # Check if we need to handle a tool confirmation
+                if getattr(self, "_awaiting_confirmation", False):
+                    self._awaiting_confirmation = False
+                    with patch_stdout():
+                        answer = await self._prompt_session.prompt_async(
+                            self._get_confirmation_prompt()
+                        )
+                    answer = answer.strip().lower()
+
+                    if answer in ("", "y", "yes"):
+                        self._confirmation_result = (True, None)
+                        self._print_system_message(
+                            "[kader.green][+] Approved — executing tool...[/kader.green]"
+                        )
+                        if self._confirmation_event:
+                            self._confirmation_event.set()
+                    elif answer in ("n", "no"):
+                        self.console.print(
+                            "  [kader.red][-] Rejected.[/kader.red] "
+                            "Please provide context for the rejection:"
+                        )
+                        with patch_stdout():
+                            context = await self._prompt_session.prompt_async(
+                                HTML("<ansired><b>  reason> </b></ansired>")
+                            )
+                        self._confirmation_result = (False, context.strip() or None)
+                        if self._confirmation_event:
+                            self._confirmation_event.set()
+                    else:
+                        # Treat as rejection with the text as the reason
+                        self._confirmation_result = (False, answer)
+                        if self._confirmation_event:
+                            self._confirmation_event.set()
+                    continue
+
+                # Normal input
+                with patch_stdout():
+                    user_input = await self._prompt_session.prompt_async(
+                        self._get_prompt_text()
+                    )
+
+                user_input = user_input.strip()
+                if not user_input:
+                    continue
+
+                # Check if awaiting rejection context
+                if self._awaiting_rejection_context:
+                    self._awaiting_rejection_context = False
+                    self._confirmation_result = (False, user_input)
+                    if self._confirmation_event:
+                        self._confirmation_event.set()
+                    continue
+
+                # Route input
+                if user_input.startswith("/"):
+                    await self._handle_command(user_input)
+                elif user_input.startswith("!"):
+                    await self._handle_terminal_command(user_input[1:])
+                else:
+                    await self._handle_chat(user_input)
+
+            except KeyboardInterrupt:
+                self.console.print(
+                    "\n  [dim]Press Ctrl+C again to exit, or type /exit[/dim]"
+                )
+                try:
+                    with patch_stdout():
+                        await self._prompt_session.prompt_async(self._get_prompt_text())
+                except (KeyboardInterrupt, EOFError):
+                    self._running = False
+                    self.console.print("  [kader.muted]Goodbye! 👋[/kader.muted]")
+
+            except EOFError:
+                self._running = False
+                self.console.print("  [kader.muted]Goodbye! 👋[/kader.muted]")
+
+    def run(self) -> None:
+        """Run the Kader CLI application."""
+        try:
+            asyncio.run(self._run_async())
+        except KeyboardInterrupt:
+            self.console.print("\n  [kader.muted]Goodbye! 👋[/kader.muted]")
+        finally:
+            self._stop_spinner()
 
 
 def main() -> None:
