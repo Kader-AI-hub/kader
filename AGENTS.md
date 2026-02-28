@@ -34,9 +34,6 @@ uv run ruff format --check .
 
 # Run the CLI
 uv run python -m cli
-
-# Run CLI with hot reload (for development)
-uv run textual run --dev cli.app:KaderApp
 ```
 
 ## Code Style Guidelines
@@ -162,5 +159,5 @@ ignore = ["E501"]
 ### Special Files
 - `.kader/` directory in home: Stores config, sessions, memory
 - `~/.kader/.env`: API keys and environment variables
-- `app.tcss`: Textual CSS for CLI styling
+- Rich library used for CLI terminal output formatting
 - `uv.lock`: Dependency lock file (do not edit manually)

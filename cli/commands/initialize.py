@@ -26,86 +26,76 @@ class InitializeCommand(BaseCommand):
         Creates .kader directory and generates KADER.md using an AgentTool
         with the current session's LLM provider.
         """
-        from ..widgets import ConversationView
-
-        conversation = self.app.query_one("#conversation-view", ConversationView)
+        console = self.app.console
 
         # Step 1: Create .kader directory
         kader_dir = Path.cwd() / ".kader"
         try:
             kader_dir.mkdir(exist_ok=True)
-            conversation.add_message(
-                f"[>] Created directory: `{kader_dir}`", "assistant"
+            console.print(
+                f"  [kader.cyan]▶[/kader.cyan] Created directory: `{kader_dir}`"
             )
         except Exception as e:
-            conversation.add_message(
-                f"(-) Failed to create directory: {e}", "assistant"
-            )
+            console.print(f"  [kader.red]✗[/kader.red] Failed to create directory: {e}")
             return
 
         # Step 2: Check if KADER.md already exists
         kader_md_path = kader_dir / "KADER.md"
         if kader_md_path.exists():
-            conversation.add_message(
-                f"(!) KADER.md already exists at `{kader_md_path}`", "assistant"
+            console.print(
+                f"  [kader.yellow][!][/kader.yellow] "
+                f"KADER.md already exists at `{kader_md_path}`"
             )
-            conversation.add_message(
-                "[>] Re-generating KADER.md with updated analysis...", "assistant"
+            console.print(
+                "  [kader.cyan]▶[/kader.cyan] "
+                "Re-generating KADER.md with updated analysis..."
             )
 
         # Step 3: Use AgentTool to generate KADER.md content
-        conversation.add_message(
-            "[>] Analyzing codebase and generating KADER.md...", "assistant"
+        console.print(
+            "  [kader.cyan]▶[/kader.cyan] Analyzing codebase and generating KADER.md..."
         )
 
         try:
-            # Get the current provider from the workflow
             provider = self.app._workflow.planner.provider
             model_name = self.app._current_model
 
-            # Create the prompt for the agent - this IS the task
             prompt = InitCommandPrompt()
             task = str(prompt)
 
-            # Create AgentTool with the current provider and model
             agent_tool = AgentTool(
                 name="init_agent",
                 description="Agent to initialize KADER.md by analyzing codebase",
                 provider=provider,
                 model_name=model_name,
-                interrupt_before_tool=False,  # Auto-execute tools for init
+                interrupt_before_tool=False,
                 tool_confirmation_callback=self._tool_confirmation_callback,
             )
 
-            # Set the session ID for the agent tool
             if self.app._current_session_id:
                 agent_tool.set_session_id(self.app._current_session_id)
 
-            # Context provides additional information about the working directory
             context = (
                 f"Working directory: {Path.cwd()}\n"
                 f"Target file: {kader_md_path}\n"
-                f"Use filesystem tools to explore the codebase and create the KADER.md file."
+                f"Use filesystem tools to explore the codebase "
+                f"and create the KADER.md file."
             )
 
-            # Run agent execution in executor to avoid blocking
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(
                 self.app._agent_executor,
                 lambda: agent_tool.execute(task=task, context=context),
             )
 
-            conversation.add_message(
-                f"(+) Successfully created KADER.md at `{kader_md_path}`",
-                "assistant",
+            console.print(
+                f"  [kader.green]✓[/kader.green] "
+                f"Successfully created KADER.md at `{kader_md_path}`"
             )
 
-            # Show preview of the result
+            # Show preview
             preview = result[:500] + "..." if len(result) > 500 else result
-            conversation.add_message(f"```markdown\n{preview}\n```", "assistant")
-
-            self.app.notify("KADER.md created successfully!", severity="information")
+            console.print(f"\n```markdown\n{preview}\n```")
 
         except Exception as e:
-            conversation.add_message(f"(-) Error generating KADER.md: {e}", "assistant")
-            self.app.notify(f"Error: {e}", severity="error")
+            console.print(f"  [kader.red]✗[/kader.red] Error generating KADER.md: {e}")

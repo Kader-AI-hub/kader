@@ -1,20 +1,18 @@
 # Kader CLI
 
-A modern terminal-based AI coding assistant built with Python's [Textual](https://textual.textualize.io/) framework, powered by **ReActAgent** with tool execution capabilities.
+A modern terminal-based AI coding assistant built with [Rich](https://github.com/Textualize/rich) and [prompt_toolkit](https://python-prompt-toolkit.readthedocs.io/), powered by **PlannerExecutorWorkflow** with tool execution capabilities.
 
 ## Features
 
-- 🤖 **ReAct Agent** - Intelligent agent with reasoning and tool execution
-- 🛠️ **Built-in Tools** - File system, command execution, web search
-- 📁 **Directory Tree** - Auto-refreshing sidebar showing current working directory
-- 💬 **Conversation View** - Markdown-rendered chat history
-- 💾 **Session Persistence** - Save and load conversation sessions
-- 🎨 **Color Themes** - 4 themes (dark, ocean, forest, sunset)
-- 🔧 **Tool Confirmation** - Interactive approval for tool execution
-- 🤖 **Model Selection** - Dynamic model switching interface
-- 📝 **File Operations** - Integrated file system tools for coding tasks
-- ☁️ **Multi-Provider Support** - Ollama, Google Gemini, Anthropic, Mistral, OpenAI, Moonshot (Kimi), Z.ai (GLM), OpenRouter, OpenCode, Groq
-- 🖥️ **CLI Message Display** - Enhanced display showing agent reasoning and tool execution
+- 🤖 **Planner-Executor Workflow** — Intelligent agent with reasoning, planning, and tool execution
+- 🛠️ **Built-in Tools** — File system, command execution, web search
+- 💬 **Rich Conversation** — Beautiful markdown-rendered chat with styled panels
+- 💾 **Session Persistence** — Save and load conversation sessions
+- 🔧 **Tool Confirmation** — Interactive approval for tool execution
+- 🤖 **Model Selection** — Dynamic model switching interface
+- 📝 **File Operations** — Integrated file system tools for coding tasks
+- ☁️ **Multi-Provider Support** — Ollama, Google Gemini, Anthropic, Mistral, OpenAI, Moonshot (Kimi), Z.ai (GLM), OpenRouter, OpenCode, Groq
+- 🖥️ **CLI Message Display** — Enhanced display showing agent reasoning and tool execution
 
 ## Prerequisites
 
@@ -58,36 +56,23 @@ python -m cli
 | Command | Description |
 |---------|-------------|
 | `/help` | Show command reference |
-| `/models` | Show available Ollama models |
-| `/theme` | Cycle color themes |
+| `/models` | Show and switch available models |
 | `/clear` | Clear conversation |
 | `/save` | Save current session |
 | `/load <id>` | Load a saved session |
 | `/sessions` | List saved sessions |
 | `/skills` | List loaded skills |
-| `/refresh` | Refresh file tree |
 | `/cost` | Show usage costs |
+| `/init` | Initialize .kader directory with KADER.md |
 | `/exit` | Exit the CLI |
+| `!cmd` | Run terminal command |
 
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+Q` | Quit |
-| `Ctrl+L` | Clear conversation |
-| `Ctrl+T` | Cycle theme |
-| `Ctrl+S` | Save session |
-| `Ctrl+R` | Refresh file tree |
-| `Tab` | Navigate panels |
-
-## Input Editing
-
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+C` | Copy selected text |
-| `Ctrl+V` | Paste from clipboard |
-| `Ctrl+A` | Select all text |
-| Click+Drag | Select text |
+| `Ctrl+C` | Cancel current operation |
+| `Ctrl+D` | Exit the CLI |
 
 ## Session Management
 
@@ -102,13 +87,13 @@ Sessions are saved to `~/.kader/sessions/`. Use:
 Kader includes an interactive tool confirmation system that prompts for approval before executing tools. This provides:
 
 - Safe execution of potentially destructive operations
-- Interactive approval with arrow keys and Enter
-- Quick confirmation with Y/N keys
+- Simple `[Y/n/reason]` prompt for quick approval
+- Ability to provide context when rejecting a tool
 - Visual feedback during tool execution
 
 ## Skills System
 
-Kader supports skills - specialized instructions for specific domains or tasks. Skills are loaded from:
+Kader supports skills — specialized instructions for specific domains or tasks. Skills are loaded from:
 
 - `~/.kader/skills/` (user-level skills)
 - `./.kader/skills/` (project-level skills)
@@ -126,31 +111,28 @@ description: Expert in Python programming and best practices
 You are an expert Python developer...
 ```
 
-Agents can load skills dynamically using the SkillsTool to get specialized instructions for specific domains.
-
 ## Model Selection Interface
 
 The model selection interface allows you to:
 
-- Browse available Ollama models
+- Browse all available models from configured providers
 - Switch models on the fly during conversation
-- See which models are currently installed
+- See which model is currently active
 - Cancel selection without changing the current model
 
 ## Project Structure
 
 ```
 cli/
-├── app.py          # Main application (ReActAgent integration)
-├── app.tcss        # Styles (TCSS)
+├── app.py          # Main application (Rich + prompt_toolkit)
 ├── utils.py        # Constants and helpers
+├── llm_factory.py  # Multi-provider LLM factory
 ├── __init__.py     # Package exports
 ├── __main__.py     # Entry point
-└── widgets/        # Custom UI components
+└── commands/       # CLI command handlers
     ├── __init__.py
-    ├── conversation.py  # Chat display
-    ├── loading.py       # Spinner animation
-    └── confirmation.py  # Tool and model selection widgets
+    ├── base.py          # Base command class
+    └── initialize.py    # /init command
 ```
 
 ## Changing the Model
@@ -192,14 +174,6 @@ export OPENCODE_API_KEY="your-opencode-api-key"
 export GROQ_API_KEY="your-groq-api-key"
 ```
 
-## Development
-
-Run with live CSS reloading:
-
-```bash
-uv run textual run --dev cli.app:KaderApp
-```
-
 ## Configuration
 
 Kader automatically creates a `.kader` directory in your home directory on first run. This stores:
@@ -212,15 +186,14 @@ Kader automatically creates a `.kader` directory in your home directory on first
 
 ### Common Issues
 
-- **No models found**: Make sure Ollama is running and you have at least one model installed (e.g., `ollama pull minimax-m2.5:cloud`)
-- **Connection errors**: Verify that Ollama service is accessible at the configured endpoint
-- **Theme not changing**: Some terminal emulators may not support all color themes
+- **No models found**: Make sure your provider is configured and API keys are set
+- **Connection errors**: Verify that the provider service is accessible
+- **Import errors**: Run `uv sync` to ensure all dependencies are installed
 
 ### Debugging
 
 If you encounter issues:
 
-1. Check that Ollama is running: `ollama serve`
-2. Verify your model is pulled: `ollama list`
-3. Ensure your terminal supports the required features
-4. Check the logs for specific error messages
+1. Check that your provider is configured: API keys set or Ollama running
+2. Verify your model is available: `/models` to list
+3. Check the logs for specific error messages
