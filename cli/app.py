@@ -78,11 +78,8 @@ class KaderApp:
             MemoryConfig(memory_dir=Path.home() / ".kader")
         )
 
-        # Tool confirmation coordination
-        self._confirmation_event: Optional[threading.Event] = None
-        self._confirmation_result: tuple[bool, Optional[str]] = (True, None)
+        # Update check state
         self._update_info: Optional[str] = None
-        self._awaiting_rejection_context: bool = False
 
         # Spinner state for Live display
         self._spinner_live: Optional[Live] = None
@@ -144,7 +141,11 @@ class KaderApp:
         self._start_spinner()
 
     def _tool_confirmation_callback(self, message: str) -> tuple[bool, Optional[str]]:
-        """Callback for tool confirmation - called from agent thread."""
+        """Callback for tool confirmation - called from agent thread.
+
+        Prompts the user directly via synchronous input since this runs
+        in the agent thread while the main loop is blocked on chat input.
+        """
         self._stop_spinner()
         self.console.print()
         self.console.print(
@@ -155,21 +156,37 @@ class KaderApp:
                 padding=(0, 1),
             )
         )
+        self.console.print(
+            "  [kader.yellow]Approve? [Y/n/reason]:[/kader.yellow] ", end=""
+        )
 
-        # Set up synchronization
-        self._confirmation_event = threading.Event()
-        self._confirmation_result = (True, None)
+        try:
+            answer = input().strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            answer = "n"
 
-        # Prompt for confirmation in the main thread context
-        # We use an event to wait for the answer from the input loop
-        self._awaiting_confirmation = True
-
-        # Wait for user response (blocking in agent thread)
-        if not self._confirmation_event.wait(timeout=300):
-            return (False, "Tool confirmation timed out after 5 minutes")
-
-        self._start_spinner()
-        return self._confirmation_result
+        if answer in ("", "y", "yes"):
+            self._print_system_message(
+                "[kader.green][+] Approved -- executing tool...[/kader.green]"
+            )
+            self._start_spinner()
+            return (True, None)
+        elif answer in ("n", "no"):
+            self.console.print(
+                "  [kader.red][-] Rejected.[/kader.red] "
+                "Please provide context for the rejection:"
+            )
+            self.console.print("  [kader.red]reason> [/kader.red] ", end="")
+            try:
+                context = input().strip()
+            except (EOFError, KeyboardInterrupt):
+                context = ""
+            self._start_spinner()
+            return (False, context or None)
+        else:
+            # Treat typed text as rejection reason
+            self._start_spinner()
+            return (False, answer)
 
     # ── Spinner helpers ───────────────────────────────────────────────
 
@@ -660,10 +677,6 @@ class KaderApp:
         """Get the styled prompt text."""
         return HTML("<ansimagenta><b>[>] </b></ansimagenta>")
 
-    def _get_confirmation_prompt(self) -> HTML:
-        """Get the confirmation prompt text."""
-        return HTML("<ansiyellow><b>  Approve? [Y/n/reason]: </b></ansiyellow>")
-
     async def _run_async(self) -> None:
         """Async main loop."""
         self._print_welcome()
@@ -677,41 +690,6 @@ class KaderApp:
 
         while self._running:
             try:
-                # Check if we need to handle a tool confirmation
-                if getattr(self, "_awaiting_confirmation", False):
-                    self._awaiting_confirmation = False
-                    with patch_stdout():
-                        answer = await self._prompt_session.prompt_async(
-                            self._get_confirmation_prompt()
-                        )
-                    answer = answer.strip().lower()
-
-                    if answer in ("", "y", "yes"):
-                        self._confirmation_result = (True, None)
-                        self._print_system_message(
-                            "[kader.green][+] Approved — executing tool...[/kader.green]"
-                        )
-                        if self._confirmation_event:
-                            self._confirmation_event.set()
-                    elif answer in ("n", "no"):
-                        self.console.print(
-                            "  [kader.red][-] Rejected.[/kader.red] "
-                            "Please provide context for the rejection:"
-                        )
-                        with patch_stdout():
-                            context = await self._prompt_session.prompt_async(
-                                HTML("<ansired><b>  reason> </b></ansired>")
-                            )
-                        self._confirmation_result = (False, context.strip() or None)
-                        if self._confirmation_event:
-                            self._confirmation_event.set()
-                    else:
-                        # Treat as rejection with the text as the reason
-                        self._confirmation_result = (False, answer)
-                        if self._confirmation_event:
-                            self._confirmation_event.set()
-                    continue
-
                 # Normal input
                 with patch_stdout():
                     user_input = await self._prompt_session.prompt_async(
@@ -720,14 +698,6 @@ class KaderApp:
 
                 user_input = user_input.strip()
                 if not user_input:
-                    continue
-
-                # Check if awaiting rejection context
-                if self._awaiting_rejection_context:
-                    self._awaiting_rejection_context = False
-                    self._confirmation_result = (False, user_input)
-                    if self._confirmation_event:
-                        self._confirmation_event.set()
                     continue
 
                 # Route input
