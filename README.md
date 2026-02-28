@@ -8,9 +8,9 @@ Kader is an intelligent coding agent designed to assist with software developmen
   - **Ollama**: Local LLM execution for privacy and speed.
   - **Google Gemini**: Cloud-based powerful models via the Google GenAI SDK.
   - **Anthropic**: High-quality Claude models via the Anthropic SDK.
-- 🖥️ **Interactive CLI** - Modern TUI interface built with Textual:
-  - **Lazy Loading**: Efficient directory tree loading for large projects.
-  - **TODO Management**: Integrated TODO list widget with automatic updates.
+- 🖥️ **Interactive CLI** - Modern terminal interface built with Rich & prompt_toolkit:
+  - **Beautiful Output**: Markdown rendering, styled panels, and dynamic tables.
+  - **Interactive Tools**: Built-in interactive prompts for model selection and tool confirmation.
 - 🛠️ **Tool Integration** - File system, command execution, web search, and more.
 - 🧠 **Memory Management** - State persistence, conversation history, and isolated sub-agent memory.
 - 🔁 **Session Management** - Save and load conversation sessions.
@@ -75,9 +75,8 @@ Once the CLI is running:
 
 1. Type any question to start chatting with the agent.
 2. Use `/help` to see available commands.
-3. Use `/models` to check available models from all providers.
-4. The directory tree on the left features **lazy loading**, expanding only when needed.
-5. The **TODO list** on the right tracks tasks identified by the planner.
+3. Use `/models` to check and interactively switch available models.
+4. Run terminal commands directly by prefixing with `!` (e.g. `!ls -la`).
 
 ## Configuration
 
@@ -109,32 +108,31 @@ Kader stores data in `~/.kader/`:
 | `/save` | Save current session |
 | `/load <id>` | Load a saved session |
 | `/sessions` | List saved sessions |
-| `/refresh` | Refresh file tree |
+| `/skills` | List loaded skills |
+| `/cost` | Show usage costs |
+| `/init` | Initialize .kader directory with KADER.md |
 | `/exit` | Exit the CLI |
+| `!cmd` | Run terminal command |
 
 ### Keyboard Shortcuts
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+Q` | Quit |
-| `Ctrl+L` | Clear conversation |
-| `Ctrl+S` | Save session |
-| `Ctrl+R` | Refresh file tree |
-| `Tab` | Navigate panels |
+| `Ctrl+C` | Cancel current operation |
+| `Ctrl+D` | Exit the CLI |
 
 ## Project Structure
 
 ```
 kader/
 ├── cli/                    # Interactive command-line interface
-│   ├── app.py             # Main application entry point
-│   ├── app.tcss           # Textual CSS for styling
+│   ├── app.py             # Main application entry point (Rich + prompt_toolkit)
+│   ├── utils.py           # Constants and helpers
 │   ├── llm_factory.py     # Provider selection logic
-│   ├── widgets/           # Custom Textual widgets
-│   │   ├── conversation.py # Chat display widget
-│   │   ├── loading.py     # Loading spinner widget
-│   │   ├── confirmation.py # Tool/model selection widgets
-│   │   └── todo_list.py    # TODO tracking widget
+│   ├── __init__.py        # Package exports
+│   └── commands/          # CLI command handlers
+│       ├── base.py        # Base command class
+│       └── initialize.py  # /init command
 │   └── README.md          # CLI documentation
 ├── examples/              # Example implementations
 │   ├── memory_example.py  # Memory management examples
@@ -252,8 +250,8 @@ cd kader
 # Install in development mode with uv
 uv sync
 
-# Run the CLI with hot reload for development
-uv run textual run --dev cli.app:KaderApp
+# Run the CLI
+uv run python -m cli
 ```
 
 ### Running Tests
@@ -328,7 +326,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Acknowledgments
 
-- Built with [Textual](https://textual.textualize.io/) for the beautiful CLI interface.
+- Built with [Rich](https://github.com/Textualize/rich) and [prompt_toolkit](https://python-prompt-toolkit.readthedocs.io/) for the beautiful CLI interface.
 - Uses [Ollama](https://ollama.ai/) for local LLM execution.
 - Powered by [Google Gemini](https://ai.google.dev/) for advanced cloud-based reasoning.
 - Enhanced by [Anthropic Claude](https://www.anthropic.com/) for high-quality coding assistance.
