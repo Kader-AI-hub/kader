@@ -17,6 +17,7 @@ from kader.memory.types import get_default_memory_dir
 from kader.prompts import KaderPlannerPrompt
 from kader.providers.base import BaseLLMProvider, Message
 from kader.tools import AgentTool, TodoTool, ToolRegistry
+from kader.tools.filesys import GlobTool, GrepTool, ReadDirectoryTool, ReadFileTool
 from kader.utils import Checkpointer
 
 from .base import BaseWorkflow
@@ -115,11 +116,17 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         return None
 
     def _build_planner(self) -> PlanningAgent:
-        """Build the PlanningAgent with TodoTool and AgentTool(s)."""
+        """Build the PlanningAgent with TodoTool, file system tools, and AgentTool(s)."""
         registry = ToolRegistry()
 
         # TodoTool is added implicitly by PlanningAgent, but we ensure it's there
         registry.register(TodoTool())
+
+        # Add reading and file system search tools
+        registry.register(ReadFileTool())
+        registry.register(ReadDirectoryTool())
+        registry.register(GlobTool())
+        registry.register(GrepTool())
 
         # Add AgentTool(s) for sub-task delegation
         for executor_name in self.executor_names:
