@@ -39,9 +39,6 @@ uv run pytest -v
 
 # Run the CLI
 uv run python -m cli
-
-# Run CLI with hot reload (for development)
-uv run textual run --dev cli.app:KaderApp
 ```
 
 ### Linting and Formatting
@@ -103,14 +100,16 @@ kader/
 ├── kader/                # Core framework (agents, providers, tools, memory)
 │   ├── agent/            # Agent implementations (Planning, ReAct)
 │   ├── memory/           # Memory management & persistence
-│   ├── providers/        # LLM providers (Ollama, Google, Mistral)
+│   ├── providers/       # LLM providers (Ollama, Google, Mistral, Anthropic)
 │   ├── tools/            # Tools (File System, Web, Command, AgentTool)
 │   ├── prompts/          # Prompt templates
-│   └── utils/            # Utilities (Checkpointer, ContextAggregator)
+│   ├── utils/            # Utilities (Checkpointer, ContextAggregator)
+│   └── workflows/        # Workflow executors (PlannerExecutorWorkflow)
 ├── cli/                  # Interactive CLI implementation
-│   ├── app.py            # Main application entry point
-│   ├── widgets/          # Custom Textual widgets
-│   └── commands/         # CLI commands
+│   ├── app.py            # Main application (Rich + prompt_toolkit)
+│   ├── commands/        # CLI commands (initialize, base)
+│   ├── llm_factory.py    # LLM provider factory
+│   └── utils.py          # CLI utilities and constants
 ├── tests/                # Test files mirroring source structure
 │   ├── providers/
 │   ├── tools/
@@ -120,12 +119,47 @@ kader/
 └── uv.lock              # Dependency lock file
 ```
 
+## CLI Commands
+
+The Kader CLI supports these commands:
+
+| Command | Description |
+|---------|-------------|
+| `/models` | Show and switch LLM models |
+| `/help` | Show help message |
+| `/clear` | Clear the conversation |
+| `/save` | Save current session |
+| `/load <id>` | Load a saved session |
+| `/sessions` | List saved sessions |
+| `/skills` | List loaded skills |
+| `/cost` | Show usage costs |
+| `/init` | Initialize .kader directory |
+| `/exit` | Exit the CLI |
+| `!cmd` | Run terminal command |
+
+## LLM Providers
+
+The CLI supports multiple LLM providers via the factory pattern:
+
+- **ollama**: Local models via Ollama (default)
+- **google**: Google Gemini models
+- **mistral**: Mistral AI models
+- **anthropic**: Anthropic Claude models
+- **openai**: OpenAI models (GPT-4, GPT-4o)
+- **moonshot**: Moonshot AI models (kimi)
+- **zai**: Z.ai models (GLM)
+- **openrouter**: OpenRouter models (200+ models)
+- **opencode**: OpenCode Zen models
+- **groq**: Groq models (ultra-fast inference)
+
+Model format: `provider:model` (e.g., `google:gemini-2.5-flash`, `ollama:llama3`)
+
 ## Important Notes
 
 - **Never edit `uv.lock` manually** - This is an auto-generated dependency lock file
 - **Store API keys in `~/.kader/.env`** - LLM providers require API keys in this location
 - **Configuration directory**: `.kader/` in home stores config, sessions, and memory
-- **CLI styling**: `app.tcss` contains Textual CSS for CLI styling
+- **CLI uses Rich + prompt_toolkit** - The CLI renders beautiful terminal output using Rich library
 
 ## Testing Requirements
 
