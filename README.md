@@ -43,6 +43,18 @@ uv sync
 uv run python -m cli
 ```
 
+### Using uv tool
+
+With uv tool, you can install Kader globally and run it directly with the `kader` command:
+
+```bash
+# Install Kader globally using uv tool
+uv tool install kader
+
+# Run the CLI
+kader
+```
+
 ### Using pip
 
 ```bash
