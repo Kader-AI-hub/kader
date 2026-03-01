@@ -173,9 +173,87 @@ class CommandExecutorTool(BaseTool[str]):
 
         return True, ""
 
+    def _stream_command_output(self, command: str, timeout: int) -> tuple[int, str]:
+        """
+        Streams the output of a shell command and collects it.
+
+        Args:
+            command: The command to execute
+            timeout: Timeout in seconds
+
+        Returns:
+            Tuple of (return_code, captured_output)
+        """
+        import time
+        from queue import Empty, Queue
+        from threading import Thread
+
+        # Prepare kwargs for Popen based on OS
+        kwargs = {
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.STDOUT,
+            "text": True,
+            "shell": True,
+        }
+
+        if self._host_os != "windows":
+            kwargs["executable"] = self._shell
+
+        process = subprocess.Popen(command, **kwargs)
+        captured_output = []
+
+        # Use a queue to capture output asynchronously for timeout handling
+        q = Queue()
+
+        def enqueue_output(out, queue):
+            for line in out:
+                queue.put(line)
+            try:
+                out.close()
+            except AttributeError:
+                pass  # mock lists in tests might not have close()
+
+        t = Thread(target=enqueue_output, args=(process.stdout, q))
+        t.daemon = True
+        t.start()
+
+        start_time = time.time()
+
+        while True:
+            # Check for timeout
+            if timeout > 0 and time.time() - start_time > timeout:
+                process.terminate()
+                try:
+                    process.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                raise subprocess.TimeoutExpired(
+                    command, timeout, "".join(captured_output).encode()
+                )
+
+            try:
+                # Read line with a short timeout to allow checking overall execution timeout
+                line = q.get(timeout=0.1)
+
+                # Collect output
+                captured_output.append(line)
+            except Empty:
+                # Queue is empty, check if process indicates it's done
+                # Note: t.is_alive() is checked because poll() might return before stdout is fully read
+                if process.poll() is not None and not t.is_alive():
+                    break
+
+        # Ensure thread finished
+        t.join(timeout=1)
+
+        # Ensure process finished
+        process.wait()
+
+        return process.returncode, "".join(captured_output).strip()
+
     def execute(self, command: str, timeout: int = 30) -> str:
         """
-        Execute a command on the host system.
+        Execute a command on the host system and stream its output.
 
         Args:
             command: The command to execute
@@ -190,39 +268,19 @@ class CommandExecutorTool(BaseTool[str]):
             if not is_valid:
                 return f"Validation Error: {reason}"
 
-            # Execute the command
-            if self._host_os == "windows":
-                # On Windows, use shell=True to allow for more complex commands
-                result = subprocess.run(
-                    command, shell=True, capture_output=True, text=True, timeout=timeout
-                )
-            else:
-                # On Unix-like systems, use the appropriate shell
-                result = subprocess.run(
-                    command,
-                    shell=True,  # Using shell=True to handle pipes and redirections
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
-                    executable=self._shell,
-                )
+            # Execute and stream the command output
+            returncode, output = self._stream_command_output(command, timeout)
 
             # Format result as a string
-            if result.returncode == 0:
-                output = result.stdout.strip()
+            if returncode == 0:
                 if output:
                     return f"Command executed successfully:\n{output}"
                 else:
                     return "Command executed successfully (no output)"
             else:
-                stdout = result.stdout.strip()
-                stderr = result.stderr.strip()
-
-                output_parts = [f"Command failed with exit code {result.returncode}"]
-                if stdout:
-                    output_parts.append(stdout)
-                if stderr:
-                    output_parts.append(stderr)
+                output_parts = [f"Command failed with exit code {returncode}"]
+                if output:
+                    output_parts.append(output)
 
                 return (
                     ":\n".join(output_parts)

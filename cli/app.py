@@ -133,11 +133,33 @@ class KaderApp:
             self.console.print(
                 rf"  [kader.green]\[+] {tool_name}[/kader.green] completed successfully"
             )
+            if tool_name == "execute_command" and ":\n" in result:
+                output = result.split(":\n", 1)[1]
+                self.console.print()
+                self.console.print(
+                    Panel(
+                        output.strip(),
+                        title="[kader.orange]Command Output[/kader.orange]",
+                        border_style="dark_orange",
+                        padding=(0, 1),
+                    )
+                )
         else:
             error_preview = result[:100] + "..." if len(result) > 100 else result
             self.console.print(
                 rf"  [kader.red]\[-] {tool_name}[/kader.red] failed: {error_preview}"
             )
+            if tool_name == "execute_command" and ":\n" in result:
+                output = result.split(":\n", 1)[1]
+                self.console.print()
+                self.console.print(
+                    Panel(
+                        output.strip(),
+                        title="[kader.red]Command Output/Error[/kader.red]",
+                        border_style="red",
+                        padding=(0, 1),
+                    )
+                )
         self._start_spinner()
 
     def _tool_confirmation_callback(self, message: str) -> tuple[bool, Optional[str]]:

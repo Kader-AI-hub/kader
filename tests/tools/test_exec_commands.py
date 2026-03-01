@@ -108,27 +108,27 @@ class TestCommandExecutorTool:
             assert "Empty command" in reason
 
     @patch("platform.system")
-    @patch("subprocess.run")
-    def test_execute_success(self, mock_subprocess_run, mock_platform_system):
+    @patch("subprocess.Popen")
+    def test_execute_success(self, mock_subprocess_popen, mock_platform_system):
         """Test successful command execution."""
         # Mock platform and subprocess
         mock_platform_system.return_value = "Linux"
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Command output"
-        mock_result.stderr = ""
-        mock_subprocess_run.return_value = mock_result
+        mock_process = Mock()
+        mock_process.returncode = 0
+        mock_process.stdout = ["Command output\n"]
+        mock_process.poll.return_value = 0
+        mock_subprocess_popen.return_value = mock_process
 
         tool = CommandExecutorTool()
         result = tool.execute("echo hello", timeout=10)
 
         # Verify subprocess was called correctly
-        mock_subprocess_run.assert_called_once_with(
+        mock_subprocess_popen.assert_called_once_with(
             "echo hello",
-            shell=True,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            timeout=10,
+            shell=True,
             executable="/bin/bash",
         )
 
@@ -137,27 +137,27 @@ class TestCommandExecutorTool:
         assert "Command output" in result
 
     @patch("platform.system")
-    @patch("subprocess.run")
-    def test_execute_success_windows(self, mock_subprocess_run, mock_platform_system):
+    @patch("subprocess.Popen")
+    def test_execute_success_windows(self, mock_subprocess_popen, mock_platform_system):
         """Test successful command execution on Windows."""
         # Mock platform and subprocess
         mock_platform_system.return_value = "Windows"
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Windows output"
-        mock_result.stderr = ""
-        mock_subprocess_run.return_value = mock_result
+        mock_process = Mock()
+        mock_process.returncode = 0
+        mock_process.stdout = ["Windows output\n"]
+        mock_process.poll.return_value = 0
+        mock_subprocess_popen.return_value = mock_process
 
         tool = CommandExecutorTool()
         result = tool.execute("echo hello")
 
         # Verify subprocess was called correctly for Windows
-        mock_subprocess_run.assert_called_once_with(
+        mock_subprocess_popen.assert_called_once_with(
             "echo hello",
-            shell=True,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            timeout=30,  # Default timeout
+            shell=True,
         )
 
         # Verify the result
@@ -165,16 +165,16 @@ class TestCommandExecutorTool:
         assert "Windows output" in result
 
     @patch("platform.system")
-    @patch("subprocess.run")
-    def test_execute_command_failed(self, mock_subprocess_run, mock_platform_system):
+    @patch("subprocess.Popen")
+    def test_execute_command_failed(self, mock_subprocess_popen, mock_platform_system):
         """Test command execution that fails."""
         # Mock platform and subprocess
         mock_platform_system.return_value = "Linux"
-        mock_result = Mock()
-        mock_result.returncode = 1
-        mock_result.stdout = ""
-        mock_result.stderr = "Command failed"
-        mock_subprocess_run.return_value = mock_result
+        mock_process = Mock()
+        mock_process.returncode = 1
+        mock_process.stdout = ["Command failed\n"]
+        mock_process.poll.return_value = 1
+        mock_subprocess_popen.return_value = mock_process
 
         tool = CommandExecutorTool()
         result = tool.execute("invalid_command")
@@ -184,38 +184,40 @@ class TestCommandExecutorTool:
         assert "Command failed" in result
 
     @patch("platform.system")
-    @patch("subprocess.run")
+    @patch("subprocess.Popen")
     def test_execute_command_failed_with_output(
-        self, mock_subprocess_run, mock_platform_system
+        self, mock_subprocess_popen, mock_platform_system
     ):
         """Test command execution that fails but has stdout."""
         # Mock platform and subprocess
         mock_platform_system.return_value = "Linux"
-        mock_result = Mock()
-        mock_result.returncode = 2
-        mock_result.stdout = "Partial output"
-        mock_result.stderr = "Error message"
-        mock_subprocess_run.return_value = mock_result
+        mock_process = Mock()
+        mock_process.returncode = 2
+        mock_process.stdout = ["Partial output\n", "Error message\n"]
+        mock_process.poll.return_value = 2
+        mock_subprocess_popen.return_value = mock_process
 
         tool = CommandExecutorTool()
         result = tool.execute("problematic_command")
 
-        # Verify the result includes both stdout and stderr
+        # Verify the result includes both stdout and stderr (which are merged in Popen)
         assert "Command failed with exit code 2" in result
         assert "Partial output" in result
         assert "Error message" in result
 
     @patch("platform.system")
-    @patch("subprocess.run")
-    def test_execute_command_no_output(self, mock_subprocess_run, mock_platform_system):
+    @patch("subprocess.Popen")
+    def test_execute_command_no_output(
+        self, mock_subprocess_popen, mock_platform_system
+    ):
         """Test command execution with no output."""
         # Mock platform and subprocess
         mock_platform_system.return_value = "Linux"
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = ""
-        mock_result.stderr = ""
-        mock_subprocess_run.return_value = mock_result
+        mock_process = Mock()
+        mock_process.returncode = 0
+        mock_process.stdout = []
+        mock_process.poll.return_value = 0
+        mock_subprocess_popen.return_value = mock_process
 
         tool = CommandExecutorTool()
         result = tool.execute("no_output_command")
@@ -224,26 +226,36 @@ class TestCommandExecutorTool:
         assert "Command executed successfully (no output)" in result
 
     @patch("platform.system")
-    @patch("subprocess.run")
-    def test_execute_command_timeout(self, mock_subprocess_run, mock_platform_system):
+    @patch("subprocess.Popen")
+    def test_execute_command_timeout(self, mock_subprocess_popen, mock_platform_system):
         """Test command execution that times out."""
-        # Mock platform and subprocess to raise TimeoutExpired
+        # Mock platform and subprocess
         mock_platform_system.return_value = "Linux"
-        mock_subprocess_run.side_effect = subprocess.TimeoutExpired("command", 5)
+        mock_process = Mock()
+        mock_process.stdout = []
+        mock_process.poll.return_value = None  # Process is still running
+        mock_subprocess_popen.return_value = mock_process
 
-        tool = CommandExecutorTool()
-        result = tool.execute("slow_command", timeout=5)
+        # We need to simulate the slow process by making the real time pass faster or wait,
+        # but time.time() is used, so we need to patch time.time
+        with patch("time.time") as mock_time:
+            # First call is start time, second is in loop check
+            mock_time.side_effect = [100.0, 110.0]
+            tool = CommandExecutorTool()
+            result = tool.execute("slow_command", timeout=5)
 
         # Verify the result
         assert "Command timed out after 5 seconds" in result
 
     @patch("platform.system")
-    @patch("subprocess.run")
-    def test_execute_command_exception(self, mock_subprocess_run, mock_platform_system):
+    @patch("subprocess.Popen")
+    def test_execute_command_exception(
+        self, mock_subprocess_popen, mock_platform_system
+    ):
         """Test command execution that raises an exception."""
         # Mock platform and subprocess to raise a general exception
         mock_platform_system.return_value = "Linux"
-        mock_subprocess_run.side_effect = Exception("Unexpected error")
+        mock_subprocess_popen.side_effect = Exception("Unexpected error")
 
         tool = CommandExecutorTool()
         result = tool.execute("error_command")
@@ -252,9 +264,9 @@ class TestCommandExecutorTool:
         assert "Execution Error: Unexpected error" in result
 
     @patch("platform.system")
-    @patch("subprocess.run")
+    @patch("subprocess.Popen")
     def test_execute_invalid_command_windows(
-        self, mock_subprocess_run, mock_platform_system
+        self, mock_subprocess_popen, mock_platform_system
     ):
         """Test executing an invalid command on Windows."""
         mock_platform_system.return_value = "Windows"
@@ -267,13 +279,13 @@ class TestCommandExecutorTool:
         assert "Unix/Linux command" in result
         assert "PowerShell" in result
 
-        # subprocess.run should not be called
-        mock_subprocess_run.assert_not_called()
+        # subprocess.Popen should not be called
+        mock_subprocess_popen.assert_not_called()
 
     @patch("platform.system")
-    @patch("subprocess.run")
+    @patch("subprocess.Popen")
     def test_execute_invalid_command_unix(
-        self, mock_subprocess_run, mock_platform_system
+        self, mock_subprocess_popen, mock_platform_system
     ):
         """Test executing an invalid command on Unix."""
         mock_platform_system.return_value = "Linux"
@@ -286,21 +298,21 @@ class TestCommandExecutorTool:
         assert "Windows command" in result
         assert "Unix equivalent" in result
 
-        # subprocess.run should not be called
-        mock_subprocess_run.assert_not_called()
+        # subprocess.Popen should not be called
+        mock_subprocess_popen.assert_not_called()
 
     @patch("platform.system")
-    @patch("subprocess.run")
+    @patch("subprocess.Popen")
     @pytest.mark.asyncio
-    async def test_aexecute(self, mock_subprocess_run, mock_platform_system):
+    async def test_aexecute(self, mock_subprocess_popen, mock_platform_system):
         """Test asynchronous command execution."""
         # Mock platform and subprocess
         mock_platform_system.return_value = "Linux"
-        mock_result = Mock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Async output"
-        mock_result.stderr = ""
-        mock_subprocess_run.return_value = mock_result
+        mock_process = Mock()
+        mock_process.returncode = 0
+        mock_process.stdout = ["Async output\n"]
+        mock_process.poll.return_value = 0
+        mock_subprocess_popen.return_value = mock_process
 
         tool = CommandExecutorTool()
         result = await tool.aexecute("echo async", timeout=15)
