@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Optional
 
 from prompt_toolkit import PromptSession
+from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.patch_stdout import patch_stdout
 from rich.console import Console
@@ -30,7 +31,7 @@ from kader.workflows import PlannerExecutorWorkflow
 
 from .commands import InitializeCommand
 from .llm_factory import LLMProviderFactory
-from .utils import DEFAULT_MODEL, HELP_TEXT
+from .utils import COMMAND_NAMES, DEFAULT_MODEL, HELP_TEXT
 
 # Suppress warnings
 warnings.filterwarnings("ignore")
@@ -92,8 +93,16 @@ class KaderApp:
 
         self._workflow = self._create_workflow(self._current_model)
 
-        # Prompt session for input
-        self._prompt_session: PromptSession = PromptSession()
+        # Prompt session for input with autocomplete
+        command_completer = WordCompleter(
+            COMMAND_NAMES,
+            ignore_case=True,
+            sentence=True,
+        )
+        self._prompt_session: PromptSession = PromptSession(
+            completer=command_completer,
+            complete_while_typing=True,
+        )
 
     def _create_workflow(self, model_name: str) -> PlannerExecutorWorkflow:
         """Create a new PlannerExecutorWorkflow with the specified model."""
@@ -272,6 +281,12 @@ class KaderApp:
 
     # ── Command handlers ─────────────────────────────────────────────
 
+    def _get_command_suggestions(self, cmd: str) -> list[str]:
+        """Get list of commands that start with the given input."""
+        if not cmd.startswith("/"):
+            cmd = "/" + cmd
+        return [c for c in COMMAND_NAMES if c.startswith(cmd.lower())]
+
     async def _handle_command(self, command: str) -> None:
         """Handle CLI commands."""
         cmd = command.lower().strip()
@@ -322,10 +337,43 @@ class KaderApp:
             self.console.print("  [kader.muted]Goodbye! [!][/kader.muted]")
 
         else:
-            self.console.print(
-                rf"  [kader.red]\[-][/kader.red] Unknown command: `{command}` "
-                "— Type `/help` to see available commands."
-            )
+            partial = cmd.lstrip("/")
+            suggestions = self._get_command_suggestions(partial)
+
+            if len(suggestions) == 1:
+                self.console.print(
+                    rf"  [kader.cyan]→[/kader.cyan] Auto-completing to `{suggestions[0]}`"
+                )
+                await self._handle_command(suggestions[0])
+            elif len(suggestions) > 1:
+                table = Table(
+                    title="[kader.cyan]Available Commands[/kader.cyan]",
+                    border_style="cyan",
+                    show_header=True,
+                    header_style="bold cyan",
+                    padding=(0, 1),
+                )
+                table.add_column("Command", style="bold white")
+                table.add_column("Description", style="dim")
+
+                from .utils import COMMANDS
+
+                cmd_map = {c.name: c.description for c in COMMANDS}
+
+                for sugg in suggestions:
+                    table.add_row(sugg, cmd_map.get(sugg, ""))
+
+                self.console.print()
+                self.console.print(table)
+                self.console.print(
+                    rf"  [kader.yellow]\[!][/kader.yellow] Did you mean: `{command}`? "
+                    "Type the full command to execute."
+                )
+            else:
+                self.console.print(
+                    rf"  [kader.red]\[-][/kader.red] Unknown command: `{command}` "
+                    "— Type `/help` to see available commands."
+                )
 
     async def _handle_models(self) -> None:
         """Handle the /models command with interactive selection."""

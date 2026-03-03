@@ -1,9 +1,60 @@
 """Utility constants and helpers for Kader CLI."""
 
+from dataclasses import dataclass
+
 from .llm_factory import LLMProviderFactory
 
 # Default model (with provider prefix for clarity)
 DEFAULT_MODEL = "minimax-m2.5:cloud"
+
+
+@dataclass
+class CLICommand:
+    name: str
+    description: str
+    has_args: bool = False
+    arg_hint: str = ""
+
+
+COMMANDS: list[CLICommand] = [
+    CLICommand(name="/help", description="Show help message"),
+    CLICommand(name="/models", description="Show and switch LLM models"),
+    CLICommand(name="/clear", description="Clear the conversation"),
+    CLICommand(name="/save", description="Save current session"),
+    CLICommand(
+        name="/load",
+        description="Load a saved session",
+        has_args=True,
+        arg_hint="<session_id>",
+    ),
+    CLICommand(name="/sessions", description="List saved sessions"),
+    CLICommand(name="/skills", description="List loaded skills"),
+    CLICommand(name="/cost", description="Show usage costs"),
+    CLICommand(name="/init", description="Initialize .kader directory with KADER.md"),
+    CLICommand(name="/exit", description="Exit the CLI"),
+]
+
+COMMAND_NAMES: list[str] = [cmd.name for cmd in COMMANDS]
+
+
+def get_commands_text() -> str:
+    """Get formatted text of available commands."""
+    lines = [
+        "## Kader CLI Commands\n",
+        "| Command | Description |",
+        "|---------|-------------|",
+    ]
+    for cmd in COMMANDS:
+        arg = f" {cmd.arg_hint}" if cmd.has_args else ""
+        lines.append(f"| `{cmd.name}`{arg} | {cmd.description} |")
+
+    lines.append("\n### Tips:")
+    lines.append("- Type any question to chat with the AI")
+    lines.append("- Use `/` to access command menu (arrow keys to navigate)")
+    lines.append("- Model format: `provider:model` (e.g., `google:gemini-2.5-flash`)")
+    lines.append("- Use `Ctrl+C` to cancel, `Ctrl+D` to exit")
+    return "\n".join(lines)
+
 
 HELP_TEXT = """## Kader CLI Commands
 
