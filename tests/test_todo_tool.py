@@ -36,11 +36,7 @@ def test_create_todo(todo_tool):
 
     result = todo_tool.execute(action="create", todo_id=todo_id, items=items)
 
-    assert "Successfully created" in result
-
-    # Verify file content
-    result_read = todo_tool.execute(action="read", todo_id=todo_id)
-    data = json.loads(result_read)
+    data = json.loads(result)
     assert len(data) == 2
     assert data[0]["task"] == "Task 1"
     assert data[0]["status"] == "not-started"
@@ -61,17 +57,13 @@ def test_update_todo_status_only(todo_tool):
     ]
     todo_tool.execute(action="create", todo_id=todo_id, items=items)
 
-    # Update only statuses - this should work
     new_items = [
         {"task": "Task 1", "status": "completed"},
         {"task": "Task 2", "status": "in-progress"},
     ]
 
     result = todo_tool.execute(action="update", todo_id=todo_id, items=new_items)
-    assert "Successfully updated" in result
-
-    result_read = todo_tool.execute(action="read", todo_id=todo_id)
-    data = json.loads(result_read)
+    data = json.loads(result)
     assert len(data) == 2
     assert data[0]["status"] == "completed"
     assert data[1]["status"] == "in-progress"
@@ -139,17 +131,16 @@ def test_delete_todo(todo_tool):
 
 def test_session_id_override(todo_tool):
     """Test overriding session ID."""
-    # This should act on a different session
     result = todo_tool.execute(
         action="create",
         todo_id="other-session-list",
         items=[],
         session_id="other-session",
     )
-    assert "Successfully created" in result
+    data = json.loads(result)
+    assert len(data) == 0
 
-    # Read back with override
     result_read = todo_tool.execute(
         action="read", todo_id="other-session-list", session_id="other-session"
     )
-    assert "[]" in result_read  # empty list JSON
+    assert "[]" in result_read
