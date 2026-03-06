@@ -431,9 +431,16 @@ class BaseAgent:
 
         # Direct execution for specific tools - applies regardless of callback
         if tool_name in direct_execution_tools:
+            # Extract tool arguments for display purposes
+            fn_info = tool_call_dict.get("function", {})
+            raw_args = fn_info.get("arguments", {})
+            if isinstance(raw_args, str):
+                tool_args = json.loads(raw_args) if raw_args else {}
+            else:
+                tool_args = raw_args
             # Notify via direct_execution_callback if available (for CLI/TUI display)
             if self.direct_execution_callback:
-                self.direct_execution_callback(display_str, tool_name)
+                self.direct_execution_callback(display_str, tool_name, tool_args)
             else:
                 # Fallback: print to console
                 print(display_str)
@@ -557,7 +564,10 @@ class BaseAgent:
                     )
                     success = status_value == "success"
                     self.tool_execution_result_callback(
-                        tool_call.name, success, tool_result.content
+                        tool_call.name,
+                        success,
+                        tool_result.content,
+                        tool_call.arguments,
                     )
 
                 # add result to memory
@@ -634,7 +644,10 @@ class BaseAgent:
                     )
                     success = status_value == "success"
                     self.tool_execution_result_callback(
-                        tool_call.name, success, tool_result.content
+                        tool_call.name,
+                        success,
+                        tool_result.content,
+                        tool_call.arguments,
                     )
 
                 tool_msg = Message.tool(
