@@ -6,6 +6,7 @@ beautiful terminal output and prompt_toolkit for async input handling.
 
 import asyncio
 import atexit
+import json
 import subprocess
 import threading
 import warnings
@@ -62,6 +63,21 @@ WELCOME_BANNER = """\
  | . \\  / ___ \\| |_| | |___|  _ <
  |_|\\_\\/_/   \\_\\____/|_____|_| \\_\\
 [/bold magenta]"""
+
+
+def format_plan_display(items: list[dict]) -> None:
+    """Format and print todo items as a readable Plan with colored status icons."""
+    status_styles = {
+        "completed": ("[x]", "green"),
+        "in-progress": ("[-]", "yellow"),
+        "not-started": ("[ ]", "dim white"),
+    }
+    console = Console(theme=KADER_THEME)
+    for item in items:
+        status = item.get("status", "not-started")
+        icon, style = status_styles.get(status, ("[ ]", "dim white"))
+        task = item.get("task", "")
+        console.print(f"  [{style}]{icon}[/{style}] {task}")
 
 
 class KaderApp:
@@ -127,14 +143,96 @@ class KaderApp:
 
     # ── Callbacks (called from agent thread) ───────────────────────────
 
-    def _direct_execution_callback(self, message: str, tool_name: str) -> None:
+    def _direct_execution_callback(
+        self, message: str, tool_name: str, tool_args: dict | None = None
+    ) -> None:
         """Callback for direct execution tools - called from agent thread."""
         self._stop_spinner()
         self.console.print(f"  [kader.cyan]⚡ {tool_name}:[/kader.cyan] {message}")
+
+        if tool_args:
+            self._display_tool_content(tool_name, tool_args)
+
         self._start_spinner()
 
+    def _display_tool_content(self, tool_name: str, tool_args: dict) -> None:
+        """Display content for write_file and edit_file tools with toggle capability."""
+        if tool_name == "write_file" and "content" in tool_args:
+            content = tool_args["content"]
+            path = tool_args.get("path", "write_file")
+            self._show_content_nonblocking(content, path, "write_file")
+
+        elif (
+            tool_name == "edit_file"
+            and "old_string" in tool_args
+            and "new_string" in tool_args
+        ):
+            old_string = tool_args["old_string"]
+            new_string = tool_args["new_string"]
+            path = tool_args.get("path", "edit_file")
+            self._show_edit_diff_nonblocking(old_string, new_string, path)
+
+    def _show_content_nonblocking(
+        self, content: str, path: str, title: str, max_lines: int = 20
+    ) -> None:
+        """Show content without blocking - partial view by default."""
+        lines = content.split("\n")
+
+        if len(lines) <= max_lines:
+            display_content = content
+        else:
+            display_content = "\n".join(lines[:max_lines])
+
+        self.console.print()
+        self.console.print(
+            Panel(
+                display_content,
+                title=f"[kader.orange]{title}: {path}[/kader.orange]",
+                border_style="dark_orange",
+                padding=(0, 1),
+            )
+        )
+        self.console.print(
+            f"  [dim]Showing {max_lines} lines | Total: {len(lines)} lines[/dim]"
+        )
+
+    def _show_edit_diff_nonblocking(
+        self, old_string: str, new_string: str, path: str, max_lines: int = 15
+    ) -> None:
+        """Show edit_file changes with side-by-side view - no blocking."""
+        old_lines = old_string.split("\n")
+        new_lines = new_string.split("\n")
+
+        old_display = "\n".join(old_lines[:max_lines])
+        new_display = "\n".join(new_lines[:max_lines])
+
+        if len(old_lines) > max_lines:
+            old_display += f"\n... ({len(old_lines)} lines total)"
+        if len(new_lines) > max_lines:
+            new_display += f"\n... ({len(new_lines)} lines total)"
+
+        old_panel = Panel(
+            old_display,
+            title=f"[kader.red]OLD: {path}[/kader.red]",
+            border_style="red",
+            padding=(0, 1),
+        )
+        new_panel = Panel(
+            new_display,
+            title=f"[kader.green]NEW: {path}[/kader.green]",
+            border_style="green",
+            padding=(0, 1),
+        )
+
+        self.console.print()
+        self.console.print(old_panel)
+        self.console.print(new_panel)
+        self.console.print(
+            f"  [dim]Showing {max_lines} lines | Old: {len(old_lines)} lines, New: {len(new_lines)} lines[/dim]"
+        )
+
     def _tool_execution_result_callback(
-        self, tool_name: str, success: bool, result: str
+        self, tool_name: str, success: bool, result: str, tool_args: dict | None = None
     ) -> None:
         """Callback for tool execution results - called from agent thread."""
         self._stop_spinner()
@@ -142,6 +240,15 @@ class KaderApp:
             self.console.print(
                 rf"  [kader.green]\[+] {tool_name}[/kader.green] completed successfully"
             )
+            if tool_name == "todo_tool" and result:
+                try:
+                    items = json.loads(result)
+                    if items:
+                        self.console.print("")
+                        self.console.print("[bold] Plan:[/bold]")
+                        format_plan_display(items)
+                except (json.JSONDecodeError, TypeError):
+                    pass
             if tool_name == "execute_command" and ":\n" in result:
                 output = result.split(":\n", 1)[1]
                 self.console.print()
