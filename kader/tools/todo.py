@@ -168,9 +168,7 @@ class TodoTool(BaseTool[str]):
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
-        return (
-            f"Successfully created todo list '{todo_id}' with {len(items_list)} items."
-        )
+        return json.dumps(data, indent=2)
 
     def _read_todo(self, session_id: str, todo_id: str) -> str:
         """Read a todo list."""
@@ -224,7 +222,7 @@ class TodoTool(BaseTool[str]):
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
-        return f"Successfully updated todo list '{todo_id}'."
+        return json.dumps(data, indent=2)
 
     def _format_integrity_error(self, todo_id: str, existing_data: list[dict]) -> str:
         """Format an integrity error message with the current todo list content."""
