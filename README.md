@@ -20,6 +20,7 @@ Kader is an intelligent coding agent designed to assist with software developmen
 - 🗂️ **File System Tools** - Read, write, search, and edit files with automatic `.gitignore` filtering.
 - 🤝 **Agent-As-Tool** - Spawn sub-agents for specific tasks with isolated memory and automated context aggregation.
 - 🎯 **Agent Skills** - Modular skill system for specialized domain knowledge and task-specific instructions.
+- ⚡ **Special Commands** - Create custom command agents from `CONTENT.md` files in `~/.kader/commands`
 
 ## Installation
 
@@ -121,6 +122,7 @@ Kader stores data in `~/.kader/`:
 | `/load <id>` | Load a saved session |
 | `/sessions` | List saved sessions |
 | `/skills` | List loaded skills |
+| `/commands` | List special commands |
 | `/cost` | Show usage costs |
 | `/init` | Initialize .kader directory with KADER.md |
 | `/exit` | Exit the CLI |
@@ -199,6 +201,71 @@ Kader supports a modular skill system for domain-specific knowledge and speciali
 - **Skill Loading**: Skills are loaded from `~/.kader/skills` (high priority) and `./.kader/` directories
 - **Skill Injection**: Available skills are automatically injected into the system prompt
 - **Skills Tool**: Agents can load skills dynamically using the `skills_tool`
+
+### Special Commands
+
+Kader supports special commands — custom command agents that can be invoked from the CLI:
+
+- **Command Structure**: Commands are defined as directories containing `CONTENT.md` files
+- **Command Loading**: Commands are loaded from `./.kader/commands/` (higher priority) and `~/.kader/commands/`
+- **Command Invocation**: Use `/<command-name> <task>` to execute a command
+- **Memory Persistence**: Command executions are saved to `~/.kader/memory/sessions/<session-id>/executors/<command-name>-<uuid>/conversation.json`
+
+#### Creating a Special Command
+
+Create a command directory with a `CONTENT.md` file:
+
+```
+~/.kader/commands/mycommand/
+├── CONTENT.md          # Required - command instructions
+├── templates/          # Optional - templates, scripts
+└── assets/            # Optional - files
+```
+
+**CONTENT.md format:**
+```yaml
+---
+description: What this command does
+---
+
+# Command Instructions
+
+Your command agent instructions here...
+
+## Guidelines
+- Guideline 1
+- Guideline 2
+```
+
+#### Example: Lint and Test Command
+
+```
+~/.kader/commands/lint-test/
+└── CONTENT.md
+```
+
+```yaml
+---
+description: Lint and test the codebase
+---
+
+You are a Lint and Test Agent. Run linting and tests when requested.
+
+## Instructions
+
+1. Run: uv run ruff check .
+2. Run: uv run ruff format --check .
+3. Run: uv run pytest -v
+4. Report results
+```
+
+**Usage:**
+```
+/lint-test
+/lint-test run full check
+```
+
+Use `/commands` to list all available special commands.
 
 ### File System Tools with Gitignore Filtering
 
