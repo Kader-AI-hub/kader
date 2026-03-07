@@ -1,5 +1,7 @@
 # CLI Reference
 
+![Kader CLI](../assets/imgs/kader-cli.png)
+
 The Kader CLI is an interactive terminal-based AI coding assistant built with Rich and prompt_toolkit.
 
 ## Features
@@ -15,11 +17,16 @@ The Kader CLI is an interactive terminal-based AI coding assistant built with Ri
 ## Running the CLI
 
 ```bash
-# Using uv (recommended)
+# Using uv tool (recommended - installs globally)
+kader
+
+# Or using uv run
 uv run python -m cli
 
-# Using pip
-python -m cli
+# Or clone and run
+git clone https://github.com/Kader-AI-hub/kader.git
+cd kader
+uv run python -m cli
 ```
 
 ## Commands

@@ -10,11 +10,25 @@ This guide will help you get started with Kader - from installation to running y
 
 ## Installation
 
-### Using uv (recommended)
+### Using uv tool (recommended)
+
+Install Kader globally using uv toolchain:
+
+```bash
+# Install Kader globally
+uv tool install kader
+
+# Run the CLI
+kader
+```
+
+### Clone and Run Locally
+
+Clone the repository and run directly:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-repo/kader.git
+git clone https://github.com/Kader-AI-hub/kader.git
 cd kader
 
 # Install dependencies
@@ -22,28 +36,6 @@ uv sync
 
 # Run the CLI
 uv run python -m cli
-```
-
-### Using uv tool
-
-With uv tool, you can install Kader globally:
-
-```bash
-# Install Kader globally
-uv tool install .
-
-# Run the CLI
-kader
-```
-
-### Using pip
-
-```bash
-# Install in development mode
-pip install -e .
-
-# Run the CLI
-python -m cli
 ```
 
 ## Provider Setup
@@ -83,11 +75,36 @@ OPENROUTER_API_KEY='your-api-key'
 ## Running the CLI
 
 ```bash
-# Using uv
-uv run python -m cli
+# Using uv tool (recommended)
+kader
 
-# Or using pip
-python -m cli
+# Or using uv run
+uv run python -m cli
+```
+
+## Updating Kader
+
+### Using uv tool
+
+Update Kader to the latest version:
+
+```bash
+# Update Kader to latest version
+uv tool update kader
+
+# Or reinstall to get the latest
+uv tool uninstall kader
+uv tool install kader
+```
+
+### Clone and Run Locally
+
+If running from clone:
+
+```bash
+cd kader
+git pull origin main
+uv sync
 ```
 
 ## First Steps in CLI
