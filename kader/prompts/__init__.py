@@ -1,5 +1,6 @@
 from .agent_prompts import (
     BasicAssistancePrompt,
+    CommandAgentPrompt,
     ExecutorAgentPrompt,
     KaderPlannerPrompt,
     PlanningAgentPrompt,
@@ -14,4 +15,5 @@ __all__ = [
     "PlanningAgentPrompt",
     "KaderPlannerPrompt",
     "ExecutorAgentPrompt",
+    "CommandAgentPrompt",
 ]

@@ -32,6 +32,7 @@ from .base import (
     # Decorator
     tool,
 )
+from .commands import Command, CommandLoader
 from .filesys import (
     EditFileTool,
     GlobTool,
@@ -163,7 +164,6 @@ __all__ = [
     "WebSearchTool",
     "WebFetchTool",
     # Command Execution Tool
-    # Command Execution Tool
     "CommandExecutorTool",
     # Todo Tool
     "TodoTool",
@@ -173,6 +173,9 @@ __all__ = [
     "Skill",
     # Agent Tool
     "AgentTool",
+    # Special Commands
+    "Command",
+    "CommandLoader",
     # Helpers
     "get_default_registry",
     "get_cached_default_registry",

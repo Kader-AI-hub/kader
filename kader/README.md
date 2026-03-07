@@ -592,6 +592,79 @@ all_skills = skill_loader.list_skills()
 description = skill_loader.get_description()
 ```
 
+### Special Commands
+
+Special commands allow you to create custom command agents that can be invoked from the CLI. Unlike skills which are loaded by agents, special commands are executed directly from the CLI using `/<command-name>`.
+
+```python
+from kader.tools import CommandLoader
+
+# Create command loader
+loader = CommandLoader()
+
+# Or specify custom command directories
+from pathlib import Path
+loader = CommandLoader(
+    commands_dirs=[Path("./commands")],
+    priority_dir=Path("./project_commands"),  # Check this directory first
+)
+
+# Load a specific command
+command = loader.load_command("lint-test")
+print(command.name)        # Command name
+print(command.description)  # Command description
+print(command.content)     # Command instructions
+print(command.base_dir)    # Command directory path
+
+# List all available commands
+all_commands = loader.list_commands()
+
+# Get formatted description of all commands
+description = loader.get_description()
+```
+
+#### Command File Format
+
+Commands are stored in directories named after the command, each containing a `CONTENT.md` file:
+
+```markdown
+---
+description: Lint and test the codebase
+---
+
+# Lint and Test Agent
+
+You are specialized in maintaining code quality.
+
+## Instructions
+
+1. Run linting: uv run ruff check .
+2. Run formatting check: uv run ruff format --check .
+3. Run tests: uv run pytest -v
+4. Report results
+```
+
+#### Command Directory Structure
+
+```
+~/.kader/commands/lint-test/
+├── CONTENT.md          # Required - command instructions
+├── templates/          # Optional - templates
+└── assets/            # Optional - files
+```
+
+Commands are loaded from:
+- `./.kader/commands/` (project-level, higher priority)
+- `~/.kader/commands/` (user-level)
+
+#### Using Commands from CLI
+
+```
+/lint-test
+/lint-test run full check
+/commands  # List all available commands
+```
+
 ### Custom Tools
 
 Create your own tools by subclassing `BaseTool`:

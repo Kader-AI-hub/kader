@@ -62,6 +62,7 @@ python -m cli
 | `/load <id>` | Load a saved session |
 | `/sessions` | List saved sessions |
 | `/skills` | List loaded skills |
+| `/commands` | List special commands |
 | `/cost` | Show usage costs |
 | `/init` | Initialize .kader directory with KADER.md |
 | `/exit` | Exit the CLI |
@@ -110,6 +111,65 @@ description: Expert in Python programming and best practices
 
 You are an expert Python developer...
 ```
+
+## Special Commands
+
+Kader supports special commands — custom command agents that can be invoked from the CLI. Commands are loaded from:
+
+- `./.kader/commands/` (project-level commands, higher priority)
+- `~/.kader/commands/` (user-level commands)
+
+Use `/commands` to list all available special commands.
+
+### Creating a Command
+
+Create a command directory with a `CONTENT.md` file:
+
+```bash
+mkdir -p ~/.kader/commands/mycommand
+```
+
+**CONTENT.md format:**
+```yaml
+---
+description: What this command does
+---
+
+# Command Instructions
+
+Your command agent instructions here...
+
+## Guidelines
+- Guideline 1
+- Guideline 2
+```
+
+### Using Commands
+
+Execute a command with:
+```
+/mycommand
+/mycommand do something specific
+```
+
+### Example: Lint and Test Command
+
+```yaml
+---
+description: Lint and test the codebase following AGENTS.md
+---
+
+You are a Lint and Test Agent specialized in maintaining code quality.
+
+## Instructions
+
+1. Run: uv run ruff check .
+2. Run: uv run ruff format --check .
+3. Run: uv run pytest -v
+4. Report results
+```
+
+Usage: `/lint-test` or `/lint-test run full check`
 
 ## Model Selection Interface
 
