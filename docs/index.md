@@ -1,5 +1,7 @@
 # Kader
 
+![Kader CLI](assets/imgs/kader-cli.png)
+
 Kader is an intelligent coding agent designed to assist with software development tasks. It provides a comprehensive framework for building AI-powered agents with advanced reasoning capabilities and tool integration.
 
 ## Features
@@ -26,8 +28,14 @@ Kader is an intelligent coding agent designed to assist with software developmen
 ## Installation
 
 ```bash
-# Using uv (recommended)
-git clone https://github.com/your-repo/kader.git
+# Using uv tool (recommended - installs globally)
+uv tool install kader
+
+# Run the CLI
+kader
+
+# Or clone and run directly
+git clone https://github.com/Kader-AI-hub/kader.git
 cd kader
 uv sync
 
