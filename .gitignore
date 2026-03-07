@@ -20,3 +20,6 @@ wheels/
 
 # optimization
 optimizers/
+
+# MkDocs output
+site/
