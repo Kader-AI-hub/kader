@@ -4,7 +4,6 @@ from dataclasses import dataclass
 
 from .llm_factory import LLMProviderFactory
 
-# Default model (with provider prefix for clarity)
 DEFAULT_MODEL = "minimax-m2.5:cloud"
 
 
@@ -14,6 +13,29 @@ class CLICommand:
     description: str
     has_args: bool = False
     arg_hint: str = ""
+
+
+def get_special_commands() -> list[CLICommand]:
+    """Get special commands from ~/.kader/commands and ./.kader/commands."""
+    try:
+        from kader.tools.commands import CommandLoader
+    except Exception:
+        return []
+
+    try:
+        loader = CommandLoader()
+        commands = loader.list_commands()
+        return [
+            CLICommand(
+                name=f"/{cmd.name}",
+                description=cmd.description,
+                has_args=True,
+                arg_hint="<task>",
+            )
+            for cmd in commands
+        ]
+    except Exception:
+        return []
 
 
 COMMANDS: list[CLICommand] = [
@@ -29,12 +51,17 @@ COMMANDS: list[CLICommand] = [
     ),
     CLICommand(name="/sessions", description="List saved sessions"),
     CLICommand(name="/skills", description="List loaded skills"),
+    CLICommand(name="/commands", description="List special commands"),
     CLICommand(name="/cost", description="Show usage costs"),
     CLICommand(name="/init", description="Initialize .kader directory with KADER.md"),
     CLICommand(name="/exit", description="Exit the CLI"),
 ]
 
-COMMAND_NAMES: list[str] = [cmd.name for cmd in COMMANDS]
+SPECIAL_COMMANDS: list[CLICommand] = get_special_commands()
+
+ALL_COMMANDS: list[CLICommand] = COMMANDS + SPECIAL_COMMANDS
+
+COMMAND_NAMES: list[str] = [cmd.name for cmd in ALL_COMMANDS]
 
 
 def get_commands_text() -> str:
@@ -47,6 +74,14 @@ def get_commands_text() -> str:
     for cmd in COMMANDS:
         arg = f" {cmd.arg_hint}" if cmd.has_args else ""
         lines.append(f"| `{cmd.name}`{arg} | {cmd.description} |")
+
+    if SPECIAL_COMMANDS:
+        lines.append("\n### Special Commands")
+        lines.append("| Command | Description |")
+        lines.append("|---------|-------------|")
+        for cmd in SPECIAL_COMMANDS:
+            arg = f" {cmd.arg_hint}" if cmd.has_args else ""
+            lines.append(f"| `{cmd.name}`{arg} | {cmd.description} |")
 
     lines.append("\n### Tips:")
     lines.append("- Type any question to chat with the AI")
@@ -67,6 +102,7 @@ HELP_TEXT = """## Kader CLI Commands
 | `/load <id>` | Load a saved session |
 | `/sessions` | List saved sessions |
 | `/skills` | List loaded skills |
+| `/commands` | List special commands |
 | `/cost` | Show usage costs |
 | `/init` | Initialize .kader directory with KADER.md |
 | `/exit` | Exit the CLI |

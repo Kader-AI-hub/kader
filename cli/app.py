@@ -422,6 +422,9 @@ class KaderApp:
         elif cmd == "/skills":
             self._handle_skills()
 
+        elif cmd == "/commands":
+            await self._handle_commands()
+
         elif cmd.startswith("/load"):
             parts = command.strip().split(maxsplit=1)
             if len(parts) < 2:
@@ -444,6 +447,12 @@ class KaderApp:
             self.console.print("  [kader.muted]Goodbye! [!][/kader.muted]")
 
         else:
+            special_cmd = self._get_special_command(command)
+            if special_cmd:
+                command_name, user_task = special_cmd
+                await self._handle_special_command(command_name, user_task, command)
+                return
+
             partial = cmd.lstrip("/")
             suggestions = self._get_command_suggestions(partial)
 
@@ -463,9 +472,10 @@ class KaderApp:
                 table.add_column("Command", style="bold white")
                 table.add_column("Description", style="dim")
 
-                from .utils import COMMANDS
+                from .utils import COMMANDS, SPECIAL_COMMANDS
 
-                cmd_map = {c.name: c.description for c in COMMANDS}
+                all_cmds = COMMANDS + SPECIAL_COMMANDS
+                cmd_map = {c.name: c.description for c in all_cmds}
 
                 for sugg in suggestions:
                     table.add_row(sugg, cmd_map.get(sugg, ""))
@@ -479,7 +489,7 @@ class KaderApp:
             else:
                 self.console.print(
                     rf"  [kader.red]\[-][/kader.red] Unknown command: `{command}` "
-                    "— Type `/help` to see available commands."
+                    "— Type `/help` to see available commands, or `/commands` for special commands."
                 )
 
     async def _handle_models(self) -> None:
@@ -764,6 +774,152 @@ class KaderApp:
                 self.console.print(table)
         except Exception as e:
             self.console.print(f"  [kader.red]✗[/kader.red] Error loading skills: {e}")
+
+    async def _handle_commands(self) -> None:
+        """Handle the /commands command to display special commands."""
+        try:
+            from kader.tools.commands import CommandLoader
+
+            loader = CommandLoader()
+            commands = loader.list_commands()
+
+            if not commands:
+                self.console.print(
+                    "  [dim]No special commands found in `~/.kader/commands` "
+                    "or `./.kader/commands`[/dim]"
+                )
+                self.console.print(
+                    "  [dim]Create a command directory with CONTENT.md to add a special command.[/dim]"
+                )
+            else:
+                table = Table(
+                    title="[kader.cyan]Special Commands[/kader.cyan]",
+                    border_style="cyan",
+                    show_header=True,
+                    header_style="bold cyan",
+                )
+                table.add_column("Command", style="bold white")
+                table.add_column("Description", style="dim")
+
+                for cmd in commands:
+                    table.add_row(f"/{cmd.name}", cmd.description)
+
+                self.console.print()
+                self.console.print(table)
+                self.console.print("  [dim]Usage: /<command> <task>[/dim]")
+        except Exception as e:
+            self.console.print(
+                f"  [kader.red]✗[/kader.red] Error loading commands: {e}"
+            )
+
+    def _get_special_command(self, command_input: str) -> tuple[str, str] | None:
+        """Parse command input and check if it's a special command.
+
+        Args:
+            command_input: The raw command input (e.g., "/mycommand do something")
+
+        Returns:
+            Tuple of (command_name, user_task) if it's a special command, None otherwise
+        """
+        if not command_input.startswith("/"):
+            return None
+
+        parts = command_input[1:].strip().split(maxsplit=1)
+        command_name = parts[0] if parts else ""
+        user_task = parts[1] if len(parts) > 1 else ""
+
+        if not command_name:
+            return None
+
+        try:
+            from kader.tools.commands import CommandLoader
+
+            loader = CommandLoader()
+            command = loader.load_command(command_name)
+            if command:
+                return (command_name, user_task)
+        except Exception:
+            pass
+
+        return None
+
+    async def _handle_special_command(
+        self, command_name: str, user_task: str, full_input: str
+    ) -> None:
+        """Handle a special command by executing it via AgentTool.
+
+        Args:
+            command_name: The name of the special command
+            user_task: The task to execute
+            full_input: The full original input for display
+        """
+        if self._is_processing:
+            self.console.print(
+                r"  [kader.yellow]\[!][/kader.yellow] "
+                "Please wait for the current response..."
+            )
+            return
+
+        self._is_processing = True
+        self._print_user_message(full_input)
+
+        try:
+            from kader.tools import AgentTool
+            from kader.tools.commands import CommandLoader
+
+            loader = CommandLoader()
+            command = loader.load_command(command_name)
+
+            if not command:
+                self.console.print(
+                    rf"  [kader.red]\[-][/kader.red] Command `{command_name}` not found."
+                )
+                return
+
+            self._start_spinner()
+
+            agent_tool = AgentTool(
+                name=command_name,
+                description=command.description,
+                provider=self._workflow.planner.provider,
+                model_name=self._workflow.planner.provider.model,
+                interrupt_before_tool=True,
+                tool_confirmation_callback=self._tool_confirmation_callback,
+                direct_execution_callback=self._direct_execution_callback,
+                tool_execution_result_callback=self._tool_execution_result_callback,
+                custom_system_prompt=command.content,
+            )
+
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                self._agent_executor,
+                lambda: agent_tool.execute(
+                    task=user_task or "Execute the command with no specific task",
+                    context="",
+                ),
+            )
+
+            self._stop_spinner()
+
+            if result:
+                self._print_assistant_message(
+                    result,
+                    model_name=self._workflow.planner.provider.model,
+                    usage_cost=self._workflow.planner.provider.total_cost.total_cost,
+                )
+            else:
+                self.console.print(
+                    r"  [kader.yellow]\[!][/kader.yellow] Command completed with no output."
+                )
+
+        except Exception as e:
+            self._stop_spinner()
+            self.console.print(
+                rf"  [kader.red]\[-] Error executing command `{command_name}`:[/kader.red] {e}"
+            )
+
+        finally:
+            self._is_processing = False
 
     def _handle_cost(self) -> None:
         """Display LLM usage costs."""
