@@ -1,0 +1,65 @@
+site_name: Kader
+site_description: An intelligent coding agent framework with multi-provider LLM support
+site_author: Kader Team
+
+repo_url: https://github.com/Kader-AI-hub/kader
+repo_name: Kader-AI-hub/kader
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Guide: guide.md
+    - Configuration: configuration.md
+  - Core Framework:
+    - Overview: core-framework/index.md
+    - Agents: core-framework/agents.md
+    - Providers: core-framework/providers.md
+    - Tools: core-framework/tools.md
+    - Memory: core-framework/memory.md
+  - CLI Reference: cli/index.md
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: deep orange
+      accent: amber
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - search.suggest
+    - search.highlight
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - tables
+  - attr_list
+  - md_in_html
+
+plugins:
+  - search:
+      lang: en
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Kader-AI-hub/kader
