@@ -56,3 +56,16 @@ class ExecutorAgentPrompt(PromptBase):
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(template_path="executor_agent.j2", **kwargs)
+
+
+class CommandAgentPrompt(PromptBase):
+    """
+    Prompt for Special Command Agents.
+
+    Used when executing special commands via /<command-name>.
+    The command's CONTENT.md is injected as instructions, and the
+    user task is provided separately.
+    """
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(template_path="command_agent.j2", **kwargs)

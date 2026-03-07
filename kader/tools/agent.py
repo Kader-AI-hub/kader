@@ -14,7 +14,6 @@ from kader.memory import (
 )
 from kader.memory.compression import CompressionConfig, ToolOutputCompressor
 from kader.memory.types import aread_text, save_json
-from kader.prompts import ExecutorAgentPrompt
 from kader.providers.base import BaseLLMProvider, Message
 from kader.utils import Checkpointer, ContextAggregator
 
@@ -175,6 +174,7 @@ class AgentTool(BaseTool[str]):
         memory_manager_type: str = "hierarchical",
         skills_dirs: list[Path] | None = None,
         priority_dir: Path | None = None,
+        custom_system_prompt: Optional[str] = None,
     ) -> None:
         """
         Initialize the AgentTool.
@@ -196,6 +196,7 @@ class AgentTool(BaseTool[str]):
             skills_dirs: Optional list of custom skill directories for sub-agents.
                         If None, uses default directories (~/.kader/skills and ./.kader/).
             priority_dir: Optional directory checked first (higher priority) for skills.
+            custom_system_prompt: Optional custom system prompt to use instead of default ExecutorAgentPrompt.
         """
         super().__init__(
             name=name,
@@ -225,6 +226,7 @@ class AgentTool(BaseTool[str]):
         self._memory_manager_type = memory_manager_type
         self._skills_dirs = skills_dirs
         self._priority_dir = priority_dir
+        self._custom_system_prompt = custom_system_prompt
 
         # Compression Configuration
         self._enable_compression = enable_compression
@@ -378,8 +380,23 @@ class AgentTool(BaseTool[str]):
             sub_registry.register(SkillsTool(self._skills_dirs, self._priority_dir))
             tools = sub_registry
 
-        # Create ExecutorAgentPrompt with tool descriptions
-        system_prompt = ExecutorAgentPrompt(tools=tools.tools)
+        # Create system prompt - use custom if provided, otherwise use default ExecutorAgentPrompt
+        if self._custom_system_prompt:
+            from kader.prompts import CommandAgentPrompt
+
+            tool_names = [t.name for t in tools.tools]
+            system_prompt = CommandAgentPrompt(
+                command_name=self.name,
+                command_description=self.description,
+                command_content=self._custom_system_prompt,
+                user_task=context or "(no context provided)",
+                tools=tools.tools,
+                tool_names=", ".join(tool_names),
+            )
+        else:
+            from kader.prompts import ExecutorAgentPrompt
+
+            system_prompt = ExecutorAgentPrompt(tools=tools.tools)
 
         # Create the ReActAgent with separate memory and executor prompt
         agent = ReActAgent(
@@ -540,8 +557,23 @@ class AgentTool(BaseTool[str]):
             sub_registry.register(SkillsTool(self._skills_dirs, self._priority_dir))
             tools = sub_registry
 
-        # Create ExecutorAgentPrompt with tool descriptions
-        system_prompt = ExecutorAgentPrompt(tools=tools.tools)
+        # Create system prompt - use custom if provided, otherwise use default ExecutorAgentPrompt
+        if self._custom_system_prompt:
+            from kader.prompts import CommandAgentPrompt
+
+            tool_names = [t.name for t in tools.tools]
+            system_prompt = CommandAgentPrompt(
+                command_name=self.name,
+                command_description=self.description,
+                command_content=self._custom_system_prompt,
+                user_task=context or "(no context provided)",
+                tools=tools.tools,
+                tool_names=", ".join(tool_names),
+            )
+        else:
+            from kader.prompts import ExecutorAgentPrompt
+
+            system_prompt = ExecutorAgentPrompt(tools=tools.tools)
 
         # Create the ReActAgent with separate memory and executor prompt
         agent = ReActAgent(
