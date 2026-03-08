@@ -708,22 +708,40 @@ class KaderApp:
             return await self._run_terminal_command_direct(command)
 
         output_parts = []
+        max_attempts = 100
+        attempts = 0
 
-        while True:
+        while attempts < max_attempts:
             try:
                 data = process.read(blocking=False)
                 if data:
                     output_parts.append(data)
                     self.console.print(data, end="")
+                    attempts = 0
             except Exception:
                 pass
 
             if not process.isalive():
-                break
+                await asyncio.sleep(0.1)
+                try:
+                    data = process.read(blocking=False)
+                    if data:
+                        output_parts.append(data)
+                        self.console.print(data, end="")
+                except Exception:
+                    pass
+                if not process.isalive():
+                    break
 
+            attempts += 1
             await asyncio.sleep(0.05)
 
-        return "".join(output_parts).strip()
+        result = "".join(output_parts).strip()
+
+        if not result:
+            return await self._run_terminal_command_direct(command)
+
+        return result
 
     async def _run_terminal_command_direct(self, command: str) -> str:
         """Run a terminal command directly without PTY (fallback)."""
