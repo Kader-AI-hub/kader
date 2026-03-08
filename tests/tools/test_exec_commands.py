@@ -27,9 +27,9 @@ class TestCommandExecutorTool:
         assert "timeout" in params
         assert params["command"].type == "string"
         assert params["timeout"].type == "integer"
-        assert params["timeout"].default == 30
+        assert params["timeout"].default == 60
         assert params["timeout"].minimum == 1
-        assert params["timeout"].maximum == 300
+        assert params["timeout"].maximum == 3600
 
     def test_get_default_shell_windows(self):
         """Test getting default shell on Windows."""
@@ -120,7 +120,7 @@ class TestCommandExecutorTool:
         mock_subprocess_popen.return_value = mock_process
 
         tool = CommandExecutorTool()
-        result = tool.execute("echo hello", timeout=10)
+        result = tool.execute(command="echo hello", timeout=10, interactive=False)
 
         # Verify subprocess was called correctly
         mock_subprocess_popen.assert_called_once_with(
@@ -149,7 +149,7 @@ class TestCommandExecutorTool:
         mock_subprocess_popen.return_value = mock_process
 
         tool = CommandExecutorTool()
-        result = tool.execute("echo hello")
+        result = tool.execute(command="echo hello")
 
         # Verify subprocess was called correctly for Windows
         mock_subprocess_popen.assert_called_once_with(
@@ -177,7 +177,7 @@ class TestCommandExecutorTool:
         mock_subprocess_popen.return_value = mock_process
 
         tool = CommandExecutorTool()
-        result = tool.execute("invalid_command")
+        result = tool.execute(command="invalid_command", interactive=False)
 
         # Verify the result
         assert "Command failed with exit code 1" in result
@@ -198,7 +198,7 @@ class TestCommandExecutorTool:
         mock_subprocess_popen.return_value = mock_process
 
         tool = CommandExecutorTool()
-        result = tool.execute("problematic_command")
+        result = tool.execute(command="problematic_command", interactive=False)
 
         # Verify the result includes both stdout and stderr (which are merged in Popen)
         assert "Command failed with exit code 2" in result
@@ -220,7 +220,7 @@ class TestCommandExecutorTool:
         mock_subprocess_popen.return_value = mock_process
 
         tool = CommandExecutorTool()
-        result = tool.execute("no_output_command")
+        result = tool.execute(command="no_output_command", interactive=False)
 
         # Verify the result
         assert "Command executed successfully (no output)" in result
@@ -242,7 +242,7 @@ class TestCommandExecutorTool:
             # First call is start time, second is in loop check
             mock_time.side_effect = [100.0, 110.0]
             tool = CommandExecutorTool()
-            result = tool.execute("slow_command", timeout=5)
+            result = tool.execute(command="slow_command", timeout=5, interactive=False)
 
         # Verify the result
         assert "Command timed out after 5 seconds" in result
@@ -258,7 +258,7 @@ class TestCommandExecutorTool:
         mock_subprocess_popen.side_effect = Exception("Unexpected error")
 
         tool = CommandExecutorTool()
-        result = tool.execute("error_command")
+        result = tool.execute(command="error_command")
 
         # Verify the result
         assert "Execution Error: Unexpected error" in result
@@ -272,7 +272,7 @@ class TestCommandExecutorTool:
         mock_platform_system.return_value = "Windows"
 
         tool = CommandExecutorTool()
-        result = tool.execute("ls -la")  # Unix command on Windows
+        result = tool.execute(command="ls -la")  # Unix command on Windows
 
         # Should fail validation before execution
         assert "Validation Error" in result
@@ -291,7 +291,7 @@ class TestCommandExecutorTool:
         mock_platform_system.return_value = "Linux"
 
         tool = CommandExecutorTool()
-        result = tool.execute("dir")  # Windows command on Unix
+        result = tool.execute(command="dir")  # Windows command on Unix
 
         # Should fail validation before execution
         assert "Validation Error" in result
@@ -315,7 +315,9 @@ class TestCommandExecutorTool:
         mock_subprocess_popen.return_value = mock_process
 
         tool = CommandExecutorTool()
-        result = await tool.aexecute("echo async", timeout=15)
+        result = await tool.aexecute(
+            command="echo async", timeout=15, interactive=False
+        )
 
         # Verify the result
         assert "Command executed successfully" in result

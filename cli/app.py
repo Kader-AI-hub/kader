@@ -7,7 +7,6 @@ beautiful terminal output and prompt_toolkit for async input handling.
 import asyncio
 import atexit
 import json
-import subprocess
 import threading
 import warnings
 from concurrent.futures import ThreadPoolExecutor
@@ -122,6 +121,11 @@ class KaderApp:
 
     def _create_workflow(self, model_name: str) -> PlannerExecutorWorkflow:
         """Create a new PlannerExecutorWorkflow with the specified model."""
+        from kader.tools.exec_commands import CommandExecutorTool
+
+        CommandExecutorTool.set_output_callback(self._command_output_callback)
+        CommandExecutorTool.set_input_callback(self._command_input_callback)
+
         provider = LLMProviderFactory.create_provider(model_name)
 
         workflow = PlannerExecutorWorkflow(
@@ -249,34 +253,31 @@ class KaderApp:
                         format_plan_display(items)
                 except (json.JSONDecodeError, TypeError):
                     pass
-            if tool_name == "execute_command" and ":\n" in result:
-                output = result.split(":\n", 1)[1]
-                self.console.print()
-                self.console.print(
-                    Panel(
-                        output.strip(),
-                        title="[kader.orange]Command Output[/kader.orange]",
-                        border_style="dark_orange",
-                        padding=(0, 1),
-                    )
-                )
         else:
             error_preview = result[:100] + "..." if len(result) > 100 else result
             self.console.print(
                 rf"  [kader.red]\[-] {tool_name}[/kader.red] failed: {error_preview}"
             )
-            if tool_name == "execute_command" and ":\n" in result:
-                output = result.split(":\n", 1)[1]
-                self.console.print()
-                self.console.print(
-                    Panel(
-                        output.strip(),
-                        title="[kader.red]Command Output/Error[/kader.red]",
-                        border_style="red",
-                        padding=(0, 1),
-                    )
-                )
         self._start_spinner()
+
+    def _command_output_callback(self, output: str) -> None:
+        """Callback for streaming command output - called from agent thread."""
+        self.console.print(output, end="")
+
+    def _command_input_callback(self) -> str | None:
+        """Callback for getting user input during command execution."""
+        self._stop_spinner()
+        self.console.print()
+        self.console.print(
+            r"[kader.yellow]\[?] Command needs input:[/kader.yellow] ",
+            end="",
+        )
+        try:
+            user_input = input().strip()
+        except (EOFError, KeyboardInterrupt):
+            user_input = None
+        self._start_spinner()
+        return user_input
 
     def _tool_confirmation_callback(self, message: str) -> tuple[bool, Optional[str]]:
         """Callback for tool confirmation - called from agent thread.
@@ -611,36 +612,134 @@ class KaderApp:
         self.console.print(f"\n  [kader.orange]\\[>] Executing:[/kader.orange] `{cmd}`")
 
         try:
-            process = await asyncio.create_subprocess_shell(
-                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            )
-            stdout, stderr = await process.communicate()
-
-            output = ""
-            if stdout:
-                output += stdout.decode().strip()
-            if stderr:
-                if output:
-                    output += "\n\n"
-                output += f"Stderr:\n{stderr.decode().strip()}"
+            output = await self._run_terminal_command_pty(cmd)
 
             if not output:
-                output = "Command executed successfully with no output."
-
-            self.console.print()
-            self.console.print(
-                Panel(
-                    output,
-                    title="[kader.orange]Terminal Output[/kader.orange]",
-                    border_style="dark_orange",
-                    padding=(0, 1),
+                self.console.print(
+                    "  [dim]Command executed successfully with no output.[/dim]"
                 )
-            )
 
         except Exception as e:
             self.console.print(
                 rf"  [kader.red]\[-][/kader.red] Error executing command: {e}"
             )
+
+    async def _run_terminal_command_pty(self, command: str) -> str:
+        """Run a terminal command using PTY for interactive support."""
+        import platform
+
+        system = platform.system().lower()
+
+        if system == "windows":
+            return await self._run_terminal_command_winpty(command)
+        else:
+            return await self._run_terminal_command_unix_pty(command)
+
+    async def _run_terminal_command_unix_pty(self, command: str) -> str:
+        """Run a terminal command using PTY on Unix."""
+        import os
+        import pty
+
+        master_fd, slave_fd = pty.openpty()
+
+        env = os.environ.copy()
+        env["TERM"] = "xterm-256color"
+
+        shell = "/bin/bash"
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                shell,
+                "-c",
+                command,
+                stdin=slave_fd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                env=env,
+            )
+        finally:
+            os.close(slave_fd)
+            os.close(master_fd)
+
+        output_parts = []
+        stdout = process.stdout
+        assert stdout is not None
+
+        while True:
+            line = await asyncio.wait_for(stdout.readline(), timeout=0.1)
+            if line:
+                text = line.decode("utf-8", errors="replace")
+                output_parts.append(text)
+                self.console.print(text, end="")
+            elif process.returncode is not None:
+                break
+
+        await process.wait()
+        return "".join(output_parts).strip()
+
+    async def _run_terminal_command_winpty(self, command: str) -> str:
+        """Run a terminal command using pywinpty on Windows."""
+
+        try:
+            import pywinpty
+        except ImportError:
+            return await self._run_terminal_command_direct(command)
+
+        command_lower = command.lower().strip()
+        is_powershell = command_lower.startswith("pwsh") or command_lower.startswith(
+            "powershell"
+        )
+
+        if is_powershell:
+            shell = "powershell.exe"
+            shell_args = ["-Command", command]
+        else:
+            shell = "cmd.exe"
+            shell_args = ["/c", command]
+
+        try:
+            pty_obj = pywinpty.PTY(width=80, height=24, visible=False)
+        except Exception:
+            return await self._run_terminal_command_direct(command)
+
+        try:
+            process = pty_obj.spawn(shell, shell_args)
+        except Exception:
+            return await self._run_terminal_command_direct(command)
+
+        output_parts = []
+
+        while True:
+            try:
+                data = process.read(blocking=False)
+                if data:
+                    output_parts.append(data)
+                    self.console.print(data, end="")
+            except Exception:
+                pass
+
+            if not process.isalive():
+                break
+
+            await asyncio.sleep(0.05)
+
+        return "".join(output_parts).strip()
+
+    async def _run_terminal_command_direct(self, command: str) -> str:
+        """Run a terminal command directly without PTY (fallback)."""
+
+        try:
+            process = await asyncio.create_subprocess_shell(
+                command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            stdout, _ = await process.communicate()
+
+            output = stdout.decode("utf-8", errors="replace").strip()
+            return output
+        except Exception as e:
+            return f"Error: {str(e)}"
 
     def _handle_save_session(self) -> None:
         """Save the current session."""
@@ -1058,12 +1157,15 @@ class KaderApp:
 
     def run(self) -> None:
         """Run the Kader CLI application."""
+        from kader.tools.exec_commands import CommandExecutorTool
+
         try:
             asyncio.run(self._run_async())
         except KeyboardInterrupt:
             self.console.print("\n  [kader.muted]Goodbye! 👋[/kader.muted]")
         finally:
             self._stop_spinner()
+            CommandExecutorTool.clear_callbacks()
 
 
 def main() -> None:
