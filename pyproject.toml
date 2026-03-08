@@ -23,6 +23,7 @@ dependencies = [
     "openai>=2.20.0",
     "python-frontmatter>=1.1.0",
     "anthropic>=0.83.0",
+    "pywinpty>=3.0.0; platform_system=='Windows'",
 ]
 
 [project.scripts]
