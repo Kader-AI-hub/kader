@@ -612,139 +612,28 @@ class KaderApp:
         self.console.print(f"\n  [kader.orange]\\[>] Executing:[/kader.orange] `{cmd}`")
 
         try:
-            output = await self._run_terminal_command_pty(cmd)
+            output = await self._run_terminal_command_direct(cmd)
 
             if not output:
-                self.console.print(
-                    "  [dim]Command executed successfully with no output.[/dim]"
+                output = "Command executed successfully with no output."
+
+            self.console.print()
+            self.console.print(
+                Panel(
+                    output,
+                    title="[kader.orange]Terminal Output[/kader.orange]",
+                    border_style="dark_orange",
+                    padding=(0, 1),
                 )
+            )
 
         except Exception as e:
             self.console.print(
                 rf"  [kader.red]\[-][/kader.red] Error executing command: {e}"
             )
 
-    async def _run_terminal_command_pty(self, command: str) -> str:
-        """Run a terminal command using PTY for interactive support."""
-        import platform
-
-        system = platform.system().lower()
-
-        if system == "windows":
-            return await self._run_terminal_command_winpty(command)
-        else:
-            return await self._run_terminal_command_unix_pty(command)
-
-    async def _run_terminal_command_unix_pty(self, command: str) -> str:
-        """Run a terminal command using PTY on Unix."""
-        import os
-        import pty
-
-        master_fd, slave_fd = pty.openpty()
-
-        env = os.environ.copy()
-        env["TERM"] = "xterm-256color"
-
-        shell = "/bin/bash"
-
-        try:
-            process = await asyncio.create_subprocess_exec(
-                shell,
-                "-c",
-                command,
-                stdin=slave_fd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-                env=env,
-            )
-        finally:
-            os.close(slave_fd)
-            os.close(master_fd)
-
-        output_parts = []
-        stdout = process.stdout
-        assert stdout is not None
-
-        while True:
-            line = await asyncio.wait_for(stdout.readline(), timeout=0.1)
-            if line:
-                text = line.decode("utf-8", errors="replace")
-                output_parts.append(text)
-                self.console.print(text, end="")
-            elif process.returncode is not None:
-                break
-
-        await process.wait()
-        return "".join(output_parts).strip()
-
-    async def _run_terminal_command_winpty(self, command: str) -> str:
-        """Run a terminal command using pywinpty on Windows."""
-
-        try:
-            import pywinpty
-        except ImportError:
-            return await self._run_terminal_command_direct(command)
-
-        command_lower = command.lower().strip()
-        is_powershell = command_lower.startswith("pwsh") or command_lower.startswith(
-            "powershell"
-        )
-
-        if is_powershell:
-            shell = "powershell.exe"
-            shell_args = ["-Command", command]
-        else:
-            shell = "cmd.exe"
-            shell_args = ["/c", command]
-
-        try:
-            pty_obj = pywinpty.PTY(width=80, height=24, visible=False)
-        except Exception:
-            return await self._run_terminal_command_direct(command)
-
-        try:
-            process = pty_obj.spawn(shell, shell_args)
-        except Exception:
-            return await self._run_terminal_command_direct(command)
-
-        output_parts = []
-        max_attempts = 100
-        attempts = 0
-
-        while attempts < max_attempts:
-            try:
-                data = process.read(blocking=False)
-                if data:
-                    output_parts.append(data)
-                    self.console.print(data, end="")
-                    attempts = 0
-            except Exception:
-                pass
-
-            if not process.isalive():
-                await asyncio.sleep(0.1)
-                try:
-                    data = process.read(blocking=False)
-                    if data:
-                        output_parts.append(data)
-                        self.console.print(data, end="")
-                except Exception:
-                    pass
-                if not process.isalive():
-                    break
-
-            attempts += 1
-            await asyncio.sleep(0.05)
-
-        result = "".join(output_parts).strip()
-
-        if not result:
-            return await self._run_terminal_command_direct(command)
-
-        return result
-
     async def _run_terminal_command_direct(self, command: str) -> str:
-        """Run a terminal command directly without PTY (fallback)."""
+        """Run a terminal command directly without PTY."""
 
         try:
             process = await asyncio.create_subprocess_shell(
