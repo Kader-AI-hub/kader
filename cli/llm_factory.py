@@ -16,6 +16,7 @@ from kader.providers import (
     OpenAIProviderConfig,
 )
 from kader.providers.base import BaseLLMProvider, ModelConfig
+from kader.providers.ollama import DEFAULT_CLOUD_HOST, DEFAULT_LOCAL_HOST
 
 
 class LLMProviderFactory:
@@ -168,6 +169,23 @@ class LLMProviderFactory:
                 default_config=config,
             )
 
+        # Handle Ollama provider (needs api_key for cloud models)
+        if provider_name == "ollama":
+            ollama_api_key = os.environ.get("OLLAMA_API_KEY")
+
+            # Strip :cloud suffix if present (we add it for display purposes)
+            actual_model_name = model_name.replace(":cloud", "")
+
+            # Use cloud host if API key is available
+            host = DEFAULT_CLOUD_HOST if ollama_api_key else None
+
+            return OllamaProvider(
+                model=actual_model_name,
+                host=host,
+                api_key=ollama_api_key,
+                default_config=config,
+            )
+
         return provider_class(model=model_name, default_config=config)
 
     @classmethod
@@ -226,12 +244,28 @@ class LLMProviderFactory:
         """
         models: dict[str, list[str]] = {}
 
-        # Get Ollama models
+        # Get Ollama models (local first)
         try:
-            ollama_models = OllamaProvider.get_supported_models()
+            ollama_models = OllamaProvider.get_supported_models(host=DEFAULT_LOCAL_HOST)
             models["ollama"] = [f"ollama:{m}" for m in ollama_models]
         except Exception:
             models["ollama"] = []
+
+        # Also try Ollama Cloud if API key is available
+        ollama_api_key = os.environ.get("OLLAMA_API_KEY")
+        if ollama_api_key:
+            try:
+                cloud_models = OllamaProvider.get_supported_models(
+                    host=DEFAULT_CLOUD_HOST, api_key=ollama_api_key
+                )
+                existing = set(models.get("ollama", []))
+                for m in cloud_models:
+                    # Add :cloud suffix to distinguish from local models
+                    prefixed = f"ollama:{m}:cloud"
+                    if prefixed.replace(":cloud", "") not in existing:
+                        models["ollama"].append(prefixed)
+            except Exception:
+                pass  # Cloud failed, but local models still available
 
         # Get Google models
         try:
@@ -339,6 +373,23 @@ class LLMProviderFactory:
         # Try to get models to verify provider is working
         try:
             provider_class = cls.PROVIDERS[provider_name]
+
+            # Special handling for Ollama: check both local and cloud
+            if provider_name == "ollama":
+                local_models = provider_class.get_supported_models(
+                    host=DEFAULT_LOCAL_HOST
+                )
+                if local_models:
+                    return True
+                # Also try cloud if API key is available
+                ollama_api_key = os.environ.get("OLLAMA_API_KEY")
+                if ollama_api_key:
+                    cloud_models = provider_class.get_supported_models(
+                        host=DEFAULT_CLOUD_HOST, api_key=ollama_api_key
+                    )
+                    return len(cloud_models) > 0
+                return False
+
             models = provider_class.get_supported_models()
             return len(models) > 0
         except Exception:
