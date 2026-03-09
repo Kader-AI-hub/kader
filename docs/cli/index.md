@@ -158,7 +158,8 @@ The model selection interface allows you to:
 
 | Provider | Format | Example |
 |----------|--------|---------|
-| Ollama | `ollama:model` | `ollama:llama3` |
+| Ollama (local) | `ollama:model` | `ollama:llama3` |
+| Ollama (cloud) | `ollama:model:cloud` | `ollama:minimax-m2.5:cloud` |
 | Google Gemini | `google:model` | `google:gemini-2.5-flash` |
 | Mistral | `mistral:model` | `mistral:small-3.1` |
 | Anthropic | `anthropic:model` | `anthropic:claude-3.5-sonnet` |
@@ -172,7 +173,13 @@ The model selection interface allows you to:
 ### Setting API Keys
 
 ```bash
+# Ollama Cloud (get from https://ollama.com/settings)
+export OLLAMA_API_KEY="your-ollama-api-key"
+
+# Google Gemini
 export GOOGLE_API_KEY="your-google-api-key"
+
+# Other providers...
 export ANTHROPIC_API_KEY="your-anthropic-api-key"
 export MISTRAL_API_KEY="your-mistral-api-key"
 export OPENAI_API_KEY="your-openai-api-key"

@@ -7,6 +7,7 @@ Kader can be configured through environment variables, YAML files, and the `.kad
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `KADER_DIR` | Kader config directory (default: `~/.kader`) | No |
+| `OLLAMA_API_KEY` | Ollama Cloud API key (get from https://ollama.com/settings) | For Ollama Cloud |
 | `GEMINI_API_KEY` | Google Gemini API key | For Google Provider |
 | `MISTRAL_API_KEY` | Mistral API key | For Mistral Provider |
 | `ANTHROPIC_API_KEY` | Anthropic API key | For Anthropic Provider |
@@ -57,7 +58,7 @@ agent = BaseAgent.from_yaml("agent.yaml")
 
 ## Provider Configuration Format
 
-### Ollama
+### Ollama (Local)
 
 ```yaml
 provider:
@@ -65,6 +66,16 @@ provider:
   model: llama3.2
   base_url: "http://localhost:11434"
   timeout: 120
+```
+
+### Ollama (Cloud)
+
+```yaml
+provider:
+  provider: ollama
+  model: minimax-m2.5
+  base_url: "https://ollama.com"
+  # api_key: "your-ollama-api-key"  # Or set OLLAMA_API_KEY env var
 ```
 
 ### Google Gemini

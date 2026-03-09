@@ -41,6 +41,9 @@ pip install -e .
 For cloud providers, create a `.env` file in `~/.kader/.env`:
 
 ```bash
+# Ollama Cloud (get from https://ollama.com/settings)
+OLLAMA_API_KEY='your-api-key'
+
 # Google Gemini
 GEMINI_API_KEY='your-api-key'
 
@@ -65,6 +68,14 @@ For local LLM inference with Ollama, install from https://ollama.ai and pull you
 ollama pull llama3.2
 ollama pull qwen2.5
 ```
+
+For cloud models via Ollama Cloud, get an API key from https://ollama.com/settings and set it in your environment:
+
+```bash
+export OLLAMA_API_KEY="your-api-key"
+```
+
+Then use cloud models with the `OllamaProvider` by specifying the cloud host:
 
 ## Core Concepts
 
@@ -302,10 +313,22 @@ For local LLM inference. Best for privacy, speed, and offline capability.
 ```python
 from kader.providers import OllamaProvider, Message
 
+# Local model (default - connects to localhost:11434)
 provider = OllamaProvider(
     model="llama3.2",          # Model name
-    base_url="http://localhost:11434",  # Custom endpoint
-    timeout=120,               # Request timeout
+)
+
+# Cloud model (requires OLLAMA_API_KEY environment variable)
+provider = OllamaProvider(
+    model="minimax-m2.5",      # Cloud model name
+    host="https://ollama.com",  # Cloud endpoint
+    api_key="your-api-key",     # Or set OLLAMA_API_KEY env var
+)
+
+# Custom local endpoint
+provider = OllamaProvider(
+    model="llama3.2",
+    host="http://localhost:11434",
 )
 
 # Basic invocation
@@ -907,6 +930,7 @@ python ollama_example.py
 | Variable | Description |
 |----------|-------------|
 | `KADER_DIR` | Kader config directory (default: `~/.kader`) |
+| `OLLAMA_API_KEY` | Ollama Cloud API key (for cloud models at ollama.com) |
 | `GEMINI_API_KEY` | Google Gemini API key |
 | `MISTRAL_API_KEY` | Mistral API key |
 | `OPENAI_API_KEY` | OpenAI API key |
