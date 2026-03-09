@@ -6,6 +6,7 @@ Kader is an intelligent coding agent designed to assist with software developmen
 
 - 🤖 **AI-powered Code Assistance** - Support for multiple LLM providers:
   - **Ollama**: Local LLM execution for privacy and speed.
+  - **Ollama Cloud**: Cloud-based models via [ollama.com](https://ollama.com).
   - **Google Gemini**: Cloud-based powerful models via the Google GenAI SDK.
   - **Anthropic**: High-quality Claude models via the Anthropic SDK.
 - 🖥️ **Interactive CLI** - Modern terminal interface built with Rich & prompt_toolkit:
@@ -98,7 +99,7 @@ When the kader module is imported for the first time, it automatically creates a
 ### Environment Variables
 
 The application automatically loads environment variables from `~/.kader/.env`:
-- `OLLAMA_API_KEY`: API key for Ollama service (if applicable).
+- `OLLAMA_API_KEY`: API key for Ollama Cloud (for cloud models at ollama.com). Get your key from https://ollama.com/settings
 - `GOOGLE_API_KEY`: API key for Google Gemini (required for Google Provider).
 - `ANTHROPIC_API_KEY`: API key for Anthropic Claude (required for Anthropic Provider).
 - Additional variables can be added to the `.env` file and will be automatically loaded.
@@ -116,7 +117,7 @@ Kader stores data in `~/.kader/`:
 | Command | Description |
 |---------|-------------|
 | `/help` | Show command reference |
-| `/models` | Show available models (Ollama, Google & Anthropic) |
+| `/models` | Show available models (Ollama local & cloud, Google & Anthropic) |
 | `/clear` | Clear conversation |
 | `/save` | Save current session |
 | `/load <id>` | Load a saved session |
@@ -184,6 +185,7 @@ Kader provides a robust agent architecture:
 
 Kader supports multiple backends:
 - **OllamaProvider**: Connects to locally running Ollama instances.
+- **OllamaProvider (Cloud)**: Connects to cloud models at ollama.com (requires OLLAMA_API_KEY).
 - **GoogleProvider**: High-performance access to Gemini models.
 - **AnthropicProvider**: Full support for Claude models.
 

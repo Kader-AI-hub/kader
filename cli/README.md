@@ -16,7 +16,7 @@ A modern terminal-based AI coding assistant built with [Rich](https://github.com
 
 ## Prerequisites
 
-- [Ollama](https://ollama.ai/) running locally (for local models)
+- [Ollama](https://ollama.ai/) running locally (for local models) or [Ollama Cloud](https://ollama.com) (for cloud models)
 - Python 3.11 or higher
 - [uv](https://docs.astral.sh/uv/) package manager (recommended) or [pip](https://pypi.org/project/pip/)
 - API keys for cloud providers (optional, based on model selection)
@@ -207,7 +207,8 @@ DEFAULT_MODEL = "minimax-m2.5:cloud"  # Default model
 
 | Provider | Format | Example |
 |----------|--------|---------|
-| Ollama | `ollama:model` | `ollama:llama3` |
+| Ollama (local) | `ollama:model` | `ollama:llama3` |
+| Ollama (cloud) | `ollama:model:cloud` | `ollama:minimax-m2.5:cloud` |
 | Google Gemini | `google:model` | `google:gemini-2.5-flash` |
 | Mistral | `mistral:model` | `mistral:small-3.1` |
 | Anthropic | `anthropic:model` | `anthropic:claude-3.5-sonnet` |
@@ -223,10 +224,16 @@ DEFAULT_MODEL = "minimax-m2.5:cloud"  # Default model
 Set API keys for cloud providers:
 
 ```bash
+# Ollama Cloud (get from https://ollama.com/settings)
+export OLLAMA_API_KEY="your-ollama-api-key"
+
+# Google Gemini
 export GOOGLE_API_KEY="your-google-api-key"
+
+# Other providers...
 export ANTHROPIC_API_KEY="your-anthropic-api-key"
 export MISTRAL_API_KEY="your-mistral-api-key"
-export OPENAI_API_KEY="your-openai-api-key"
+export OPENAI_API_KEY="your-openapi-key"
 export MOONSHOT_API_KEY="your-kimi-api-key"
 export ZAI_API_KEY="your-glm-api-key"
 export OPENROUTER_API_KEY="your-openrouter-api-key"

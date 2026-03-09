@@ -54,6 +54,9 @@ ollama pull qwen2.5
 Create a `.env` file in `~/.kader/.env`:
 
 ```bash
+# Ollama Cloud (get from https://ollama.com/settings)
+OLLAMA_API_KEY='your-api-key'
+
 # Google Gemini
 GEMINI_API_KEY='your-api-key'
 
