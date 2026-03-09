@@ -1,9 +1,11 @@
 """
 Ollama LLM Provider implementation.
 
-Provides synchronous and asynchronous access to Ollama models.
+Provides synchronous and asynchronous access to Ollama models,
+including both local and cloud (ollama.com) models.
 """
 
+import os
 from typing import AsyncIterator, Iterator
 
 from ollama import AsyncClient, Client
@@ -19,6 +21,9 @@ from .base import (
     StreamChunk,
     Usage,
 )
+
+DEFAULT_LOCAL_HOST = "http://localhost:11434"
+DEFAULT_CLOUD_HOST = "https://ollama.com"
 
 
 class OllamaProvider(BaseLLMProvider):
@@ -38,6 +43,7 @@ class OllamaProvider(BaseLLMProvider):
         self,
         model: str,
         host: str | None = None,
+        api_key: str | None = None,
         default_config: ModelConfig | None = None,
     ) -> None:
         """
@@ -46,12 +52,23 @@ class OllamaProvider(BaseLLMProvider):
         Args:
             model: The Ollama model identifier (e.g., "llama3.2", "gpt-oss:120b-cloud")
             host: Optional Ollama server host (default: http://localhost:11434)
+            api_key: Optional API key for Ollama Cloud (ollama.com)
             default_config: Default configuration for all requests
         """
         super().__init__(model=model, default_config=default_config)
         self._host = host
-        self._client = Client(host=host) if host else Client()
-        self._async_client = AsyncClient(host=host) if host else AsyncClient()
+        self._api_key = api_key or os.environ.get("OLLAMA_API_KEY")
+
+        headers = None
+        if self._api_key:
+            headers = {"Authorization": f"Bearer {self._api_key}"}
+
+        if host:
+            self._client = Client(host=host, headers=headers)
+            self._async_client = AsyncClient(host=host, headers=headers)
+        else:
+            self._client = Client()
+            self._async_client = AsyncClient()
 
     def _convert_messages(self, messages: list[Message]) -> list[dict]:
         """Convert Message objects to Ollama format."""
@@ -416,18 +433,28 @@ class OllamaProvider(BaseLLMProvider):
             return None
 
     @classmethod
-    def get_supported_models(cls, host: str | None = None) -> list[str]:
+    def get_supported_models(
+        cls, host: str | None = None, api_key: str | None = None
+    ) -> list[str]:
         """
         Get list of models available on the Ollama server.
 
         Args:
-            host: Optional Ollama server host
+            host: Optional Ollama server host (e.g., "http://localhost:11434" or "https://ollama.com")
+            api_key: Optional API key for Ollama Cloud
 
         Returns:
             List of available model names
         """
+        api_key = api_key or os.environ.get("OLLAMA_API_KEY")
+        headers = None
+        if api_key:
+            headers = {"Authorization": f"Bearer {api_key}"}
+
         try:
-            client = Client(host=host) if host else Client()
+            client = (
+                Client(host=host, headers=headers) if host else Client(headers=headers)
+            )
             response = client.list()
             models = [model.model for model in response.models]
             models_config = {}
@@ -444,4 +471,4 @@ class OllamaProvider(BaseLLMProvider):
 
     def list_models(self) -> list[str]:
         """List all available models on the Ollama server."""
-        return self.get_supported_models(self._host)
+        return self.get_supported_models(self._host, self._api_key)
