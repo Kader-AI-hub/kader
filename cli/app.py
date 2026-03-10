@@ -7,6 +7,7 @@ beautiful terminal output and prompt_toolkit for async input handling.
 import asyncio
 import atexit
 import json
+import sys
 import threading
 import warnings
 from concurrent.futures import ThreadPoolExecutor
@@ -62,6 +63,18 @@ WELCOME_BANNER = """\
  | . \\  / ___ \\| |_| | |___|  _ <
  |_|\\_\\/_/   \\_\\____/|_____|_| \\_\\
 [/bold magenta]"""
+
+
+def enter_fullscreen() -> None:
+    """Clear screen and hide cursor for fullscreen CLI mode."""
+    sys.stdout.write("\033[2J\033[H\033[?25l")
+    sys.stdout.flush()
+
+
+def exit_fullscreen() -> None:
+    """Restore terminal: clear screen and show cursor."""
+    sys.stdout.write("\033[2J\033[H\033[?25h")
+    sys.stdout.flush()
 
 
 def format_plan_display(items: list[dict]) -> None:
@@ -1066,6 +1079,7 @@ class KaderApp:
         """Run the Kader CLI application."""
         from kader.tools.exec_commands import CommandExecutorTool
 
+        enter_fullscreen()
         try:
             asyncio.run(self._run_async())
         except KeyboardInterrupt:
@@ -1073,6 +1087,7 @@ class KaderApp:
         finally:
             self._stop_spinner()
             CommandExecutorTool.clear_callbacks()
+            exit_fullscreen()
 
 
 def main() -> None:
