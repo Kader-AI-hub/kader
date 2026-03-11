@@ -221,6 +221,25 @@ class PlannerExecutorWorkflow(BaseWorkflow):
             # Silently fail if checkpointing fails - don't interrupt workflow
             return None
 
+    async def _acreate_checkpoint(self) -> Optional[str]:
+        """
+        Create a checkpoint of the current session asynchronously.
+
+        Returns:
+            Path to the checkpoint file if created, None otherwise.
+        """
+        if not self.session_id or not self.use_persistence:
+            return None
+
+        try:
+            checkpointer = Checkpointer(provider=self._planner.provider)
+            memory_path = f"{self.session_id}/conversation.json"
+            checkpoint_path = await checkpointer.agenerate_checkpoint(memory_path)
+            return checkpoint_path
+        except Exception:
+            # Silently fail if checkpointing fails - don't interrupt workflow
+            return None
+
     def run(self, task: str) -> str:
         """
         Execute the planner-executor workflow synchronously.
@@ -264,7 +283,7 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         response = await self._planner.ainvoke(task)
 
         # Create checkpoint after execution completes
-        self._create_checkpoint()
+        await self._acreate_checkpoint()
 
         if hasattr(response, "content"):
             return str(response.content)
