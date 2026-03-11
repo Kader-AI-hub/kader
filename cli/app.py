@@ -7,7 +7,6 @@ beautiful terminal output and prompt_toolkit for async input handling.
 import asyncio
 import json
 import sys
-import threading
 import warnings
 from importlib.metadata import version as get_version
 from pathlib import Path
@@ -1016,13 +1015,8 @@ class KaderApp:
 
     async def _run_async(self) -> None:
         """Async main loop."""
+        self._check_for_updates()
         self._print_welcome()
-
-        # Background update check
-        threading.Thread(target=self._check_for_updates, daemon=True).start()
-
-        # Show update notification after a short delay
-        await asyncio.sleep(2)
         self._show_update_notification()
 
         while self._running:
