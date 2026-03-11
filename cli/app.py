@@ -5,12 +5,10 @@ beautiful terminal output and prompt_toolkit for async input handling.
 """
 
 import asyncio
-import atexit
 import json
 import sys
 import threading
 import warnings
-from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import version as get_version
 from pathlib import Path
 from typing import Optional
@@ -112,12 +110,6 @@ class KaderApp:
 
         # Spinner state for Live display
         self._spinner_live: Optional[Live] = None
-
-        # Dedicated thread pool for agent invocation
-        self._agent_executor = ThreadPoolExecutor(
-            max_workers=2, thread_name_prefix="kader_agent"
-        )
-        atexit.register(self._agent_executor.shutdown, wait=False)
 
         self._workflow = self._create_workflow(self._current_model)
 
@@ -590,11 +582,8 @@ class KaderApp:
             # Start spinner
             self._start_spinner()
 
-            # Run the workflow in the dedicated thread pool
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(
-                self._agent_executor, lambda: self._workflow.run(message)
-            )
+            # Run the workflow asynchronously
+            response = await self._workflow.arun(message)
 
             # Stop spinner and show response
             self._stop_spinner()
@@ -909,13 +898,9 @@ class KaderApp:
                 custom_system_prompt=command.content,
             )
 
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                self._agent_executor,
-                lambda: agent_tool.execute(
-                    task=user_task or "Execute the command with no specific task",
-                    context="",
-                ),
+            result = await agent_tool.aexecute(
+                task=user_task or "Execute the command with no specific task",
+                context="",
             )
 
             self._stop_spinner()
