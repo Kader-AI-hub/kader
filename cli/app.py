@@ -6,6 +6,8 @@ beautiful terminal output and prompt_toolkit for async input handling.
 
 import asyncio
 import json
+import os
+import subprocess
 import sys
 import warnings
 from importlib.metadata import version as get_version
@@ -1000,12 +1002,30 @@ class KaderApp:
         except Exception:
             version = "?"
 
+        cwd = os.getcwd()
+        git_info = ""
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            if result.returncode == 0:
+                branch = result.stdout.strip()
+                if branch:
+                    git_info = f" · {branch}"
+        except (subprocess.SubprocessError, FileNotFoundError, TimeoutError):
+            pass
+
         self.console.print(WELCOME_BANNER)
         self.console.print(
             f"  [dim]v{version} · "
             f"Model: {self._current_model} · "
             f"Type /help for commands[/dim]\n"
         )
+        self.console.print(f"  [dim]{cwd}{git_info}[/dim]")
 
     # ── Main loop ────────────────────────────────────────────────────
 
