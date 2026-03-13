@@ -208,15 +208,17 @@ Kader supports a modular skill system for domain-specific knowledge and speciali
 
 Kader supports special commands — custom command agents that can be invoked from the CLI:
 
-- **Command Structure**: Commands are defined as directories containing `CONTENT.md` files
+- **Command Structure**: Commands can be defined as either:
+  - **Directory**: `<command-name>/CONTENT.md` (can include additional files like templates, assets)
+  - **Direct file**: `<command-name>.md` (simple command without extra files)
+  - **Sub-commands**: `<command-name>/<subcommand>.md` (multiple commands in one directory)
 - **Command Loading**: Commands are loaded from `./.kader/commands/` (higher priority) and `~/.kader/commands/`
-- **Command Invocation**: Use `/<command-name> <task>` to execute a command
+- **Command Invocation**: Use `/<command-name> <task>` or `/<command-name>/<subcommand> <task>` to execute a command
 - **Memory Persistence**: Command executions are saved to `~/.kader/memory/sessions/<session-id>/executors/<command-name>-<uuid>/conversation.json`
 
 #### Creating a Special Command
 
-Create a command directory with a `CONTENT.md` file:
-
+**Option 1: Directory format** (with additional files)
 ```
 ~/.kader/commands/mycommand/
 ├── CONTENT.md          # Required - command instructions
@@ -224,7 +226,22 @@ Create a command directory with a `CONTENT.md` file:
 └── assets/            # Optional - files
 ```
 
-**CONTENT.md format:**
+**Option 2: Simple file format**
+```
+~/.kader/commands/mycommand.md
+```
+
+**Option 3: Directory with sub-commands**
+```
+~/.kader/commands/mycommand/
+├── CONTENT.md           # Main command (/mycommand)
+├── subcommand1.md       # Sub-command (/mycommand/subcommand1)
+├── subcommand2.md       # Sub-command (/mycommand/subcommand2)
+├── templates/           # Optional - shared templates
+└── assets/             # Optional - shared assets
+```
+
+**CONTENT.md or .md file format:**
 ```yaml
 ---
 description: What this command does

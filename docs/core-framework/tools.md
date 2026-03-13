@@ -181,17 +181,56 @@ When writing Python code:
 
 ## Special Commands
 
-Create custom command agents:
+Special commands allow you to create custom command agents that can be invoked from the CLI. Unlike skills which are loaded by agents, special commands are executed directly from the CLI using `/<command-name>`.
 
 ```python
 from kader.tools import CommandLoader
 
+# Create command loader
 loader = CommandLoader()
+
+# Load a specific command
 command = loader.load_command("lint-test")
+print(command.name)        # Command name
+print(command.description)  # Command description
+print(command.content)     # Command instructions
+print(command.base_dir)    # Command directory path
+
+# List all available commands
 all_commands = loader.list_commands()
+
+# Get formatted description
+description = loader.get_description()
 ```
 
 ### Command File Format
+
+Commands can be defined in three formats:
+
+**Option 1: Directory format** (with additional files)
+```
+~/.kader/commands/lint-test/
+├── CONTENT.md          # Main command instructions
+├── templates/          # Optional - templates
+└── assets/            # Optional - files
+```
+
+**Option 2: Simple file format**
+```
+~/.kader/commands/lint-test.md
+```
+
+**Option 3: Directory with sub-commands**
+```
+~/.kader/commands/mycommand/
+├── CONTENT.md           # Main command (/mycommand)
+├── subcommand1.md      # Sub-command (/mycommand/subcommand1)
+├── subcommand2.md      # Sub-command (/mycommand/subcommand2)
+├── templates/           # Optional - shared templates
+└── assets/             # Optional - shared assets
+```
+
+All formats use the same CONTENT.md or .md file format:
 
 ```yaml
 ---
@@ -207,6 +246,19 @@ You are specialized in maintaining code quality.
 1. Run linting: uv run ruff check .
 2. Run tests: uv run pytest -v
 3. Report results
+```
+
+Commands are loaded from:
+- `./.kader/commands/` (project-level, higher priority)
+- `~/.kader/commands/` (user-level)
+
+### Using Commands from CLI
+
+```
+/lint-test
+/lint-test run full check
+/lint-test/lint    # Sub-command
+/commands  # List all available commands
 ```
 
 ## Custom Tools

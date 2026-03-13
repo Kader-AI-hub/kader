@@ -648,7 +648,22 @@ description = loader.get_description()
 
 #### Command File Format
 
-Commands are stored in directories named after the command, each containing a `CONTENT.md` file:
+Commands can be defined in two formats:
+
+**Option 1: Directory format** (with additional files)
+```
+~/.kader/commands/lint-test/
+├── CONTENT.md          # Required - command instructions
+├── templates/          # Optional - templates
+└── assets/            # Optional - files
+```
+
+**Option 2: Simple file format**
+```
+~/.kader/commands/lint-test.md
+```
+
+Both formats use the same CONTENT.md or .md file format:
 
 ```markdown
 ---
@@ -665,15 +680,6 @@ You are specialized in maintaining code quality.
 2. Run formatting check: uv run ruff format --check .
 3. Run tests: uv run pytest -v
 4. Report results
-```
-
-#### Command Directory Structure
-
-```
-~/.kader/commands/lint-test/
-├── CONTENT.md          # Required - command instructions
-├── templates/          # Optional - templates
-└── assets/            # Optional - files
 ```
 
 Commands are loaded from:

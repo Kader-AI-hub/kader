@@ -48,8 +48,14 @@ class CommandLoader:
         """
         Find the command file in the commands directories.
 
+        Supports three formats:
+        1. Directory with CONTENT.md: <command-name>/CONTENT.md (higher priority)
+        2. Directory with README.md: <command-name>/README.md
+        3. Direct file: <command-name>.md
+        4. Sub-command: <command-name>/<subcommand>.md
+
         Args:
-            name: Name of the command to find
+            name: Name of the command to find (can be "command" or "command/subcommand")
 
         Returns:
             Tuple of (command_dir, content_file) if found, None otherwise
@@ -57,18 +63,58 @@ class CommandLoader:
         for commands_dir in self.commands_dirs:
             if not commands_dir.exists():
                 continue
+
+            # Check if this is a sub-command (contains /)
+            if "/" in name:
+                parts = name.split("/", 1)
+                command_name = parts[0]
+                subcommand_name = parts[1]
+
+                command_dir = commands_dir / command_name
+                if not command_dir.is_dir():
+                    continue
+
+                # For sub-commands, check the specific .md file first
+                # Then fall back to CONTENT.md or README.md in the directory
+                md_file = command_dir / f"{subcommand_name}.md"
+                if md_file.exists():
+                    return (commands_dir, md_file)
+
+                # Fall back to CONTENT.md or README.md
+                for md_name in ["CONTENT.md", "README.md"]:
+                    content_file = command_dir / md_name
+                    if content_file.exists():
+                        return (commands_dir, content_file)
+                continue
+
+            # Regular command (no sub-command)
+            # First check for directory with CONTENT.md (higher priority)
             command_dir = commands_dir / name
-            content_file = command_dir / "CONTENT.md"
-            if content_file.exists():
-                return (commands_dir, content_file)
+
+            # Check for CONTENT.md or README.md in directory
+            for md_name in ["CONTENT.md", "README.md"]:
+                content_file = command_dir / md_name
+                if content_file.exists():
+                    return (commands_dir, content_file)
+
+            # Then check for direct .md file
+            md_file = commands_dir / f"{name}.md"
+            if md_file.exists():
+                return (commands_dir, md_file)
+
         return None
 
     def load_command(self, name: str) -> Command | None:
         """
         Load a command by name.
 
+        Supports four formats:
+        1. Directory: <command-name>/CONTENT.md or README.md
+        2. Direct file: <command-name>.md
+        3. Sub-command: <command-name>/<subcommand>.md
+
         Args:
-            name: Name of the command to load
+            name: Name of the command to load (can be "command" or "command/subcommand")
 
         Returns:
             Command object if found, None otherwise
@@ -77,7 +123,7 @@ class CommandLoader:
         if result is None:
             return None
 
-        command_dir, content_file = result
+        commands_dir, content_file = result
         parsed = frontmatter.load(str(content_file))
 
         metadata = parsed.metadata or {}
@@ -87,16 +133,36 @@ class CommandLoader:
             first_line = parsed.content.strip().split("\n")[0][:100]
             description = first_line if first_line else "No description available"
 
+            # Determine base_dir and final command name
+        if "/" in name:
+            # Sub-command: command/subcommand
+            command_name = name.split("/", 1)[0]
+            full_name = name  # Keep as command/subcommand
+            base_dir = commands_dir / command_name
+        elif content_file.name in ["CONTENT.md", "README.md"]:
+            # Directory format: command/CONTENT.md or command/README.md
+            full_name = name
+            base_dir = content_file.parent
+        else:
+            # Direct file format: command.md
+            full_name = name
+            base_dir = commands_dir / name
+
         return Command(
-            name=name,
+            name=full_name,
             description=description,
             content=parsed.content,
-            base_dir=command_dir / name,
+            base_dir=base_dir,
         )
 
     def list_commands(self) -> list[Command]:
         """
         List all available commands from all directories.
+
+        Supports four formats:
+        1. Directory: <command-name>/CONTENT.md or README.md
+        2. Direct file: <command-name>.md
+        3. Sub-commands: <command-name>/<subcommand>.md
 
         Commands from priority_dir take priority, then ~/.kader/commands,
         then ./.kader/commands.
@@ -111,11 +177,24 @@ class CommandLoader:
             if not commands_dir.exists():
                 continue
 
-            for command_dir in sorted(commands_dir.iterdir()):
-                if not command_dir.is_dir():
-                    continue
+            # Collect command names from directories and .md files
+            command_names: set[str] = set()
 
-                name = command_dir.name
+            # First, add directory names
+            for entry in commands_dir.iterdir():
+                if entry.is_dir():
+                    command_names.add(entry.name)
+
+            # Then, add .md file names (without extension)
+            for entry in commands_dir.iterdir():
+                if entry.is_file() and entry.suffix == ".md":
+                    cmd_name = entry.stem
+                    # Only add if not already found as a directory
+                    if cmd_name not in command_names:
+                        command_names.add(cmd_name)
+
+            # Load each top-level command
+            for name in sorted(command_names):
                 if name in seen_names:
                     continue
 
@@ -123,6 +202,32 @@ class CommandLoader:
                 if command:
                     commands.append(command)
                     seen_names.add(name)
+
+            # Now find sub-commands within directories
+            for entry in sorted(commands_dir.iterdir()):
+                if not entry.is_dir():
+                    continue
+
+                command_name = entry.name
+                # Look for .md files in the subdirectory (sub-commands)
+                for md_file in sorted(entry.iterdir()):
+                    if not md_file.is_file() or md_file.suffix != ".md":
+                        continue
+
+                    # Skip CONTENT.md and README.md as they're handled above
+                    if md_file.name in ["CONTENT.md", "README.md"]:
+                        continue
+
+                    subcommand_name = md_file.stem
+                    full_name = f"{command_name}/{subcommand_name}"
+
+                    if full_name in seen_names:
+                        continue
+
+                    command = self.load_command(full_name)
+                    if command:
+                        commands.append(command)
+                        seen_names.add(full_name)
 
         return commands
 
