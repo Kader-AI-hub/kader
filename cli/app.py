@@ -6,6 +6,8 @@ beautiful terminal output and prompt_toolkit for async input handling.
 
 import asyncio
 import json
+import os
+import subprocess
 import sys
 import warnings
 from importlib.metadata import version as get_version
@@ -25,6 +27,7 @@ from rich.table import Table
 from rich.theme import Theme
 
 from kader.memory import FileSessionManager, MemoryConfig
+from kader.utils import agenerate_session_title
 from kader.workflows import PlannerExecutorWorkflow
 
 from .commands import InitializeCommand
@@ -98,6 +101,7 @@ class KaderApp:
         self._current_model = DEFAULT_MODEL
         self._current_session_id: str | None = None
         self._running = True
+        self._session_title: Optional[str] = None
 
         # Session manager
         self._session_manager = FileSessionManager(
@@ -367,9 +371,12 @@ class KaderApp:
         message: str,
         model_name: str | None = None,
         usage_cost: float | None = None,
+        session_title: str | None = None,
     ) -> None:
         """Display an assistant message."""
         subtitle_parts = []
+        if session_title:
+            subtitle_parts.append(f"[yellow]{session_title}[/yellow]")
         if model_name:
             subtitle_parts.append(f"[dim]{model_name}[/dim]")
         if usage_cost is not None:
@@ -414,6 +421,7 @@ class KaderApp:
             self._workflow.planner.memory.clear()
             self._workflow.planner.provider.reset_tracking()
             self._current_session_id = self._workflow.session_id
+            self._session_title = None
             self.console.clear()
             self._print_welcome()
             self._print_system_message("Conversation cleared!", "kader.green")
@@ -578,6 +586,14 @@ class KaderApp:
         self._print_user_message(message)
 
         try:
+            is_first_message = len(self._workflow.planner.memory.get_messages()) == 0
+
+            if is_first_message and self._session_title is None:
+                asyncio.create_task(self._generate_session_title(message))
+                self.console.print("  [dim]Session: Generating...[/dim]")
+            elif self._session_title:
+                self.console.print(f"  [dim]Session: {self._session_title}[/dim]")
+
             # Start spinner
             self._start_spinner()
 
@@ -591,6 +607,7 @@ class KaderApp:
                     response,
                     model_name=self._workflow.planner.provider.model,
                     usage_cost=self._workflow.planner.provider.total_cost.total_cost,
+                    session_title=self._session_title,
                 )
 
         except Exception as e:
@@ -603,6 +620,17 @@ class KaderApp:
 
         finally:
             self._is_processing = False
+
+    async def _generate_session_title(self, message: str) -> None:
+        """Generate session title in background."""
+        try:
+            title = await agenerate_session_title(
+                provider=self._workflow.planner.provider,
+                query=message,
+            )
+            self._session_title = title
+        except Exception:
+            pass
 
     async def _handle_terminal_command(self, command: str) -> None:
         """Handle terminal commands starting with !."""
@@ -909,6 +937,7 @@ class KaderApp:
                     result,
                     model_name=self._workflow.planner.provider.model,
                     usage_cost=self._workflow.planner.provider.total_cost.total_cost,
+                    session_title=self._session_title,
                 )
             else:
                 self.console.print(
@@ -1000,12 +1029,30 @@ class KaderApp:
         except Exception:
             version = "?"
 
+        cwd = os.getcwd()
+        git_info = ""
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            if result.returncode == 0:
+                branch = result.stdout.strip()
+                if branch:
+                    git_info = f" · {branch}"
+        except (subprocess.SubprocessError, FileNotFoundError, TimeoutError):
+            pass
+
         self.console.print(WELCOME_BANNER)
         self.console.print(
             f"  [dim]v{version} · "
             f"Model: {self._current_model} · "
             f"Type /help for commands[/dim]\n"
         )
+        self.console.print(f"  [dim]{cwd}{git_info}[/dim]")
 
     # ── Main loop ────────────────────────────────────────────────────
 

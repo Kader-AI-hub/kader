@@ -69,3 +69,10 @@ class CommandAgentPrompt(PromptBase):
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(template_path="command_agent.j2", **kwargs)
+
+
+class SessionTitlePrompt(PromptBase):
+    """Prompt for generating session titles."""
+
+    def __init__(self, query: str, **kwargs: Any) -> None:
+        super().__init__(template_path="session_title.j2", query=query, **kwargs)
