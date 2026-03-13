@@ -102,13 +102,37 @@ Use `/commands` to list all available special commands.
 
 ### Creating a Command
 
-Create a command directory with a `CONTENT.md` file:
+Commands can be defined in three formats:
 
+**Option 1: Directory format** (with additional files)
 ```bash
 mkdir -p ~/.kader/commands/mycommand
 ```
 
-**CONTENT.md format:**
+```
+~/.kader/commands/mycommand/
+├── CONTENT.md          # Main command instructions
+├── templates/          # Optional - templates
+└── assets/            # Optional - files
+```
+
+**Option 2: Simple file format**
+```bash
+# Just create a .md file directly
+~/.kader/commands/mycommand.md
+```
+
+**Option 3: Directory with sub-commands**
+```
+~/.kader/commands/mycommand/
+├── CONTENT.md           # Main command (/mycommand)
+├── subcommand1.md      # Sub-command (/mycommand/subcommand1)
+├── subcommand2.md      # Sub-command (/mycommand/subcommand2)
+├── templates/           # Optional - shared templates
+└── assets/             # Optional - shared assets
+```
+
+**CONTENT.md or .md file format:**
 
 ```yaml
 ---
@@ -122,29 +146,45 @@ Your command agent instructions here...
 
 ### Using Commands
 
+Execute a command with:
 ```
 /mycommand
 /mycommand do something specific
+/mycommand/subcommand specific task
 ```
 
-### Example: Lint and Test Command
+### Example: Lint and Test Command with Sub-commands
 
+**Directory with sub-commands:**
+```
+~/.kader/commands/lint-test/
+├── CONTENT.md     # Main command: /lint-test
+├── lint.md        # Sub-command: /lint-test/lint
+└── test.md        # Sub-command: /lint-test/test
+```
+
+**lint.md:**
 ```yaml
 ---
-description: Lint and test the codebase following AGENTS.md
+description: Run only linting
 ---
 
-You are a Lint and Test Agent specialized in maintaining code quality.
-
-## Instructions
-
-1. Run: uv run ruff check .
-2. Run: uv run ruff format --check .
-3. Run: uv run pytest -v
-4. Report results
+Run linting only using ruff.
 ```
 
-Usage: `/lint-test` or `/lint-test run full check`
+**test.md:**
+```yaml
+---
+description: Run only tests
+---
+
+Run tests only using pytest.
+```
+
+Usage:
+- `/lint-test` - Run full lint and test
+- `/lint-test/lint` - Run linting only
+- `/lint-test/test` - Run tests only
 
 ## Model Selection
 
