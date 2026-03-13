@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from .llm_factory import LLMProviderFactory
 
-DEFAULT_MODEL = "minimax-m2.5:cloud"
+DEFAULT_MODEL = "glm-5:cloud"
 
 
 @dataclass
