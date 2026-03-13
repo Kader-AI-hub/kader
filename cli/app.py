@@ -469,6 +469,16 @@ class KaderApp:
             partial = cmd.lstrip("/")
             suggestions = self._get_command_suggestions(partial)
 
+            # Filter: if exactly 1 suggestion and it's a sub-command (contains / after the command name),
+            # don't auto-complete - show all options instead to avoid infinite loops
+            # We check if suggestion has pattern like /command/subcommand (2+ slashes)
+            if len(suggestions) == 1:
+                # Count slashes - if more than 1, it's a sub-command
+                slash_count = suggestions[0].count("/")
+                if slash_count >= 2:
+                    # Don't auto-complete to sub-commands directly
+                    suggestions = []
+
             if len(suggestions) == 1:
                 self.console.print(
                     rf"  [kader.cyan]→[/kader.cyan] Auto-completing to `{suggestions[0]}`"
@@ -850,6 +860,10 @@ class KaderApp:
     def _get_special_command(self, command_input: str) -> tuple[str, str] | None:
         """Parse command input and check if it's a special command.
 
+        Supports formats:
+        - /command task
+        - /command/subcommand task
+
         Args:
             command_input: The raw command input (e.g., "/mycommand do something")
 
@@ -859,9 +873,36 @@ class KaderApp:
         if not command_input.startswith("/"):
             return None
 
-        parts = command_input[1:].strip().split(maxsplit=1)
-        command_name = parts[0] if parts else ""
-        user_task = parts[1] if len(parts) > 1 else ""
+        # Remove leading / and get the rest
+        rest = command_input[1:].strip()
+
+        # Determine the full command name (including sub-command)
+        # Format: command/subcommand task or command task
+        if " " in rest:
+            # Has space: command task or command/subcommand task
+            cmd_with_sub = rest.split()[0]
+        elif "/" in rest:
+            # Has slash but no space: command/subcommand
+            cmd_with_sub = rest
+        else:
+            # Just command name
+            cmd_with_sub = rest
+
+        # Parse command name and user task
+        if "/" in cmd_with_sub:
+            cmd_parts = cmd_with_sub.split("/", 1)
+            command_name = cmd_parts[0]
+            remaining = cmd_parts[1] if len(cmd_parts) > 1 else ""
+
+            if remaining:
+                task_parts = remaining.split(maxsplit=1)
+                user_task = task_parts[1] if len(task_parts) > 1 else ""
+            else:
+                user_task = ""
+        else:
+            parts = rest.split(maxsplit=1)
+            command_name = parts[0] if parts else ""
+            user_task = parts[1] if len(parts) > 1 else ""
 
         if not command_name:
             return None
@@ -870,9 +911,19 @@ class KaderApp:
             from kader.tools.commands import CommandLoader
 
             loader = CommandLoader()
-            command = loader.load_command(command_name)
+
+            # Try to load with full command name (including sub-command)
+            full_command_name = cmd_with_sub if "/" in cmd_with_sub else command_name
+            command = loader.load_command(full_command_name)
             if command:
-                return (command_name, user_task)
+                return (full_command_name, user_task)
+
+            # Also try without sub-command part for top-level commands
+            if "/" in full_command_name:
+                top_level = full_command_name.split("/")[0]
+                command = loader.load_command(top_level)
+                if command:
+                    return (full_command_name, user_task)
         except Exception:
             pass
 
