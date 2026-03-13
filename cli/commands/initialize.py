@@ -4,7 +4,6 @@ Creates a .kader directory in the current working directory and generates
 KADER.md file using an AgentTool to analyze the codebase.
 """
 
-import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -82,10 +81,9 @@ class InitializeCommand(BaseCommand):
                 f"and create the KADER.md file."
             )
 
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                self.app._agent_executor,
-                lambda: agent_tool.execute(task=task, context=context),
+            result = await agent_tool.aexecute(
+                task=task,
+                context=context,
             )
 
             console.print(
