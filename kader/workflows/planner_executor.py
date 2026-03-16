@@ -56,6 +56,8 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         memory_manager_type: str = "hierarchical",
         skills_dirs: list[Path] | None = None,
         priority_dir: Path | None = None,
+        executor_model_name: Optional[str] = None,
+        executor_provider: Optional[BaseLLMProvider] = None,
     ) -> None:
         """
         Initialize the Planner-Executor workflow.
@@ -73,6 +75,8 @@ class PlannerExecutorWorkflow(BaseWorkflow):
             skills_dirs: Optional list of custom skill directories for sub-agents.
                         If None, uses default directories (~/.kader/skills and ./.kader/).
             priority_dir: Optional directory checked first (higher priority) for skills.
+            executor_model_name: Model name for executor sub-agents. If None, uses planner's model.
+            executor_provider: Provider for executor sub-agents. If None, uses planner's provider.
         """
         super().__init__(
             name=name,
@@ -89,6 +93,8 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         self.memory_manager_type = memory_manager_type
         self.skills_dirs = skills_dirs
         self.priority_dir = priority_dir
+        self.executor_model_name = executor_model_name
+        self.executor_provider = executor_provider
 
         # Build the planner agent with tools
         self._planner = self._build_planner()
@@ -137,8 +143,8 @@ class PlannerExecutorWorkflow(BaseWorkflow):
                     "Use this when a specific task needs to be executed by a "
                     "specialized worker agent. Provide a clear task description."
                 ),
-                provider=self.provider,
-                model_name=self.model_name,
+                provider=self.executor_provider or self.provider,
+                model_name=self.executor_model_name or self.model_name,
                 interrupt_before_tool=self.interrupt_before_tool,
                 tool_confirmation_callback=self.tool_confirmation_callback,
                 direct_execution_callback=self.direct_execution_callback,
