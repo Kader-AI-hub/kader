@@ -14,7 +14,7 @@ from kader.memory import (
 )
 from kader.memory.compression import CompressionConfig, ToolOutputCompressor
 from kader.memory.types import aread_text, save_json
-from kader.providers.base import BaseLLMProvider, Message
+from kader.providers.base import BaseLLMProvider
 from kader.utils import Checkpointer, ContextAggregator
 
 from .base import (
@@ -360,9 +360,6 @@ class AgentTool(BaseTool[str]):
         else:
             full_context = context
 
-        # Add context to memory as user message
-        memory.add_message(Message.user(full_context))
-
         # Get default tools (filesystem, web, command executor) - use cached version
         from kader.tools.skills import SkillLoader, SkillsTool
 
@@ -396,7 +393,7 @@ class AgentTool(BaseTool[str]):
         else:
             from kader.prompts import ExecutorAgentPrompt
 
-            system_prompt = ExecutorAgentPrompt(tools=tools.tools)
+            system_prompt = ExecutorAgentPrompt(tools=tools.tools, context=full_context)
 
         # Create the ReActAgent with separate memory and executor prompt
         agent = ReActAgent(
@@ -537,9 +534,6 @@ class AgentTool(BaseTool[str]):
         else:
             full_context = context
 
-        # Add context to memory as user message
-        memory.add_message(Message.user(full_context))
-
         # Get default tools (filesystem, web, command executor) - use cached version
         from kader.tools.skills import SkillLoader, SkillsTool
 
@@ -573,7 +567,7 @@ class AgentTool(BaseTool[str]):
         else:
             from kader.prompts import ExecutorAgentPrompt
 
-            system_prompt = ExecutorAgentPrompt(tools=tools.tools)
+            system_prompt = ExecutorAgentPrompt(tools=tools.tools, context=full_context)
 
         # Create the ReActAgent with separate memory and executor prompt
         agent = ReActAgent(

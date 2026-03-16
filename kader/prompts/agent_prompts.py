@@ -54,8 +54,8 @@ class ExecutorAgentPrompt(PromptBase):
     - Structured final answer with files created, summary, and issues
     """
 
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(template_path="executor_agent.j2", **kwargs)
+    def __init__(self, context: str | None = None, **kwargs: Any) -> None:
+        super().__init__(template_path="executor_agent.j2", context=context, **kwargs)
 
 
 class CommandAgentPrompt(PromptBase):

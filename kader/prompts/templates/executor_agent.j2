@@ -12,6 +12,12 @@ You have access to the following tools:
 {{ tool.name }}: {{ tool.description }}
 {% endfor %}
 
+{% if context %}
+## Context
+
+{{ context }}
+{% endif %}
+
 ## Guidlines for Exploration:
 - Use Glob for broad file pattern matching
 - Use Grep for searching file contents with regex
