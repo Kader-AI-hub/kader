@@ -291,3 +291,104 @@ class TestPlannerExecutorWorkflowSkills:
             ]
             for agent_tool in agent_tools:
                 assert agent_tool._priority_dir == priority
+
+    @patch("kader.workflows.planner_executor.PlanningAgent")
+    def test_workflow_propagates_executor_model_name_to_agent_tool(
+        self, mock_planning_agent
+    ):
+        """PlannerExecutorWorkflow stores executor_model_name and passes it to AgentTool."""
+        from kader.workflows.planner_executor import PlannerExecutorWorkflow
+
+        mock_planning_agent.return_value = MagicMock()
+
+        workflow = PlannerExecutorWorkflow(
+            name="test_workflow",
+            model_name="planner_model",
+            executor_model_name="executor_model",
+        )
+
+        assert workflow.executor_model_name == "executor_model"
+
+        call_kwargs = mock_planning_agent.call_args[1]
+        planner_registry = call_kwargs["tools"]
+
+        agent_tools = [t for t in planner_registry.tools if isinstance(t, AgentTool)]
+        assert len(agent_tools) > 0
+        for agent_tool in agent_tools:
+            assert agent_tool._model_name == "executor_model"
+
+    @patch("kader.workflows.planner_executor.PlanningAgent")
+    def test_workflow_propagates_executor_provider_to_agent_tool(
+        self, mock_planning_agent
+    ):
+        """PlannerExecutorWorkflow stores executor_provider and passes it to AgentTool."""
+        from kader.providers.ollama import OllamaProvider
+        from kader.workflows.planner_executor import PlannerExecutorWorkflow
+
+        mock_planning_agent.return_value = MagicMock()
+
+        mock_provider = MagicMock(spec=OllamaProvider)
+
+        workflow = PlannerExecutorWorkflow(
+            name="test_workflow",
+            executor_provider=mock_provider,
+        )
+
+        assert workflow.executor_provider == mock_provider
+
+        call_kwargs = mock_planning_agent.call_args[1]
+        planner_registry = call_kwargs["tools"]
+
+        agent_tools = [t for t in planner_registry.tools if isinstance(t, AgentTool)]
+        assert len(agent_tools) > 0
+        for agent_tool in agent_tools:
+            assert agent_tool._provider == mock_provider
+
+    @patch("kader.workflows.planner_executor.PlanningAgent")
+    def test_workflow_uses_planner_model_as_executor_default(self, mock_planning_agent):
+        """When executor_model_name is None, AgentTool uses planner's model."""
+        from kader.workflows.planner_executor import PlannerExecutorWorkflow
+
+        mock_planning_agent.return_value = MagicMock()
+
+        workflow = PlannerExecutorWorkflow(
+            name="test_workflow",
+            model_name="planner_model",
+            executor_model_name=None,
+        )
+
+        assert workflow.executor_model_name is None
+
+        call_kwargs = mock_planning_agent.call_args[1]
+        planner_registry = call_kwargs["tools"]
+
+        agent_tools = [t for t in planner_registry.tools if isinstance(t, AgentTool)]
+        for agent_tool in agent_tools:
+            assert agent_tool._model_name == "planner_model"
+
+    @patch("kader.workflows.planner_executor.PlanningAgent")
+    def test_workflow_uses_planner_provider_as_executor_default(
+        self, mock_planning_agent
+    ):
+        """When executor_provider is None, AgentTool uses planner's provider."""
+        from kader.providers.ollama import OllamaProvider
+        from kader.workflows.planner_executor import PlannerExecutorWorkflow
+
+        mock_planning_agent.return_value = MagicMock()
+
+        mock_provider = MagicMock(spec=OllamaProvider)
+
+        workflow = PlannerExecutorWorkflow(
+            name="test_workflow",
+            provider=mock_provider,
+            executor_provider=None,
+        )
+
+        assert workflow.executor_provider is None
+
+        call_kwargs = mock_planning_agent.call_args[1]
+        planner_registry = call_kwargs["tools"]
+
+        agent_tools = [t for t in planner_registry.tools if isinstance(t, AgentTool)]
+        for agent_tool in agent_tools:
+            assert agent_tool._provider == mock_provider
