@@ -1,3 +1,4 @@
+import asyncio
 import json
 from enum import Enum
 from pathlib import Path
@@ -6,6 +7,7 @@ from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field, ValidationError
 
 from kader.tools.base import BaseTool, ParameterSchema, ToolCategory
+from kader.utils.todo_metadata import TodoMetadataHandler
 
 
 class TodoStatus(str, Enum):
@@ -97,6 +99,61 @@ class TodoTool(BaseTool[str]):
                 ),
             ],
         )
+        self._metadata_handler = TodoMetadataHandler()
+
+    def _schedule_metadata(
+        self,
+        session_id: str,
+        todo_id: str,
+        items: list[dict[str, Any]] | None,
+        action: Literal["create", "update", "delete"],
+    ) -> None:
+        """Schedule metadata update as a non-blocking background task."""
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(
+                self._metadata_handler.handle_todo_change(
+                    session_id, todo_id, items, action
+                )
+            )
+        except RuntimeError:
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(
+                        self._metadata_handler.handle_todo_change(
+                            session_id, todo_id, items, action
+                        )
+                    )
+                else:
+                    loop.run_in_executor(
+                        None,
+                        self._run_sync_metadata,
+                        session_id,
+                        todo_id,
+                        items,
+                        action,
+                    )
+            except RuntimeError:
+                pass
+
+    def _run_sync_metadata(
+        self,
+        session_id: str,
+        todo_id: str,
+        items: list[dict[str, Any]] | None,
+        action: Literal["create", "update", "delete"],
+    ) -> None:
+        """Run metadata update synchronously (fallback for non-async contexts)."""
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(
+                self._metadata_handler.handle_todo_change(
+                    session_id, todo_id, items, action
+                )
+            )
+        finally:
+            loop.close()
 
     def execute(self, **kwargs: Any) -> str:
         """
@@ -122,17 +179,42 @@ class TodoTool(BaseTool[str]):
 
         try:
             if input_data.action == "create":
-                return self._create_todo(
+                result = self._create_todo(
                     session_id, input_data.todo_id, input_data.items
                 )
+                if not result.startswith("Error:"):
+                    items_dicts = (
+                        [item.model_dump() for item in input_data.items]
+                        if input_data.items
+                        else []
+                    )
+                    self._schedule_metadata(
+                        session_id, input_data.todo_id, items_dicts, "create"
+                    )
+                return result
             elif input_data.action == "read":
                 return self._read_todo(session_id, input_data.todo_id)
             elif input_data.action == "update":
-                return self._update_todo(
+                result = self._update_todo(
                     session_id, input_data.todo_id, input_data.items
                 )
+                if not result.startswith("Error:"):
+                    items_dicts = (
+                        [item.model_dump() for item in input_data.items]
+                        if input_data.items
+                        else []
+                    )
+                    self._schedule_metadata(
+                        session_id, input_data.todo_id, items_dicts, "update"
+                    )
+                return result
             elif input_data.action == "delete":
-                return self._delete_todo(session_id, input_data.todo_id)
+                result = self._delete_todo(session_id, input_data.todo_id)
+                if not result.startswith("Error:"):
+                    self._schedule_metadata(
+                        session_id, input_data.todo_id, None, "delete"
+                    )
+                return result
             else:
                 return f"Error: Unknown action '{input_data.action}'"
         except Exception as e:

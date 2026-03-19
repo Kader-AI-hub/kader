@@ -503,9 +503,9 @@ todo.execute(
     action="create",
     todo_id="project-tasks",
     items=[
-        {"id": "1", "content": "Setup project", "status": "completed"},
-        {"id": "2", "content": "Write tests", "status": "pending"},
-        {"id": "3", "content": "Deploy", "status": "pending"},
+        {"task": "Setup project", "status": "not-started"},
+        {"task": "Write tests", "status": "not-started"},
+        {"task": "Deploy", "status": "not-started"},
     ]
 )
 
@@ -513,13 +513,45 @@ todo.execute(
 todo.execute(
     action="update",
     todo_id="project-tasks",
-    item_id="2",
-    status="completed"
+    items=[
+        {"task": "Setup project", "status": "completed"},
+        {"task": "Write tests", "status": "in-progress"},
+        {"task": "Deploy", "status": "not-started"},
+    ]
 )
 
 # Read todo list
 result = todo.execute(action="read", todo_id="project-tasks")
+
+# Delete todo list
+todo.execute(action="delete", todo_id="project-tasks")
 ```
+
+#### Automatic Metadata Tracking
+
+Every create, update, or delete operation automatically updates a per-session metadata file at:
+`~/.kader/memory/sessions/<session_id>/todos/metadata-<session_id>.json`
+
+This metadata file tracks completion statistics for all todo lists in a session:
+
+```json
+{
+  "session-id": "abc-123",
+  "plans": {
+    "project-tasks": {
+      "completed": false,
+      "remaining-tasks": 2,
+      "completed-tasks": 1
+    }
+  }
+}
+```
+
+- `completed`: `true` only when all tasks are done
+- `remaining-tasks`: count of incomplete tasks
+- `completed-tasks`: count of completed tasks
+
+Metadata updates run asynchronously in the background and never block tool execution.
 
 ### Agent Tool (Sub-agents)
 
