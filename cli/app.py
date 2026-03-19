@@ -610,8 +610,34 @@ class KaderApp:
             # Run the workflow asynchronously
             response = await self._workflow.arun(message)
 
+            # Handle empty/None responses - retry with 'continue' up to 2 times
+            max_continues = 2
+            continue_count = 0
+
+            while (
+                response is None or (isinstance(response, str) and not response.strip())
+            ) and continue_count < max_continues:
+                continue_count += 1
+                self._stop_spinner()
+                self.console.print(
+                    r"  [kader.red]\→[/kader.red] "
+                    "[kader.red]Continuing task execution...[/kader.red]"
+                )
+                self._start_spinner()
+                await asyncio.sleep(3)
+                response = await self._workflow.arun("continue")
+
             # Stop spinner and show response
             self._stop_spinner()
+
+            # Handle case where response is still None/empty after retries
+            if response is None or (isinstance(response, str) and not response.strip()):
+                self.console.print(
+                    r"  [kader.yellow]\→[/kader.yellow] "
+                    "Task execution completed with no response."
+                )
+                return
+
             if response:
                 self._print_assistant_message(
                     response,
