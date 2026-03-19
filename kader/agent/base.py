@@ -13,9 +13,9 @@ import yaml
 from tenacity import RetryError, stop_after_attempt, wait_exponential
 
 from kader.memory import (
+    AsyncFileSessionManager,
     CompressionConfig,
     ConversationManager,
-    FileSessionManager,
     SlidingWindowConversationManager,
     ToolOutputCompressor,
 )
@@ -112,7 +112,9 @@ class BaseAgent:
         # Persistence Configuration
         self.session_id = session_id
         self.use_persistence = use_persistence or (session_id is not None)
-        self.session_manager = FileSessionManager() if self.use_persistence else None
+        self.session_manager = (
+            AsyncFileSessionManager() if self.use_persistence else None
+        )
 
         # Initialize Logger if agent uses persistence (logs only if there's a session)
         self.logger_id = None
@@ -219,6 +221,45 @@ class BaseAgent:
             self.session_manager.save_conversation(self.session_id, messages)
         except Exception:
             # Log error or handle silently? Best not to crash main flow on save failure
+            pass
+
+    async def _aload_session(self) -> None:
+        """Load conversation history from session storage (async)."""
+        if not self.session_manager:
+            return
+
+        if not self.session_id:
+            session = await self.session_manager.async_create_session(self.name)
+            self.session_id = session.session_id
+
+        # Initialize logger if we now have a session_id and logging hasn't been set up yet
+        if self.use_persistence and not self.logger_id and self.session_id:
+            self.logger_id = agent_logger.setup_logger(self.name, self.session_id)
+
+        # Propagate session to tools
+        self._propagate_session_to_tools()
+
+        # Load conversation history
+        try:
+            history = await self.session_manager.async_load_conversation(
+                self.session_id
+            )
+            if history:
+                self.memory.add_messages(history)
+        except Exception:
+            pass
+
+    async def _asave_session(self) -> None:
+        """Save current conversation history to session storage (async)."""
+        if not self.session_manager or not self.session_id:
+            return
+
+        try:
+            messages = [msg.message for msg in self.memory.get_messages()]
+            await self.session_manager.async_save_conversation(
+                self.session_id, messages
+            )
+        except Exception:
             pass
 
     @property
@@ -945,7 +986,7 @@ class BaseAgent:
 
             # Save session update
             if self.use_persistence:
-                self._save_session()
+                await self._asave_session()
 
             if response.has_tool_calls:
                 tool_result = await self._aprocess_tool_calls(response)
@@ -1005,7 +1046,7 @@ class BaseAgent:
 
                 # Save session update
                 if self.use_persistence:
-                    self._save_session()
+                    await self._asave_session()
                 continue
             else:
                 final_response = response
@@ -1050,7 +1091,7 @@ class BaseAgent:
         self.memory.add_message(final_msg)
 
         if self.use_persistence:
-            self._save_session()
+            await self._asave_session()
 
     # -------------------------------------------------------------------------
     # Serialization Methods
