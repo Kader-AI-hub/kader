@@ -28,6 +28,7 @@ from rich.theme import Theme
 
 from kader.memory import AsyncFileSessionManager, MemoryConfig
 from kader.utils import agenerate_session_title
+from kader.utils.todo_metadata import TodoMetadataHandler
 from kader.workflows import PlannerExecutorWorkflow
 
 from .commands import InitializeCommand
@@ -610,41 +611,99 @@ class KaderApp:
             # Run the workflow asynchronously
             response = await self._workflow.arun(message)
 
-            # Handle empty/None responses - retry with 'continue' up to 2 times
+            # Check completeness and last message upfront
+            is_complete = await self._should_send_continuation()
+            last_msg = self._get_last_assistant_message()
             max_continues = 2
             continue_count = 0
 
-            while (
-                response is None or (isinstance(response, str) and not response.strip())
-            ) and continue_count < max_continues:
-                continue_count += 1
-                self._stop_spinner()
-                self.console.print(
-                    r"  [kader.red]\→[/kader.red] "
-                    "[kader.red]Continuing task execution...[/kader.red]"
-                )
-                self._start_spinner()
-                await asyncio.sleep(3)
-                response = await self._workflow.arun("continue")
+            # ── Handle response with todo-based continuation logic ──
+            while continue_count < max_continues:
+                # Check current state
+                is_complete = await self._should_send_continuation()
+                last_msg = self._get_last_assistant_message()
 
-            # Stop spinner and show response
-            self._stop_spinner()
+                if is_complete and last_msg:
+                    # Plan complete - send continue to finalize
+                    self._stop_spinner()
+                    self.console.print(
+                        r"  [kader.red]\→[/kader.red] "
+                        "[kader.red]Plan complete, sending continuation...[/kader.red]"
+                    )
+                    self._start_spinner()
+                    await asyncio.sleep(3)
+                    response = await self._workflow.arun("continue")
+                    self._stop_spinner()
 
-            # Handle case where response is still None/empty after retries
+                    if response is None or (
+                        isinstance(response, str) and not response.strip()
+                    ):
+                        response = last_msg
+                        self.console.print(
+                            r"  [kader.red]\→[/kader.red] "
+                            "[kader.red]Using cached response.[/kader.red]"
+                        )
+                    break
+
+                if response is None or (
+                    isinstance(response, str) and not response.strip()
+                ):
+                    # Response empty, plan not complete - retry
+                    continue_count += 1
+                    self._stop_spinner()
+                    self.console.print(
+                        r"  [kader.red]\→[/kader.red] "
+                        "[kader.red]Sending continuation...[/kader.red]"
+                    )
+                    self._start_spinner()
+                    await asyncio.sleep(3)
+                    response = await self._workflow.arun("continue")
+                    self._stop_spinner()
+                else:
+                    # Response exists, plan not complete - retry to get final response
+                    continue_count += 1
+                    self._stop_spinner()
+                    self.console.print(
+                        r"  [kader.red]\→[/kader.red] "
+                        "[kader.red]Sending continuation...[/kader.red]"
+                    )
+                    self._start_spinner()
+                    await asyncio.sleep(3)
+                    response = await self._workflow.arun("continue")
+                    self._stop_spinner()
+
+                    if response is None or (
+                        isinstance(response, str) and not response.strip()
+                    ):
+                        response = last_msg
+                        self.console.print(
+                            r"  [kader.red]\→[/kader.red] "
+                            "[kader.red]Using cached response.[/kader.red]"
+                        )
+                        break
+
+            # Final check if no response after all retries
             if response is None or (isinstance(response, str) and not response.strip()):
-                self.console.print(
-                    r"  [kader.yellow]\→[/kader.yellow] "
-                    "Task execution completed with no response."
-                )
-                return
+                last_msg = self._get_last_assistant_message()
+                if last_msg:
+                    response = last_msg
+                    self.console.print(
+                        r"  [kader.red]\→[/kader.red] "
+                        "[kader.red]Using cached response.[/kader.red]"
+                    )
+                else:
+                    self.console.print(
+                        r"  [kader.yellow]\→[/kader.yellow] "
+                        "Task execution completed with no response."
+                    )
+                    return
 
-            if response:
-                self._print_assistant_message(
-                    response,
-                    model_name=self._workflow.planner.provider.model,
-                    usage_cost=self._workflow.planner.provider.total_cost.total_cost,
-                    session_title=self._session_title,
-                )
+            self._print_assistant_message(
+                response,
+                model_name=self._workflow.planner.provider.model,
+                usage_cost=self._workflow.planner.provider.total_cost.total_cost,
+                session_title=self._session_title,
+            )
 
         except Exception as e:
             self._stop_spinner()
@@ -656,6 +715,46 @@ class KaderApp:
 
         finally:
             self._is_processing = False
+
+    async def _should_send_continuation(self) -> bool:
+        """
+        Check if we should send a continuation message based on todo metadata.
+
+        Returns:
+            True if the current todo is complete and we should continue,
+            False if the todo is not complete and we should stop.
+        """
+        if not self._workflow.session_id:
+            return True
+
+        todo_tool = self._workflow.planner.tools_map.get("todo_tool")
+        if not todo_tool:
+            return True
+
+        current_todo_id = getattr(todo_tool, "current_todo_id", None)
+        if not current_todo_id:
+            return True
+
+        metadata_handler = TodoMetadataHandler()
+        return await metadata_handler.is_todo_complete(
+            self._workflow.session_id, current_todo_id
+        )
+
+    def _get_last_assistant_message(self) -> str | None:
+        """
+        Get the last assistant message from memory.
+
+        Returns:
+            The content of the last assistant message, or None if not found.
+        """
+        messages = self._workflow.planner.memory.get_messages()
+        for msg in reversed(messages):
+            if msg.role == "assistant":
+                content = msg.content
+                if content and (isinstance(content, str) and content.strip()):
+                    return content
+                return None
+        return None
 
     async def _generate_session_title(self, message: str) -> None:
         """Generate session title in background."""
