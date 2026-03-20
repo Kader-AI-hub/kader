@@ -100,6 +100,12 @@ class TodoTool(BaseTool[str]):
             ],
         )
         self._metadata_handler = TodoMetadataHandler()
+        self._current_todo_id: str | None = None
+
+    @property
+    def current_todo_id(self) -> str | None:
+        """Get the most recently created todo ID."""
+        return self._current_todo_id
 
     def _schedule_metadata(
         self,
@@ -249,6 +255,8 @@ class TodoTool(BaseTool[str]):
 
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
+
+        self._current_todo_id = todo_id
 
         return json.dumps(data, indent=2)
 

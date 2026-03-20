@@ -170,3 +170,40 @@ class TodoMetadataHandler:
             await self._handle_update(session_id, todo_id, items)
         elif action == "delete":
             await self._handle_delete(session_id, todo_id)
+
+    async def is_todo_complete(self, session_id: str, todo_id: str) -> bool:
+        """
+        Check if a todo list is marked as complete.
+
+        Args:
+            session_id: Session identifier
+            todo_id: Todo list identifier
+
+        Returns:
+            True if the todo is marked as complete, False otherwise.
+        """
+        metadata = await self._load_metadata(session_id)
+        plan_data = metadata.get("plans", {}).get(todo_id)
+        if plan_data is None:
+            return False
+        return plan_data.get("completed", False)
+
+    async def get_current_todo_id(self, session_id: str) -> str | None:
+        """
+        Get the most recently created todo ID for a session.
+
+        Since todos are stored in plans dict, we track creation order
+        by checking which todo_id was last created. This is a heuristic
+        based on the fact that plans dict maintains insertion order.
+
+        Args:
+            session_id: Session identifier
+
+        Returns:
+            The most recent todo_id if any exist, None otherwise.
+        """
+        metadata = await self._load_metadata(session_id)
+        plans = metadata.get("plans", {})
+        if not plans:
+            return None
+        return list(plans.keys())[-1] if plans else None
