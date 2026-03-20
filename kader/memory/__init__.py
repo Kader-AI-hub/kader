@@ -27,6 +27,7 @@ from .conversation import (
 
 # Session management
 from .session import (
+    AsyncFileSessionManager,
     FileSessionManager,
     Session,
     SessionManager,
@@ -69,6 +70,7 @@ __all__ = [
     "Session",
     "SessionManager",
     "FileSessionManager",
+    "AsyncFileSessionManager",
     # Conversation
     "ConversationMessage",
     "ConversationManager",

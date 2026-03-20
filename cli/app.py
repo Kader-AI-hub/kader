@@ -26,7 +26,7 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.theme import Theme
 
-from kader.memory import FileSessionManager, MemoryConfig
+from kader.memory import AsyncFileSessionManager, MemoryConfig
 from kader.utils import agenerate_session_title
 from kader.workflows import PlannerExecutorWorkflow
 
@@ -104,7 +104,7 @@ class KaderApp:
         self._session_title: Optional[str] = None
 
         # Session manager
-        self._session_manager = FileSessionManager(
+        self._session_manager = AsyncFileSessionManager(
             MemoryConfig(memory_dir=Path.home() / ".kader")
         )
 
@@ -427,10 +427,10 @@ class KaderApp:
             self._print_system_message("Conversation cleared!", "kader.green")
 
         elif cmd == "/save":
-            self._handle_save_session()
+            await self._handle_save_session()
 
         elif cmd == "/sessions":
-            self._handle_list_sessions()
+            await self._handle_list_sessions()
 
         elif cmd == "/skills":
             self._handle_skills()
@@ -446,7 +446,7 @@ class KaderApp:
                     "— Use `/sessions` to see available sessions."
                 )
             else:
-                self._handle_load_session(parts[1])
+                await self._handle_load_session(parts[1])
 
         elif cmd == "/cost":
             self._handle_cost()
@@ -713,7 +713,7 @@ class KaderApp:
         except Exception as e:
             return f"Error: {str(e)}"
 
-    def _handle_save_session(self) -> None:
+    async def _handle_save_session(self) -> None:
         """Save the current session."""
         import shutil
 
@@ -721,7 +721,7 @@ class KaderApp:
 
         try:
             if not self._current_session_id:
-                session = self._session_manager.create_session("kader_cli")
+                session = await self._session_manager.async_create_session("kader_cli")
                 self._current_session_id = session.session_id
 
             planner_session_dir = (
@@ -744,10 +744,10 @@ class KaderApp:
         except Exception as e:
             self.console.print(f"  [kader.red]✗[/kader.red] Error saving session: {e}")
 
-    def _handle_load_session(self, session_id: str) -> None:
+    async def _handle_load_session(self, session_id: str) -> None:
         """Load a saved session by ID."""
         try:
-            session = self._session_manager.get_session(session_id)
+            session = await self._session_manager.async_get_session(session_id)
             if not session:
                 self.console.print(
                     rf"  [kader.red]\[-][/kader.red] Session `{session_id}` not found. "
@@ -755,7 +755,7 @@ class KaderApp:
                 )
                 return
 
-            messages = self._session_manager.load_conversation(session_id)
+            messages = await self._session_manager.async_load_conversation(session_id)
             self._workflow.planner.memory.clear()
 
             for msg in messages:
@@ -776,10 +776,10 @@ class KaderApp:
         except Exception as e:
             self.console.print(f"  [kader.red]✗[/kader.red] Error loading session: {e}")
 
-    def _handle_list_sessions(self) -> None:
+    async def _handle_list_sessions(self) -> None:
         """List all saved sessions."""
         try:
-            sessions = self._session_manager.list_sessions()
+            sessions = await self._session_manager.async_list_sessions()
 
             if not sessions:
                 self.console.print(
