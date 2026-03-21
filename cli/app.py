@@ -14,6 +14,7 @@ from importlib.metadata import version as get_version
 from pathlib import Path
 from typing import Optional
 
+from loguru import logger
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.formatted_text import HTML
@@ -25,6 +26,12 @@ from rich.panel import Panel
 from rich.spinner import Spinner
 from rich.table import Table
 from rich.theme import Theme
+from tenacity import (
+    AsyncRetrying,
+    RetryError,
+    stop_after_attempt,
+    wait_fixed,
+)
 
 from kader.memory import AsyncFileSessionManager, MemoryConfig
 from kader.utils import agenerate_session_title
@@ -584,6 +591,42 @@ class KaderApp:
         except Exception as e:
             self.console.print(f"  [kader.red]✗[/kader.red] Error fetching models: {e}")
 
+    async def _send_continuation(self, max_attempts: int = 3) -> str:
+        """Send continuation messages with tenacity retry until plan is complete.
+
+        Uses tenacity for structured retry with wait between attempts.
+        Stops when the plan is complete or max_attempts is reached.
+
+        Args:
+            max_attempts: Maximum number of continuation attempts.
+
+        Returns:
+            The latest workflow response string.
+        """
+        response = ""
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(max_attempts),
+            wait=wait_fixed(3),
+            reraise=True,
+        ):
+            with attempt:
+                self._stop_spinner()
+                self.console.print(
+                    r"  [kader.yellow]\→[/kader.yellow] "
+                    "Plan not complete. Sending continuation..."
+                )
+                self._start_spinner()
+                response = await self._workflow.arun("continue")
+                self._stop_spinner()
+
+                is_complete = await self._should_send_continuation()
+                if is_complete:
+                    return response
+                # Not complete — raise to trigger next retry attempt
+                raise RuntimeError("Plan not yet complete")
+
+        return response
+
     async def _handle_chat(self, message: str) -> None:
         """Handle regular chat messages with PlannerExecutorWorkflow."""
         if self._is_processing:
@@ -610,47 +653,16 @@ class KaderApp:
 
             # Run the workflow asynchronously
             response = await self._workflow.arun(message)
+            self._stop_spinner()
 
             # Check completeness and last message upfront
             is_complete = await self._should_send_continuation()
             last_msg = self._get_last_assistant_message()
-            max_continues = 2
-            continue_count = 0
 
             # ── Handle response with todo-based continuation logic ──
-            while continue_count < max_continues:
-                # Check current state
-                is_complete = await self._should_send_continuation()
-                last_msg = self._get_last_assistant_message()
-
-                if is_complete and last_msg:
-                    # Plan complete - send continue to finalize
-                    self._stop_spinner()
-                    self.console.print(
-                        r"  [kader.red]\→[/kader.red] "
-                        "[kader.red]Plan complete, sending continuation...[/kader.red]"
-                    )
-                    self._start_spinner()
-                    await asyncio.sleep(3)
-                    response = await self._workflow.arun("continue")
-                    self._stop_spinner()
-
-                    if response is None or (
-                        isinstance(response, str) and not response.strip()
-                    ):
-                        response = last_msg
-                        self.console.print(
-                            r"  [kader.red]\→[/kader.red] "
-                            "[kader.red]Using cached response.[/kader.red]"
-                        )
-                    break
-
-                if response is None or (
-                    isinstance(response, str) and not response.strip()
-                ):
-                    # Response empty, plan not complete - retry
-                    continue_count += 1
-                    self._stop_spinner()
+            if is_complete:
+                if not last_msg:
+                    # Response empty but plan completed — single retry
                     self.console.print(
                         r"  [kader.red]\→[/kader.red] "
                         "[kader.red]Sending continuation...[/kader.red]"
@@ -659,44 +671,12 @@ class KaderApp:
                     await asyncio.sleep(3)
                     response = await self._workflow.arun("continue")
                     self._stop_spinner()
-                else:
-                    # Response exists, plan not complete - retry to get final response
-                    continue_count += 1
-                    self._stop_spinner()
-                    self.console.print(
-                        r"  [kader.red]\→[/kader.red] "
-                        "[kader.red]Sending continuation...[/kader.red]"
-                    )
-                    self._start_spinner()
-                    await asyncio.sleep(3)
-                    response = await self._workflow.arun("continue")
-                    self._stop_spinner()
-
-                    if response is None or (
-                        isinstance(response, str) and not response.strip()
-                    ):
-                        response = last_msg
-                        self.console.print(
-                            r"  [kader.red]\→[/kader.red] "
-                            "[kader.red]Using cached response.[/kader.red]"
-                        )
-                        break
-
-            # Final check if no response after all retries
-            if response is None or (isinstance(response, str) and not response.strip()):
-                last_msg = self._get_last_assistant_message()
-                if last_msg:
-                    response = last_msg
-                    self.console.print(
-                        r"  [kader.red]\→[/kader.red] "
-                        "[kader.red]Using cached response.[/kader.red]"
-                    )
-                else:
-                    self.console.print(
-                        r"  [kader.yellow]\→[/kader.yellow] "
-                        "Task execution completed with no response."
-                    )
-                    return
+            else:
+                # Plan not complete — use tenacity-based continuation
+                try:
+                    response = await self._send_continuation(max_attempts=3)
+                except (RetryError, RuntimeError):
+                    logger.warning("Plan continuation exhausted after max retries")
 
             self._print_assistant_message(
                 response,
@@ -705,8 +685,25 @@ class KaderApp:
                 session_title=self._session_title,
             )
 
+        except ConnectionError as e:
+            self._stop_spinner()
+            logger.error(f"Connection error during chat: {e}")
+            self.console.print(
+                f"\n  [kader.red]\\[-] Connection Error:[/kader.red] {e}\n"
+                f"  Check your network and provider for `{self._current_model}`."
+            )
+
+        except RetryError as e:
+            self._stop_spinner()
+            logger.error(f"Retry exhausted during chat: {e}")
+            self.console.print(
+                f"\n  [kader.red]\\[-] Retry Exhausted:[/kader.red] {e}\n"
+                f"  The provider for `{self._current_model}` may be overloaded."
+            )
+
         except Exception as e:
             self._stop_spinner()
+            logger.error(f"Unexpected error during chat: {e}")
             self.console.print(
                 f"\n  [kader.red]\\[-] Error:[/kader.red] {e}\n"
                 f"  Make sure the provider for `{self._current_model}` "
