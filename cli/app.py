@@ -203,10 +203,17 @@ class KaderApp:
         else:
             display_content = "\n".join(lines[:max_lines])
 
+        from rich.syntax import Syntax
+
+        lexer_name = Syntax.guess_lexer(path, code=display_content)
+        display_syntax = Syntax(
+            display_content, lexer_name, theme="monokai", word_wrap=True
+        )
+
         self.console.print()
         self.console.print(
             Panel(
-                display_content,
+                display_syntax,
                 title=f"[kader.orange]{title}: {path}[/kader.orange]",
                 border_style="dark_orange",
                 padding=(0, 1),
@@ -231,14 +238,20 @@ class KaderApp:
         if len(new_lines) > max_lines:
             new_display += f"\n... ({len(new_lines)} lines total)"
 
+        from rich.syntax import Syntax
+
+        lexer_name = Syntax.guess_lexer(path, code=new_display)
+        old_syntax = Syntax(old_display, lexer_name, theme="monokai", word_wrap=True)
+        new_syntax = Syntax(new_display, lexer_name, theme="monokai", word_wrap=True)
+
         old_panel = Panel(
-            old_display,
+            old_syntax,
             title=f"[kader.red]OLD: {path}[/kader.red]",
             border_style="red",
             padding=(0, 1),
         )
         new_panel = Panel(
-            new_display,
+            new_syntax,
             title=f"[kader.green]NEW: {path}[/kader.green]",
             border_style="green",
             padding=(0, 1),
@@ -301,6 +314,9 @@ class KaderApp:
         Prompts the user directly via synchronous input since this runs
         in the agent thread while the main loop is blocked on chat input.
         """
+        from prompt_toolkit.shortcuts import choice
+        from prompt_toolkit.styles import Style
+
         self._stop_spinner()
         self.console.print()
         self.console.print(
@@ -311,22 +327,36 @@ class KaderApp:
                 padding=(0, 1),
             )
         )
-        self.console.print(
-            "  [kader.yellow]Approve? [Y/n/reason]:[/kader.yellow] ", end=""
+
+        custom_style = Style.from_dict(
+            {
+                "selected": "reverse",
+                "radio-selected": "reverse",
+                "radio-checked": "reverse",
+                "selected-option": "reverse",
+                "pointer": "reverse",
+            }
         )
 
         try:
-            answer = input().strip().lower()
-        except (EOFError, KeyboardInterrupt):
+            answer = choice(
+                message="  Approve?",
+                options=[
+                    ("y", "Yes - Execute tool"),
+                    ("n", "No - Reject and provide reason..."),
+                ],
+                style=custom_style,
+            )
+        except (Exception, KeyboardInterrupt):
             answer = "n"
 
-        if answer in ("", "y", "yes"):
+        if answer == "y":
             self._print_system_message(
                 "[kader.green][+] Approved -- executing tool...[/kader.green]"
             )
             self._start_spinner()
             return (True, None)
-        elif answer in ("n", "no"):
+        else:
             self.console.print(
                 "  [kader.red][-] Rejected.[/kader.red] "
                 "Please provide context for the rejection:"
@@ -338,10 +368,6 @@ class KaderApp:
                 context = ""
             self._start_spinner()
             return (False, context or None)
-        else:
-            # Treat typed text as rejection reason
-            self._start_spinner()
-            return (False, answer)
 
     # ── Spinner helpers ───────────────────────────────────────────────
 
