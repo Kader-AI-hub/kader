@@ -9,7 +9,8 @@ A modern terminal-based AI coding assistant built with [Rich](https://github.com
 - 💬 **Rich Conversation** — Beautiful markdown-rendered chat with styled panels
 - 💾 **Session Persistence** — Save and load conversation sessions
 - 🔧 **Tool Confirmation** — Interactive approval for tool execution
-- 🤖 **Model Selection** — Dynamic model switching interface
+- 🤖 **Model Selection** — Per-agent model switching (main agent & sub agent)
+- ⚙️ **Persistent Settings** — User preferences stored in `~/.kader/settings.json`
 - 📝 **File Operations** — Integrated file system tools for coding tasks
 - ☁️ **Multi-Provider Support** — Ollama, Google Gemini, Anthropic, Mistral, OpenAI, Moonshot (Kimi), Z.ai (GLM), OpenRouter, OpenCode, Groq
 - 🖥️ **CLI Message Display** — Enhanced display showing agent reasoning and tool execution
@@ -215,12 +216,17 @@ Usage: `/lint-test` or `/lint-test run full check`
 
 ## Model Selection Interface
 
-The model selection interface allows you to:
+The `/models` command uses a two-step interactive flow:
 
-- Browse all available models from configured providers
-- Switch models on the fly during conversation
-- See which model is currently active
-- Cancel selection without changing the current model
+1. **Agent selection** — Choose which agent to update (Main Agent or Sub Agent)
+2. **Model selection** — Browse and pick from all available provider models
+
+Features:
+
+- Configure main (planner) and sub (executor) agents independently
+- See the current model for the selected agent
+- Changes are persisted to `~/.kader/settings.json`
+- Cancel at any step without changing the current model
 
 ## Project Structure
 
@@ -231,19 +237,33 @@ cli/
 ├── llm_factory.py  # Multi-provider LLM factory
 ├── __init__.py     # Package exports
 ├── __main__.py     # Entry point
+├── settings/       # Persistent settings management
+│   ├── __init__.py
+│   └── settings.py      # KaderSettings dataclass + load/save
 └── commands/       # CLI command handlers
     ├── __init__.py
     ├── base.py          # Base command class
     └── initialize.py    # /init command
 ```
 
+## Settings
+
+Kader stores user preferences in `~/.kader/settings.json`. This file is created automatically on first run with default values:
+
+```json
+{
+  "main-agent-provider": "ollama",
+  "sub-agent-provider": "ollama",
+  "main-agent-model": "glm-5:cloud",
+  "sub-agent-model": "glm-5:cloud"
+}
+```
+
+Settings are updated automatically when you switch models via `/models`. You can also edit the file directly.
+
 ## Changing the Model
 
-The default model is set in `utils.py`. Kader supports multiple providers with the format `provider:model`:
-
-```python
-DEFAULT_MODEL = "minimax-m2.5:cloud"  # Default model
-```
+Use the `/models` command to interactively switch models per agent. Kader supports multiple providers with the format `provider:model`.
 
 ### Supported Providers
 
@@ -287,8 +307,9 @@ export GROQ_API_KEY="your-groq-api-key"
 
 Kader automatically creates a `.kader` directory in your home directory on first run. This stores:
 
+- Settings in `~/.kader/settings.json`
 - Session data in `~/.kader/sessions/`
-- Configuration files in `~/.kader/`
+- Environment variables in `~/.kader/.env`
 - Memory files in `~/.kader/memory/`
 
 ## Troubleshooting

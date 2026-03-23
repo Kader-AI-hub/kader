@@ -116,7 +116,7 @@ Once the CLI is running:
 
 1. Type any question to start chatting with the agent
 2. Use `/help` to see available commands
-3. Use `/models` to check and interactively switch available models
+3. Use `/models` to switch models per agent (main or sub)
 4. Run terminal commands directly by prefixing with `!` (e.g., `!ls -la`)
 
 ## CLI Commands
@@ -124,7 +124,7 @@ Once the CLI is running:
 | Command | Description |
 |---------|-------------|
 | `/help` | Show command reference |
-| `/models` | Show available models |
+| `/models` | Switch models per agent (main/sub) |
 | `/clear` | Clear conversation |
 | `/save` | Save current session |
 | `/load <id>` | Load a saved session |

@@ -11,7 +11,8 @@ The Kader CLI is an interactive terminal-based AI coding assistant built with Ri
 - **Rich Conversation** — Beautiful markdown-rendered chat with styled panels
 - **Session Persistence** — Save and load conversation sessions
 - **Tool Confirmation** — Interactive approval for tool execution
-- **Model Selection** — Dynamic model switching interface
+- **Model Selection** — Per-agent model switching (main agent & sub agent)
+- **Persistent Settings** — User preferences stored in `~/.kader/settings.json`
 - **Multi-Provider Support** — Ollama, Google Gemini, Anthropic, Mistral, OpenAI, and more
 
 ## Running the CLI
@@ -34,7 +35,7 @@ uv run python -m cli
 | Command | Description |
 |---------|-------------|
 | `/help` | Show command reference |
-| `/models` | Show and switch available models |
+| `/models` | Switch models per agent (main/sub) |
 | `/clear` | Clear conversation |
 | `/save` | Save current session |
 | `/load <id>` | Load a saved session |
@@ -188,11 +189,31 @@ Usage:
 
 ## Model Selection
 
-The model selection interface allows you to:
+The `/models` command uses a two-step interactive flow:
 
-- Browse all available models from configured providers
-- Switch models on the fly during conversation
-- See which model is currently active
+1. **Agent selection** — Choose which agent to update (Main Agent or Sub Agent)
+2. **Model selection** — Browse and pick from all available provider models
+
+Features:
+
+- Configure main (planner) and sub (executor) agents independently
+- See the current model for the selected agent
+- Changes are persisted to `~/.kader/settings.json`
+
+## Settings
+
+User preferences are stored in `~/.kader/settings.json`, auto-created on first run:
+
+```json
+{
+  "main-agent-provider": "ollama",
+  "sub-agent-provider": "ollama",
+  "main-agent-model": "glm-5:cloud",
+  "sub-agent-model": "glm-5:cloud"
+}
+```
+
+Settings update automatically when switching models via `/models`.
 
 ### Supported Providers
 
