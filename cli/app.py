@@ -40,7 +40,8 @@ from kader.workflows import PlannerExecutorWorkflow
 
 from .commands import InitializeCommand
 from .llm_factory import LLMProviderFactory
-from .utils import COMMAND_NAMES, DEFAULT_MODEL, HELP_TEXT
+from .settings import load_settings, save_settings
+from .utils import COMMAND_NAMES, HELP_TEXT
 
 # Suppress warnings
 warnings.filterwarnings("ignore")
@@ -106,7 +107,11 @@ class KaderApp:
     def __init__(self) -> None:
         self.console = Console(theme=KADER_THEME)
         self._is_processing = False
-        self._current_model = DEFAULT_MODEL
+
+        # Load persistent settings
+        self._settings = load_settings()
+        self._current_model = self._settings.get_main_model_string()
+
         self._current_session_id: str | None = None
         self._running = True
         self._session_title: Optional[str] = None
@@ -144,6 +149,10 @@ class KaderApp:
 
         provider = LLMProviderFactory.create_provider(model_name)
 
+        # Build executor model string from settings
+        executor_model = self._settings.get_sub_model_string()
+        executor_provider = LLMProviderFactory.create_provider(executor_model)
+
         workflow = PlannerExecutorWorkflow(
             name="kader_cli",
             provider=provider,
@@ -154,6 +163,8 @@ class KaderApp:
             tool_execution_result_callback=self._tool_execution_result_callback,
             use_persistence=True,
             executor_names=["executor"],
+            executor_model_name=executor_model,
+            executor_provider=executor_provider,
         )
 
         if not self._current_session_id:
@@ -550,7 +561,53 @@ class KaderApp:
                 )
 
     async def _handle_models(self) -> None:
-        """Handle the /models command with interactive selection."""
+        """Handle the /models command with interactive agent and model selection."""
+        from prompt_toolkit.shortcuts import choice as pt_choice
+        from prompt_toolkit.styles import Style
+
+        custom_style = Style.from_dict(
+            {
+                "selected": "reverse",
+                "radio-selected": "reverse",
+                "radio-checked": "reverse",
+                "selected-option": "reverse",
+                "pointer": "reverse",
+            }
+        )
+
+        # ── Step 1: Choose which agent to update ──────────────────────
+        current_main = self._settings.get_main_model_string()
+        current_sub = self._settings.get_sub_model_string()
+
+        self.console.print()
+        self.console.print(
+            f"  [dim]Current main agent model:[/dim] [bold]{current_main}[/bold]"
+        )
+        self.console.print(
+            f"  [dim]Current sub agent model:[/dim]  [bold]{current_sub}[/bold]"
+        )
+
+        try:
+            loop = asyncio.get_event_loop()
+            agent_choice = await loop.run_in_executor(
+                None,
+                lambda: pt_choice(
+                    message="  Which agent to update?",
+                    options=[
+                        ("main", "Main Agent — planner / orchestrator"),
+                        ("sub", "Sub Agent — executor / worker"),
+                    ],
+                    style=custom_style,
+                ),
+            )
+        except (Exception, KeyboardInterrupt):
+            self._print_system_message("Model selection cancelled.")
+            return
+
+        is_main = agent_choice == "main"
+        agent_label = "Main Agent" if is_main else "Sub Agent"
+
+        # ── Step 2: Show models and pick one ──────────────────────────
         try:
             models = LLMProviderFactory.get_flat_model_list()
             if not models:
@@ -560,9 +617,10 @@ class KaderApp:
                 )
                 return
 
-            # Display models as a numbered list
+            current_for_agent = current_main if is_main else current_sub
+
             table = Table(
-                title="[kader.cyan]Available Models[/kader.cyan]",
+                title=f"[kader.cyan]Available Models — {agent_label}[/kader.cyan]",
                 border_style="cyan",
                 show_header=True,
                 header_style="bold cyan",
@@ -575,7 +633,7 @@ class KaderApp:
             for i, model in enumerate(models, 1):
                 marker = (
                     "[kader.green]● current[/kader.green]"
-                    if model == self._current_model
+                    if model == current_for_agent
                     else "[dim]available[/dim]"
                 )
                 table.add_row(str(i), model, marker)
@@ -586,32 +644,47 @@ class KaderApp:
                 "  [dim]Enter model number to switch, or press Enter to cancel:[/dim]"
             )
 
-            # Get selection
             try:
-                choice = await self._prompt_session.prompt_async(
+                model_choice = await self._prompt_session.prompt_async(
                     HTML("<ansicyan>  model> </ansicyan>")
                 )
-                choice = choice.strip()
-                if not choice:
+                model_choice = model_choice.strip()
+                if not model_choice:
                     self._print_system_message(
-                        f"Model selection cancelled. Current: `{self._current_model}`"
+                        f"{agent_label} model selection cancelled. "
+                        f"Current: `{current_for_agent}`"
                     )
                     return
 
-                idx = int(choice) - 1
+                idx = int(model_choice) - 1
                 if 0 <= idx < len(models):
-                    old_model = self._current_model
-                    self._current_model = models[idx]
+                    selected_model = models[idx]
+                    provider_name, model_name = LLMProviderFactory.parse_model_name(
+                        selected_model
+                    )
+
+                    if is_main:
+                        old_model = current_main
+                        self._settings.main_agent_provider = provider_name
+                        self._settings.main_agent_model = model_name
+                        self._current_model = selected_model
+                    else:
+                        old_model = current_sub
+                        self._settings.sub_agent_provider = provider_name
+                        self._settings.sub_agent_model = model_name
+
+                    save_settings(self._settings)
                     self._workflow = self._create_workflow(self._current_model)
                     self._print_system_message(
-                        f"[kader.green]Model changed from "
-                        f"`{old_model}` to `{self._current_model}`[/kader.green]"
+                        f"[kader.green]{agent_label} model changed from "
+                        f"`{old_model}` to `{selected_model}`[/kader.green]"
                     )
                 else:
                     self.console.print("  [kader.red]✗[/kader.red] Invalid selection.")
             except (ValueError, EOFError, KeyboardInterrupt):
                 self._print_system_message(
-                    f"Model selection cancelled. Current: `{self._current_model}`"
+                    f"{agent_label} model selection cancelled. "
+                    f"Current: `{current_for_agent}`"
                 )
 
         except Exception as e:
