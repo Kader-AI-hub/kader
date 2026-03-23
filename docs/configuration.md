@@ -25,6 +25,7 @@ When the kader module is imported for the first time, it automatically creates a
 ```
 ~/.kader/
 ├── .env                   # Environment variables
+├── settings.json          # User preferences (model/provider)
 ├── memory/               # Memory and session storage
 │   └── sessions/         # Saved conversation sessions
 ├── skills/               # User-level skills
@@ -116,3 +117,25 @@ Sessions are saved to `~/.kader/memory/sessions/` and include:
 - Agent state
 - Tool execution logs
 - Sub-agent contexts (for aggregated context)
+
+## Settings
+
+User preferences are stored in `~/.kader/settings.json`, created automatically on first run:
+
+```json
+{
+  "main-agent-provider": "ollama",
+  "sub-agent-provider": "ollama",
+  "main-agent-model": "glm-5:cloud",
+  "sub-agent-model": "glm-5:cloud"
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `main-agent-provider` | LLM provider for the planner agent |
+| `sub-agent-provider` | LLM provider for executor sub-agents |
+| `main-agent-model` | Model name for the planner agent |
+| `sub-agent-model` | Model name for executor sub-agents |
+
+Settings are updated automatically when switching models via the `/models` CLI command. You can also edit the file directly.
