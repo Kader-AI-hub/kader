@@ -6,6 +6,7 @@ in the user's home directory, including creating the required .env file
 with OLLAMA_API_KEY and loading environment variables.
 """
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -96,6 +97,27 @@ ANTHROPIC_API_KEY=''
     return env_file
 
 
+_DEFAULT_SETTINGS = {
+    "main-agent-provider": "ollama",
+    "sub-agent-provider": "ollama",
+    "main-agent-model": "glm-5:cloud",
+    "sub-agent-model": "glm-5:cloud",
+}
+
+
+def _ensure_settings_file(settings_path):
+    """Create settings.json with defaults if it does not exist.
+
+    Args:
+        settings_path: Path to the settings.json file.
+    """
+    if not settings_path.exists():
+        settings_path.write_text(
+            json.dumps(_DEFAULT_SETTINGS, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+
 def initialize_kader_config():
     """
     Initialize the .kader directory in the user's home directory with required configuration files.
@@ -108,6 +130,9 @@ def initialize_kader_config():
 
         # Ensure the .env file exists with the required configuration
         ensure_env_file(kader_dir)
+
+        # Ensure settings.json exists with default configuration
+        _ensure_settings_file(kader_dir / "settings.json")
 
         # Load environment variables from the .env file
         env_file_path = kader_dir / ".env"
