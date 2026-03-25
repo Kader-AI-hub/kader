@@ -54,6 +54,10 @@ COMMANDS: list[CLICommand] = [
     CLICommand(name="/commands", description="List special commands"),
     CLICommand(name="/cost", description="Show usage costs"),
     CLICommand(name="/init", description="Initialize .kader directory with KADER.md"),
+    CLICommand(
+        name="/update",
+        description="Check for updates and update Kader if newer version available",
+    ),
     CLICommand(name="/exit", description="Exit the CLI"),
 ]
 
