@@ -173,8 +173,7 @@ class LoggingToolCallback(ToolCallback):
                 if result.status == "success"
                 else f"error: {result.error_message}"
             )
-            print(
-                f"[Callback] {context.agent_name}: {tool_name} -> {status_str}")
+            print(f"[Callback] {context.agent_name}: {tool_name} -> {status_str}")
             if result.content and len(result.content) < 500:
                 print(f"[Callback] Result: {result.content[:200]}...")
 
