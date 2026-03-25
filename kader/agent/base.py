@@ -7,11 +7,12 @@ with tools, memory, and LLM provider integration.
 
 import json
 from pathlib import Path
-from typing import AsyncIterator, Iterator, Optional, Union
+from typing import Any, AsyncIterator, Iterator, Optional, Union
 
 import yaml
 from tenacity import RetryError, stop_after_attempt, wait_exponential
 
+from kader.callbacks import BaseCallback, CallbackContext, CallbackEvent
 from kader.memory import (
     AsyncFileSessionManager,
     CompressionConfig,
@@ -30,7 +31,7 @@ from kader.providers.base import (
 )
 from kader.providers.google import GoogleProvider
 from kader.providers.ollama import OllamaProvider
-from kader.tools import BaseTool, ToolRegistry
+from kader.tools import BaseTool, ToolRegistry, ToolResult
 from kader.tools.skills import SkillLoader
 
 from .logger import agent_logger
@@ -66,6 +67,7 @@ class BaseAgent:
         enable_compression: bool = True,
         compression_config: Optional[CompressionConfig] = None,
         skills_dirs: Optional[list[Path]] = None,
+        callbacks: Optional[list[BaseCallback]] = None,
     ) -> None:
         """
         Initialize the Base Agent.
@@ -86,6 +88,7 @@ class BaseAgent:
                 Returns (should_execute, user_elaboration_if_declined).
             enable_compression: If True, compresses tool outputs to reduce token usage (default: True).
             compression_config: Optional custom compression configuration. If None, uses default rules.
+            callbacks: Optional list of callback instances for tool execution events.
         """
         self.name = name
         self.system_prompt = system_prompt
@@ -96,6 +99,7 @@ class BaseAgent:
         self.tool_confirmation_callback = tool_confirmation_callback
         self.direct_execution_callback = direct_execution_callback
         self.tool_execution_result_callback = tool_execution_result_callback
+        self.callbacks = callbacks or []
 
         # Compression Configuration
         self.enable_compression = enable_compression
@@ -530,6 +534,72 @@ class BaseAgent:
             self._confirm_tool_execution, tool_call_dict, llm_content
         )
 
+    def _create_callback_context(self, event: CallbackEvent) -> CallbackContext:
+        """Create a callback context for the current agent."""
+        return CallbackContext(event=event, agent_name=self.name, extra={})
+
+    def _invoke_before_tool_callbacks(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Invoke before_tool_call callbacks and return modified arguments."""
+        context = self._create_callback_context(CallbackEvent.TOOL_BEFORE)
+        for callback in self.callbacks:
+            if not callback.enabled:
+                continue
+            if hasattr(callback, "on_tool_before"):
+                arguments = callback.on_tool_before(context, tool_name, arguments)
+        return arguments
+
+    def _invoke_after_tool_callbacks(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
+        tool_result: "ToolResult",
+    ) -> "ToolResult":
+        """Invoke after_tool_call callbacks and return modified result."""
+        context = self._create_callback_context(CallbackEvent.TOOL_AFTER)
+        for callback in self.callbacks:
+            if not callback.enabled:
+                continue
+            if hasattr(callback, "on_tool_after"):
+                tool_result = callback.on_tool_after(
+                    context, tool_name, arguments, tool_result
+                )
+        return tool_result
+
+    async def _ainvoke_before_tool_callbacks(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Async version - invoke before_tool_call callbacks."""
+        context = self._create_callback_context(CallbackEvent.TOOL_BEFORE)
+        for callback in self.callbacks:
+            if not callback.enabled:
+                continue
+            if hasattr(callback, "on_tool_before"):
+                arguments = callback.on_tool_before(context, tool_name, arguments)
+        return arguments
+
+    async def _ainvoke_after_tool_callbacks(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
+        tool_result: ToolResult,
+    ) -> ToolResult:
+        """Async version - invoke after_tool_call callbacks."""
+        context = self._create_callback_context(CallbackEvent.TOOL_AFTER)
+        for callback in self.callbacks:
+            if not callback.enabled:
+                continue
+            if hasattr(callback, "on_tool_after"):
+                tool_result = callback.on_tool_after(
+                    context, tool_name, arguments, tool_result
+                )
+        return tool_result
+
     def _process_tool_calls(
         self, response: LLMResponse
     ) -> Union[list[Message], tuple[bool, str]]:
@@ -585,6 +655,12 @@ class BaseAgent:
                         arguments={},  # Error case
                     )
 
+                # Invoke before_tool callbacks - can modify arguments
+                modified_args = self._invoke_before_tool_callbacks(
+                    tool_call.name, tool_call.arguments
+                )
+                tool_call.arguments = modified_args
+
                 # Execute tool
                 tool_result = self._tool_registry.run(tool_call)
 
@@ -595,6 +671,11 @@ class BaseAgent:
                         output=tool_result.content,
                     )
                     tool_result.content = compressed_content
+
+                # Invoke after_tool callbacks - can modify result
+                tool_result = self._invoke_after_tool_callbacks(
+                    tool_call.name, tool_call.arguments, tool_result
+                )
 
                 # Notify about tool execution result if callback available
                 if self.tool_execution_result_callback:
@@ -665,6 +746,12 @@ class BaseAgent:
                     else json.dumps(raw_args),
                 )
 
+                # Invoke before_tool callbacks - can modify arguments
+                modified_args = await self._ainvoke_before_tool_callbacks(
+                    tool_call.name, tool_call.arguments
+                )
+                tool_call.arguments = modified_args
+
                 # Execute tool async
                 tool_result = await self._tool_registry.arun(tool_call)
 
@@ -675,6 +762,11 @@ class BaseAgent:
                         output=tool_result.content,
                     )
                     tool_result.content = compressed_content
+
+                # Invoke after_tool callbacks - can modify result
+                tool_result = await self._ainvoke_after_tool_callbacks(
+                    tool_call.name, tool_call.arguments, tool_result
+                )
 
                 # Notify about tool execution result if callback available
                 if self.tool_execution_result_callback:

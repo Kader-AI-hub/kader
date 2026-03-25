@@ -38,7 +38,7 @@ from kader.utils import agenerate_session_title
 from kader.utils.todo_metadata import TodoMetadataHandler
 from kader.workflows import PlannerExecutorWorkflow
 
-from .commands import InitializeCommand
+from .commands import InitializeCommand, UpdateCommand
 from .llm_factory import LLMProviderFactory
 from .settings import load_settings, save_settings
 from .utils import COMMAND_NAMES, HELP_TEXT
@@ -499,6 +499,11 @@ class KaderApp:
         elif cmd == "/init":
             init_cmd = InitializeCommand(self)
             await init_cmd.execute()
+
+        elif cmd == "/update":
+            update_cmd = UpdateCommand(self)
+            await update_cmd.execute()
+            return
 
         elif cmd == "/exit":
             self._running = False
@@ -1390,6 +1395,12 @@ class KaderApp:
 
 def main() -> None:
     """Run the Kader CLI application."""
+    from .settings import migrate_settings
+
+    settings = migrate_settings()
+    if settings.auto_update:
+        subprocess.run(["uv", "tool", "upgrade", "kader"], capture_output=True)
+
     app = KaderApp()
     app.run()
 

@@ -161,5 +161,6 @@ class TestLoadSaveSettings:
             "sub-agent-provider",
             "main-agent-model",
             "sub-agent-model",
+            "auto-update",
         }
         assert set(data.keys()) == expected_keys

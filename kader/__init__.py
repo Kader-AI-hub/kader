@@ -13,7 +13,7 @@ from .utils import Checkpointer
 # Initialize the configuration when the module is imported
 initialize_kader_config()
 
-__version__ = "0.1.0"
+__version__ = "2.9.1"
 __author__ = "Kader Project"
 __all__ = [
     "KADER_DIR",

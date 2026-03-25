@@ -39,6 +39,7 @@ _JSON_KEY_MAP: dict[str, str] = {
     "sub-agent-provider": "sub_agent_provider",
     "main-agent-model": "main_agent_model",
     "sub-agent-model": "sub_agent_model",
+    "auto-update": "auto_update",
 }
 
 _FIELD_KEY_MAP: dict[str, str] = {v: k for k, v in _JSON_KEY_MAP.items()}
@@ -53,6 +54,7 @@ class KaderSettings:
         sub_agent_provider: LLM provider name for executor sub-agents.
         main_agent_model: Model identifier for the planner agent.
         sub_agent_model: Model identifier for executor sub-agents.
+        auto_update: Whether to automatically update Kader on startup.
     """
 
     VALID_PROVIDERS: ClassVar[set[str]] = VALID_PROVIDERS
@@ -61,6 +63,7 @@ class KaderSettings:
     sub_agent_provider: str = field(default=_DEFAULT_PROVIDER)
     main_agent_model: str = field(default=_DEFAULT_MAIN_MODEL)
     sub_agent_model: str = field(default=_DEFAULT_SUB_MODEL)
+    auto_update: bool = field(default=False)
 
     def __post_init__(self) -> None:
         """Validate provider values after initialisation."""
@@ -84,10 +87,19 @@ class KaderSettings:
 
         Unknown keys are silently ignored; missing keys use defaults.
         """
-        kwargs: dict[str, str] = {}
+        kwargs: dict[str, str | bool] = {}
         for json_key, field_name in _JSON_KEY_MAP.items():
             if json_key in data:
-                kwargs[field_name] = data[json_key]
+                if field_name == "auto_update":
+                    value = data[json_key]
+                    if isinstance(value, bool):
+                        kwargs[field_name] = value
+                    elif isinstance(value, str):
+                        kwargs[field_name] = value.lower() == "true"
+                    else:
+                        kwargs[field_name] = bool(value)
+                else:
+                    kwargs[field_name] = data[json_key]
         return cls(**kwargs)
 
     def get_main_model_string(self) -> str:
@@ -148,3 +160,43 @@ def ensure_settings_file(path: Path | None = None) -> KaderSettings:
         return settings
 
     return load_settings(path)
+
+
+def migrate_settings(path: Path | None = None) -> KaderSettings:
+    """Check for missing keys in settings file and add them with defaults.
+
+    Reads the existing settings file, adds any missing keys with their
+    default values, and saves the updated file. Existing keys are preserved.
+
+    Returns the loaded (potentially migrated) settings.
+    """
+    path = path or get_settings_path()
+
+    if not path.exists():
+        return KaderSettings()
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, ValueError, TypeError) as exc:
+        logger.warning(f"Failed to parse settings at {path}: {exc}")
+        return KaderSettings()
+
+    defaults = KaderSettings()
+    default_dict = defaults.to_dict()
+
+    migrated = False
+    for key, default_value in default_dict.items():
+        if key not in data:
+            data[key] = default_value
+            migrated = True
+            logger.info(f"Added missing setting '{key}' with default value")
+
+    if migrated:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(data, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        logger.info(f"Migrated settings file at {path}")
+
+    return KaderSettings.from_dict(data)
