@@ -66,6 +66,7 @@ python -m cli
 | `/commands` | List special commands |
 | `/cost` | Show usage costs |
 | `/init` | Initialize .kader directory with KADER.md |
+| `/update` | Check for updates and update Kader if newer version available |
 | `/exit` | Exit the CLI |
 | `!cmd` | Run terminal command |
 
@@ -255,11 +256,26 @@ Kader stores user preferences in `~/.kader/settings.json`. This file is created 
   "main-agent-provider": "ollama",
   "sub-agent-provider": "ollama",
   "main-agent-model": "glm-5:cloud",
-  "sub-agent-model": "glm-5:cloud"
+  "sub-agent-model": "glm-5:cloud",
+  "auto-update": false
 }
 ```
 
 Settings are updated automatically when you switch models via `/models`. You can also edit the file directly.
+
+### Available Settings
+
+| Field | Description | Default |
+|-------|-------------|---------|
+| `main-agent-provider` | LLM provider for the planner agent | `ollama` |
+| `sub-agent-provider` | LLM provider for executor sub-agents | `ollama` |
+| `main-agent-model` | Model name for the planner agent | `glm-5:cloud` |
+| `sub-agent-model` | Model name for executor sub-agents | `glm-5:cloud` |
+| `auto-update` | Automatically update Kader on startup | `false` |
+
+### Auto-Update
+
+When `auto-update` is set to `true`, Kader will automatically check for and install updates on every startup. The update is performed silently using `uv tool upgrade kader`.
 
 ## Changing the Model
 
