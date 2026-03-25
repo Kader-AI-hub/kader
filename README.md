@@ -112,6 +112,34 @@ Kader stores data in `~/.kader/`:
 - Memory files: `~/.kader/memory/`
 - Checkpoints: `~/.kader/memory/sessions/<session-id>/executors/` (Aggregated context from sub-agents)
 
+### Settings
+
+User preferences are stored in `~/.kader/settings.json`, created automatically on first run:
+
+```json
+{
+  "main-agent-provider": "ollama",
+  "sub-agent-provider": "ollama",
+  "main-agent-model": "glm-5:cloud",
+  "sub-agent-model": "glm-5:cloud",
+  "auto-update": false
+}
+```
+
+| Field | Description | Default |
+|-------|-------------|---------|
+| `main-agent-provider` | LLM provider for the planner agent | `ollama` |
+| `sub-agent-provider` | LLM provider for executor sub-agents | `ollama` |
+| `main-agent-model` | Model name for the planner agent | `glm-5:cloud` |
+| `sub-agent-model` | Model name for executor sub-agents | `glm-5:cloud` |
+| `auto-update` | Automatically update Kader on startup | `false` |
+
+#### Auto-Update
+
+When `auto-update` is set to `true`, Kader will automatically check for and install updates on every startup using `uv tool upgrade kader`. The update is performed silently.
+
+You can also manually check for updates using the `/update` command. If a newer version is available, it will upgrade Kader and restart the CLI. If you're already on the latest version, it will display a confirmation message.
+
 ## CLI Commands
 
 | Command | Description |
@@ -126,6 +154,7 @@ Kader stores data in `~/.kader/`:
 | `/commands` | List special commands |
 | `/cost` | Show usage costs |
 | `/init` | Initialize .kader directory with KADER.md |
+| `/update` | Check for updates and update Kader if newer version available |
 | `/exit` | Exit the CLI |
 | `!cmd` | Run terminal command |
 

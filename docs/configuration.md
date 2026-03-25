@@ -127,15 +127,23 @@ User preferences are stored in `~/.kader/settings.json`, created automatically o
   "main-agent-provider": "ollama",
   "sub-agent-provider": "ollama",
   "main-agent-model": "glm-5:cloud",
-  "sub-agent-model": "glm-5:cloud"
+  "sub-agent-model": "glm-5:cloud",
+  "auto-update": false
 }
 ```
 
-| Field | Description |
-|-------|-------------|
-| `main-agent-provider` | LLM provider for the planner agent |
-| `sub-agent-provider` | LLM provider for executor sub-agents |
-| `main-agent-model` | Model name for the planner agent |
-| `sub-agent-model` | Model name for executor sub-agents |
+| Field | Description | Default |
+|-------|-------------|---------|
+| `main-agent-provider` | LLM provider for the planner agent | `ollama` |
+| `sub-agent-provider` | LLM provider for executor sub-agents | `ollama` |
+| `main-agent-model` | Model name for the planner agent | `glm-5:cloud` |
+| `sub-agent-model` | Model name for executor sub-agents | `glm-5:cloud` |
+| `auto-update` | Automatically update Kader on startup | `false` |
 
 Settings are updated automatically when switching models via the `/models` CLI command. You can also edit the file directly.
+
+### Auto-Update
+
+When `auto-update` is set to `true`, Kader will automatically check for and install updates on every startup. The update is performed silently using `uv tool upgrade kader`.
+
+You can also manually check for updates using the `/update` command. If a newer version is available, it will upgrade Kader and restart the CLI. If you're already on the latest version, it will display a confirmation message.
