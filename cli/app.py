@@ -1273,10 +1273,14 @@ class KaderApp:
     def _check_for_updates(self) -> None:
         """Check for package updates in background thread."""
         try:
-            from outdated import check_outdated
+            from urllib.request import urlopen
 
             current_version = get_version("kader")
-            is_outdated, latest_version = check_outdated("kader", current_version)
+            url = "https://pypi.org/pypi/kader/json"
+            with urlopen(url, timeout=10) as response:
+                data = response.read()
+                latest_version = data.split(b'"version":"')[1].split(b'"')[0].decode()
+                is_outdated = latest_version != current_version
 
             if is_outdated:
                 self._update_info = latest_version

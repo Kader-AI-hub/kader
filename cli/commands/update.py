@@ -9,12 +9,33 @@ import sys
 from importlib.metadata import version as get_version
 from typing import TYPE_CHECKING
 
-from outdated import check_outdated
-
 from .base import BaseCommand
 
 if TYPE_CHECKING:
     pass
+
+
+def check_outdated(package_name: str, current_version: str) -> tuple[bool, str]:
+    """Check if a package is outdated.
+
+    Args:
+        package_name: The name of the package to check.
+        current_version: The current version of the package.
+
+    Returns:
+        A tuple of (is_outdated, latest_version).
+    """
+    from urllib.request import urlopen
+
+    url = f"https://pypi.org/pypi/{package_name}/json"
+    try:
+        with urlopen(url, timeout=10) as response:
+            data = response.read()
+            latest_version = data.split(b'"version":"')[1].split(b'"')[0].decode()
+            is_outdated = latest_version != current_version
+            return is_outdated, latest_version
+    except Exception:
+        return False, current_version
 
 
 class UpdateCommand(BaseCommand):
