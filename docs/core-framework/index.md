@@ -79,3 +79,4 @@ conv_mgr.add_message(Message.user("Hello"))
 - [Providers](providers.md) - Ollama, Google, Anthropic, Mistral, OpenAI-compatible
 - [Tools](tools.md) - Built-in tools and custom tool creation
 - [Memory](memory.md) - Session management and conversation history
+- [Callbacks](callbacks.md) - Hook system for agent execution lifecycle

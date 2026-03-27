@@ -127,26 +127,42 @@ class BaseCallback(ABC):
         pass
 
     def on_llm_start(
-        self, context: CallbackContext, messages: list[dict[str, Any]]
-    ) -> None:
+        self,
+        context: CallbackContext,
+        messages: list[Any],
+        config: Any | None,
+    ) -> tuple[list[Any], Any | None]:
         """
         Called before LLM is invoked.
 
         Args:
             context: Callback context with event info.
             messages: Messages being sent to LLM.
-        """
-        pass
+            config: ModelConfig being used for the call.
 
-    def on_llm_end(self, context: CallbackContext, response: Any) -> None:
+        Returns:
+            Tuple of (modified_messages, modified_config).
+        """
+        return messages, config
+
+    def on_llm_end(
+        self,
+        context: CallbackContext,
+        messages: list[Any],
+        response: Any,
+    ) -> Any:
         """
         Called after LLM response is received.
 
         Args:
             context: Callback context with event info.
+            messages: Messages that were sent to LLM.
             response: LLM response.
+
+        Returns:
+            Modified response (can be transformed).
         """
-        pass
+        return response
 
     def on_error(self, context: CallbackContext, error: Exception) -> None:
         """

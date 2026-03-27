@@ -21,6 +21,10 @@ Example:
 """
 
 from .base import BaseCallback, CallbackContext, CallbackEvent
+from .llm_callbacks import (
+    LLMCallback,
+    LoggingLLMCallback,
+)
 from .tool_callbacks import (
     LoggingToolCallback,
     ToolCallback,
@@ -32,4 +36,6 @@ __all__ = [
     "CallbackEvent",
     "ToolCallback",
     "LoggingToolCallback",
+    "LLMCallback",
+    "LoggingLLMCallback",
 ]

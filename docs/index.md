@@ -15,6 +15,7 @@ Kader is an intelligent coding agent designed to assist with software developmen
 - **Interactive CLI** - Modern terminal interface built with Rich & prompt_toolkit
 - **Tool Integration** - File system, command execution, web search, and more
 - **Memory Management** - State persistence, conversation history, and isolated sub-agent memory
+- **Callback System** - Hook into agent execution for logging, monitoring, and modification
 - **Planner-Executor Framework** - Sophisticated reasoning and acting architecture
 - **Agent Skills** - Modular skill system for specialized domain knowledge
 
@@ -51,12 +52,13 @@ kader/
 ├── examples/              # Example implementations
 ├── kader/                 # Core framework
 │   ├── agent/            # Agent implementations
-│   ├── memory/           # Memory management
-│   ├── providers/        # LLM providers
-│   ├── tools/            # Tools
-│   ├── prompts/          # Prompt templates
-│   └── utils/            # Utilities
-└── docs/                  # Documentation
+│   ├── callbacks/       # Callback system for agent lifecycle hooks
+│   ├── memory/          # Memory management
+│   ├── providers/       # LLM providers
+│   ├── prompts/         # Prompt templates
+│   ├── tools/           # Tools
+│   └── utils/           # Utilities
+└── docs/                 # Documentation
 ```
 
 ## License
