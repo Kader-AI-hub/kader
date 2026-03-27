@@ -12,6 +12,7 @@ Kader is a flexible framework that enables developers to create AI agents capabl
 - **Agent Types**: BaseAgent, ReActAgent, and PlanningAgent for different reasoning patterns
 - **Tool System**: Build custom tools with automatic schema generation for any LLM provider
 - **Memory Management**: Persistent sessions, conversation history with sliding windows, and state management
+- **Callback System**: Hook into agent execution for logging, monitoring, and argument/result transformation
 - **Workflows**: Planner-Executor pattern for complex multi-step tasks
 - **Session Persistence**: Save and resume agent conversations
 
@@ -859,6 +860,155 @@ compressed = compressor.compress(
 )
 ```
 
+## Callbacks
+
+The callback system allows you to hook into various stages of agent execution for logging, monitoring, and transforming arguments and results.
+
+### Callback Types
+
+#### ToolCallback
+
+Callbacks for tool execution events:
+
+```python
+from kader.callbacks import ToolCallback, CallbackContext
+
+class MyToolCallback(ToolCallback):
+    def on_tool_before(
+        self,
+        context: CallbackContext,
+        tool_name: str,
+        arguments: dict,
+    ) -> dict:
+        print(f"Calling {tool_name} with {arguments}")
+        return arguments  # Can modify arguments
+
+    def on_tool_after(
+        self,
+        context: CallbackContext,
+        tool_name: str,
+        arguments: dict,
+        result,
+    ):
+        print(f"{tool_name} returned: {result}")
+        return result  # Can modify result
+```
+
+#### LLMCallback
+
+Callbacks for LLM invocation events:
+
+```python
+from kader.callbacks import LLMCallback, CallbackContext
+
+class MyLLMCallback(LLMCallback):
+    def on_llm_start(
+        self,
+        context: CallbackContext,
+        messages: list,
+        config,
+    ) -> tuple:
+        print(f"LLM call starting with {len(messages)} messages")
+        return messages, config  # Can modify messages and config
+
+    def on_llm_end(
+        self,
+        context: CallbackContext,
+        messages: list,
+        response,
+    ):
+        print(f"LLM response: {response.content}")
+        return response  # Can modify response
+```
+
+#### AgentCallback
+
+Callbacks for agent start/end events:
+
+```python
+from kader.callbacks import BaseCallback, CallbackContext
+
+class MyAgentCallback(BaseCallback):
+    def on_agent_start(self, context: CallbackContext) -> None:
+        print(f"Agent {context.agent_name} starting!")
+
+    def on_agent_end(self, context: CallbackContext) -> None:
+        print(f"Agent {context.agent_name} finished!")
+```
+
+### Using Callbacks with Agents
+
+```python
+from kader.agent import BaseAgent
+from kader.callbacks import ToolCallback, LLMCallback, BaseCallback, CallbackContext
+from kader.providers import OllamaProvider
+from kader.tools import ReadFileTool
+
+# Create callbacks
+class LoggingToolCallback(ToolCallback):
+    def on_tool_before(self, context, tool_name, arguments):
+        print(f"[LOG] Calling {tool_name}")
+        return arguments
+
+class LoggingLLMCallback(LLMCallback):
+    def on_llm_start(self, context, messages, config):
+        print(f"[LOG] LLM call starting")
+        return messages, config
+
+    def on_llm_end(self, context, messages, response):
+        print(f"[LOG] LLM response received")
+        return response
+
+class AgentEventsCallback(BaseCallback):
+    def on_agent_start(self, context):
+        print(f"[LOG] Agent starting!")
+
+    def on_agent_end(self, context):
+        print(f"[LOG] Agent finished!")
+
+# Initialize agent with callbacks
+agent = BaseAgent(
+    name="my_agent",
+    system_prompt="You are a helpful assistant.",
+    tools=[ReadFileTool()],
+    provider=OllamaProvider(model="llama3.2"),
+    callbacks=[
+        LoggingToolCallback(),
+        LoggingLLMCallback(),
+        AgentEventsCallback(),
+    ],
+)
+
+response = agent.invoke("Read the file README.md")
+```
+
+### Callback Execution Order
+
+1. `on_agent_start` - At the beginning of agent execution
+2. `on_llm_start` - Before each LLM call
+3. `on_llm_end` - After each LLM call
+4. `on_tool_before` - Before each tool execution
+5. `on_tool_after` - After each tool execution
+6. `on_agent_end` - At the end of agent execution
+
+### Built-in Callbacks
+
+Kader provides ready-to-use callbacks:
+
+```python
+from kader.callbacks import LoggingToolCallback, LoggingLLMCallback
+
+# Log all tool executions
+agent = BaseAgent(
+    callbacks=[LoggingToolCallback()]
+)
+
+# Log LLM calls for specific models
+agent = BaseAgent(
+    callbacks=[LoggingLLMCallback(model_names=["mistral-vibe-cli"])]
+)
+```
+
 ## Workflows
 
 ### PlannerExecutorWorkflow
@@ -954,6 +1104,16 @@ python ollama_example.py
 | `SlidingWindowConversationManager` | Conversation history |
 | `ToolOutputCompressor` | Token optimization |
 | `PlannerExecutorWorkflow` | Planning + execution workflow |
+
+### Callback Classes
+
+| Class | Description |
+|-------|-------------|
+| `BaseCallback` | Base callback class |
+| `ToolCallback` | Tool execution callbacks |
+| `LLMCallback` | LLM invocation callbacks |
+| `LoggingToolCallback` | Built-in tool logging |
+| `LoggingLLMCallback` | Built-in LLM logging |
 
 ### Key Functions
 
