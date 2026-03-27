@@ -8,7 +8,6 @@ and modify the agent execution lifecycle.
 import io
 import os
 import sys
-from typing import Any
 
 from kader.agent.base import BaseAgent
 from kader.callbacks import CallbackContext, LLMCallback
