@@ -16,6 +16,7 @@ nav:
     - Providers: core-framework/providers.md
     - Tools: core-framework/tools.md
     - Memory: core-framework/memory.md
+    - Callbacks: core-framework/callbacks.md
   - CLI Reference: cli/index.md
 
 theme:
