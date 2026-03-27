@@ -538,6 +538,42 @@ class BaseAgent:
         """Create a callback context for the current agent."""
         return CallbackContext(event=event, agent_name=self.name, extra={})
 
+    def _invoke_agent_start_callbacks(self) -> None:
+        """Invoke on_agent_start callbacks."""
+        context = self._create_callback_context(CallbackEvent.AGENT_START)
+        for callback in self.callbacks:
+            if not callback.enabled:
+                continue
+            if hasattr(callback, "on_agent_start"):
+                callback.on_agent_start(context)
+
+    def _invoke_agent_end_callbacks(self) -> None:
+        """Invoke on_agent_end callbacks."""
+        context = self._create_callback_context(CallbackEvent.AGENT_END)
+        for callback in self.callbacks:
+            if not callback.enabled:
+                continue
+            if hasattr(callback, "on_agent_end"):
+                callback.on_agent_end(context)
+
+    async def _ainvoke_agent_start_callbacks(self) -> None:
+        """Async version - invoke on_agent_start callbacks."""
+        context = self._create_callback_context(CallbackEvent.AGENT_START)
+        for callback in self.callbacks:
+            if not callback.enabled:
+                continue
+            if hasattr(callback, "on_agent_start"):
+                callback.on_agent_start(context)
+
+    async def _ainvoke_agent_end_callbacks(self) -> None:
+        """Async version - invoke on_agent_end callbacks."""
+        context = self._create_callback_context(CallbackEvent.AGENT_END)
+        for callback in self.callbacks:
+            if not callback.enabled:
+                continue
+            if hasattr(callback, "on_agent_end"):
+                callback.on_agent_end(context)
+
     def _invoke_before_tool_callbacks(
         self,
         tool_name: str,
@@ -599,6 +635,62 @@ class BaseAgent:
                     context, tool_name, arguments, tool_result
                 )
         return tool_result
+
+    def _invoke_llm_callbacks(
+        self,
+        messages: list[Message],
+        config: ModelConfig | None,
+    ) -> tuple[list[Message], ModelConfig | None]:
+        """Invoke on_llm_start callbacks and return modified messages and config."""
+        context = self._create_callback_context(CallbackEvent.LLM_START)
+        for callback in self.callbacks:
+            if not callback.enabled:
+                continue
+            if hasattr(callback, "on_llm_start"):
+                messages, config = callback.on_llm_start(context, messages, config)
+        return messages, config
+
+    def _invoke_llm_response_callbacks(
+        self,
+        messages: list[Message],
+        response: LLMResponse,
+    ) -> LLMResponse:
+        """Invoke on_llm_end callbacks and return modified response."""
+        context = self._create_callback_context(CallbackEvent.LLM_END)
+        for callback in self.callbacks:
+            if not callback.enabled:
+                continue
+            if hasattr(callback, "on_llm_end"):
+                response = callback.on_llm_end(context, messages, response)
+        return response
+
+    async def _ainvoke_llm_callbacks(
+        self,
+        messages: list[Message],
+        config: ModelConfig | None,
+    ) -> tuple[list[Message], ModelConfig | None]:
+        """Async version - invoke on_llm_start callbacks."""
+        context = self._create_callback_context(CallbackEvent.LLM_START)
+        for callback in self.callbacks:
+            if not callback.enabled:
+                continue
+            if hasattr(callback, "on_llm_start"):
+                messages, config = callback.on_llm_start(context, messages, config)
+        return messages, config
+
+    async def _ainvoke_llm_response_callbacks(
+        self,
+        messages: list[Message],
+        response: LLMResponse,
+    ) -> LLMResponse:
+        """Async version - invoke on_llm_end callbacks."""
+        context = self._create_callback_context(CallbackEvent.LLM_END)
+        for callback in self.callbacks:
+            if not callback.enabled:
+                continue
+            if hasattr(callback, "on_llm_end"):
+                response = callback.on_llm_end(context, messages, response)
+        return response
 
     def _process_tool_calls(
         self, response: LLMResponse
@@ -802,6 +894,9 @@ class BaseAgent:
 
         Handles message preparation, LLM invocation with retries, and tool execution loop.
         """
+        # Invoke agent start callbacks
+        self._invoke_agent_start_callbacks()
+
         # Retry decorator wrapper logic
         # Since tenacity decorators wrap functions, we define an inner function or use the decorator on a method
         # but we want dynamic retry attempts (from self) which decorators strictly speaking don't support easily without specialized usage.
@@ -830,14 +925,20 @@ class BaseAgent:
             # Note: _prepare_messages adds input to memory. On subsequent turns (tools),
             # we don't re-add the user input. self.memory already has it + previous turns.
 
+            # Invoke LLM start callbacks - can modify messages and config
+            full_history, config = self._invoke_llm_callbacks(
+                full_history, self._get_run_config(config)
+            )
+
             # Call LLM with retry
             try:
-                response = runner(
-                    self.provider.invoke, full_history, self._get_run_config(config)
-                )
+                response = runner(self.provider.invoke, full_history, config)
             except RetryError as e:
                 # Should not happen with reraise=True, but just in case
                 raise e
+
+            # Invoke LLM end callbacks - can modify response
+            response = self._invoke_llm_response_callbacks(full_history, response)
 
             # Add assistant response to memory
             self.memory.add_message(response.to_message())
@@ -954,6 +1055,9 @@ class BaseAgent:
                 final_response = response
                 break
 
+        # Invoke agent end callbacks
+        self._invoke_agent_end_callbacks()
+
         return final_response
 
     def stream(
@@ -1013,6 +1117,9 @@ class BaseAgent:
         self, messages: Union[str, list[Message]], config: Optional[ModelConfig] = None
     ) -> LLMResponse:
         """Asynchronous invocation with retries and tool loop."""
+        # Invoke agent start callbacks
+        await self._ainvoke_agent_start_callbacks()
+
         from tenacity import AsyncRetrying
 
         runner = AsyncRetrying(
@@ -1031,8 +1138,16 @@ class BaseAgent:
             current_turn += 1
             full_history = self._prepare_messages(messages if current_turn == 1 else [])
 
-            response = await runner(
-                self.provider.ainvoke, full_history, self._get_run_config(config)
+            # Invoke LLM start callbacks - can modify messages and config
+            full_history, config = await self._ainvoke_llm_callbacks(
+                full_history, self._get_run_config(config)
+            )
+
+            response = await runner(self.provider.ainvoke, full_history, config)
+
+            # Invoke LLM end callbacks - can modify response
+            response = await self._ainvoke_llm_response_callbacks(
+                full_history, response
             )
 
             self.memory.add_message(response.to_message())
@@ -1143,6 +1258,9 @@ class BaseAgent:
             else:
                 final_response = response
                 break
+
+        # Invoke agent end callbacks
+        await self._ainvoke_agent_end_callbacks()
 
         return final_response
 
