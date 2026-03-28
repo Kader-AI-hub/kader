@@ -175,6 +175,7 @@ class AgentTool(BaseTool[str]):
         skills_dirs: list[Path] | None = None,
         priority_dir: Path | None = None,
         custom_system_prompt: Optional[str] = None,
+        callbacks: Optional[list] = None,
     ) -> None:
         """
         Initialize the AgentTool.
@@ -227,6 +228,7 @@ class AgentTool(BaseTool[str]):
         self._skills_dirs = skills_dirs
         self._priority_dir = priority_dir
         self._custom_system_prompt = custom_system_prompt
+        self._callbacks = callbacks or []
 
         # Compression Configuration
         self._enable_compression = enable_compression
@@ -410,6 +412,7 @@ class AgentTool(BaseTool[str]):
             tool_confirmation_callback=self._tool_confirmation_callback,
             direct_execution_callback=self._direct_execution_callback,
             tool_execution_result_callback=self._tool_execution_result_callback,
+            callbacks=self._callbacks,
         )
 
         try:
@@ -587,6 +590,7 @@ class AgentTool(BaseTool[str]):
             tool_confirmation_callback=self._tool_confirmation_callback,
             direct_execution_callback=self._direct_execution_callback,
             tool_execution_result_callback=self._tool_execution_result_callback,
+            callbacks=self._callbacks,
         )
 
         try:
