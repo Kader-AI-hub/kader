@@ -38,7 +38,8 @@ from kader.utils import agenerate_session_title
 from kader.utils.todo_metadata import TodoMetadataHandler
 from kader.workflows import PlannerExecutorWorkflow
 
-from .commands import InitializeCommand, UpdateCommand
+from .callbacks import load_callbacks_from_settings
+from .commands import InitializeCommand, RefreshCommand, UpdateCommand
 from .llm_factory import LLMProviderFactory
 from .settings import load_settings, save_settings
 from .utils import COMMAND_NAMES, HELP_TEXT
@@ -153,6 +154,9 @@ class KaderApp:
         executor_model = self._settings.get_sub_model_string()
         executor_provider = LLMProviderFactory.create_provider(executor_model)
 
+        # Load callbacks from settings
+        callbacks = load_callbacks_from_settings(self._settings)
+
         workflow = PlannerExecutorWorkflow(
             name="kader_cli",
             provider=provider,
@@ -165,6 +169,7 @@ class KaderApp:
             executor_names=["executor"],
             executor_model_name=executor_model,
             executor_provider=executor_provider,
+            callbacks=callbacks,
         )
 
         if not self._current_session_id:
@@ -499,6 +504,10 @@ class KaderApp:
         elif cmd == "/init":
             init_cmd = InitializeCommand(self)
             await init_cmd.execute()
+
+        elif cmd == "/refresh":
+            refresh_cmd = RefreshCommand(self)
+            await refresh_cmd.execute()
 
         elif cmd == "/update":
             update_cmd = UpdateCommand(self)
@@ -1267,6 +1276,16 @@ class KaderApp:
                 self.console.print("  [dim]ℹ Ollama runs locally — no API costs.[/dim]")
         except Exception as e:
             self.console.print(f"  [kader.red]✗[/kader.red] Error getting costs: {e}")
+
+    # ── Refresh settings ───────────────────────────────────────────────
+
+    def _refresh_settings(self) -> None:
+        """Reload settings and callbacks, recreate workflow."""
+        from cli.settings import load_settings
+
+        self._settings = load_settings()
+        self._current_model = self._settings.get_main_model_string()
+        self._workflow = self._create_workflow(self._current_model)
 
     # ── Update check ─────────────────────────────────────────────────
 
