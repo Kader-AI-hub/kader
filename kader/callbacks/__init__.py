@@ -25,6 +25,7 @@ from .llm_callbacks import (
     LLMCallback,
     LoggingLLMCallback,
 )
+from .loader import CallbackLoader
 from .tool_callbacks import (
     LoggingToolCallback,
     ToolCallback,
@@ -34,6 +35,7 @@ __all__ = [
     "BaseCallback",
     "CallbackContext",
     "CallbackEvent",
+    "CallbackLoader",
     "ToolCallback",
     "LoggingToolCallback",
     "LLMCallback",
