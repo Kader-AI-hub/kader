@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Callable, Optional, Tuple
 
 from kader.agent.agents import PlanningAgent
+from kader.callbacks import BaseCallback
 from kader.memory import (
     HierarchicalConversationManager,
     SlidingWindowConversationManager,
@@ -58,6 +59,7 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         priority_dir: Path | None = None,
         executor_model_name: Optional[str] = None,
         executor_provider: Optional[BaseLLMProvider] = None,
+        callbacks: Optional[list[BaseCallback]] = None,
     ) -> None:
         """
         Initialize the Planner-Executor workflow.
@@ -95,6 +97,7 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         self.priority_dir = priority_dir
         self.executor_model_name = executor_model_name
         self.executor_provider = executor_provider
+        self.callbacks = callbacks or []
 
         # Build the planner agent with tools
         self._planner = self._build_planner()
@@ -152,6 +155,7 @@ class PlannerExecutorWorkflow(BaseWorkflow):
                 memory_manager_type=self.memory_manager_type,
                 skills_dirs=self.skills_dirs,
                 priority_dir=self.priority_dir,
+                callbacks=self.callbacks,
             )
             registry.register(agent_tool)
 
@@ -189,6 +193,7 @@ class PlannerExecutorWorkflow(BaseWorkflow):
             tool_confirmation_callback=self.tool_confirmation_callback,
             direct_execution_callback=self.direct_execution_callback,
             tool_execution_result_callback=self.tool_execution_result_callback,
+            callbacks=self.callbacks,
         )
 
         if not self.session_id:

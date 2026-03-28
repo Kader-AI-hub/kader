@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 from kader.agent.base import BaseAgent
+from kader.callbacks import BaseCallback
 from kader.memory import ConversationManager
 from kader.prompts import PlanningAgentPrompt, PromptBase, ReActAgentPrompt
 from kader.providers.base import BaseLLMProvider
@@ -35,6 +36,7 @@ class ReActAgent(BaseAgent):
         direct_execution_callback: Optional[callable] = None,
         tool_execution_result_callback: Optional[callable] = None,
         skills_dirs: Optional[list[Path]] = None,
+        callbacks: Optional[list[BaseCallback]] = None,
     ) -> None:
         # Resolve tools for prompt context if necessary
         # The base agent handles tool registration, but for the prompt template
@@ -74,6 +76,7 @@ class ReActAgent(BaseAgent):
             direct_execution_callback=direct_execution_callback,
             tool_execution_result_callback=tool_execution_result_callback,
             skills_dirs=skills_dirs,
+            callbacks=callbacks,
         )
 
 
@@ -100,6 +103,7 @@ class PlanningAgent(BaseAgent):
         direct_execution_callback: Optional[callable] = None,
         tool_execution_result_callback: Optional[callable] = None,
         skills_dirs: Optional[list[Path]] = None,
+        callbacks: Optional[list[BaseCallback]] = None,
     ) -> None:
         # Ensure TodoTool is available
         _todo_tool = TodoTool()
@@ -136,4 +140,5 @@ class PlanningAgent(BaseAgent):
             direct_execution_callback=direct_execution_callback,
             tool_execution_result_callback=tool_execution_result_callback,
             skills_dirs=skills_dirs,
+            callbacks=callbacks,
         )
