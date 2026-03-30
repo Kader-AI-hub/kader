@@ -54,6 +54,7 @@ COMMANDS: list[CLICommand] = [
     CLICommand(name="/commands", description="List special commands"),
     CLICommand(name="/cost", description="Show usage costs"),
     CLICommand(name="/init", description="Initialize .kader directory with KADER.md"),
+    CLICommand(name="/refresh", description="Refresh settings and reload callbacks"),
     CLICommand(
         name="/update",
         description="Check for updates and update Kader if newer version available",
@@ -109,6 +110,8 @@ HELP_TEXT = """## Kader CLI Commands
 | `/commands` | List special commands |
 | `/cost` | Show usage costs |
 | `/init` | Initialize .kader directory with KADER.md |
+| `refresh` | Refresh settings of Kader CLI |
+| `update` | Check for updates and update Kader |
 | `/exit` | Exit the CLI |
 | `!cmd` | Run terminal command |
 

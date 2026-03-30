@@ -162,5 +162,6 @@ class TestLoadSaveSettings:
             "main-agent-model",
             "sub-agent-model",
             "auto-update",
+            "callbacks",
         }
         assert set(data.keys()) == expected_keys
