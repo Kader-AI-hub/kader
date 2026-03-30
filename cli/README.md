@@ -66,6 +66,7 @@ python -m cli
 | `/commands` | List special commands |
 | `/cost` | Show usage costs |
 | `/init` | Initialize .kader directory with KADER.md |
+| `/refresh` | Refresh settings and reload callbacks |
 | `/update` | Check for updates and update Kader if newer version available |
 | `/exit` | Exit the CLI |
 | `!cmd` | Run terminal command |
@@ -215,6 +216,97 @@ Usage:
 
 Usage: `/lint-test` or `/lint-test run full check`
 
+## Callbacks System
+
+Kader supports callbacks — custom code that hooks into various stages of agent execution. Callbacks can modify tool arguments, log events, transform responses, and more.
+
+### Callback Locations
+
+Callbacks are loaded from two locations:
+
+- `./.kader/custom/callbacks/` — **Project-level callbacks** (auto-loaded, always enabled)
+- `~/.kader/custom/callbacks/` — **User-level callbacks** (require configuration in settings.json)
+
+### Creating a Callback
+
+Create a Python file in the callbacks directory that defines a class extending `BaseCallback`, `ToolCallback`, or `LLMCallback`:
+
+```python
+from kader.callbacks.tool_callbacks import ToolCallback
+
+class MyCallback(ToolCallback):
+    """Custom callback that modifies tool behavior."""
+
+    def __init__(self, enabled: bool = True):
+        super().__init__(tool_names=["execute_command"], enabled=enabled)
+
+    def on_tool_before(self, context, tool_name: str, arguments: dict) -> dict:
+        """Called before tool execution."""
+        # Modify arguments before execution
+        return arguments
+
+    def on_tool_after(self, context, tool_name: str, arguments: dict, result) -> dict:
+        """Called after tool execution."""
+        # Modify result after execution
+        return result
+```
+
+### Available Callback Base Classes
+
+| Class | Description |
+|-------|-------------|
+| `BaseCallback` | Abstract base class for all callbacks |
+| `ToolCallback` | For tool execution events (before/after) |
+| `LLMCallback` | For LLM invocation events (before/after) |
+
+### Callback Events
+
+| Event | Description |
+|-------|-------------|
+| `on_tool_before` | Called before a tool is executed |
+| `on_tool_after` | Called after a tool is executed |
+| `on_agent_start` | Called when agent starts execution |
+| `on_agent_end` | Called when agent finishes execution |
+| `on_llm_start` | Called before LLM is invoked |
+| `on_llm_end` | Called after LLM response is received |
+| `on_error` | Called when an error occurs |
+
+### User-Level Callbacks Configuration
+
+User-level callbacks must be explicitly enabled in `~/.kader/settings.json`:
+
+```json
+{
+  "main-agent-provider": "ollama",
+  "main-agent-model": "glm-5:cloud",
+  "callbacks": [
+    {"name": "my_callback", "enabled": "true"},
+    {"name": "other_callback", "enabled": "false"}
+  ]
+}
+```
+
+- `name`: The filename (without `.py` extension) containing the callback class
+- `enabled`: `"true"` to enable, `"false"` to disable
+
+### Project-Level Callbacks
+
+Project-level callbacks in `./.kader/custom/callbacks/` are automatically discovered and loaded. They don't require any configuration — just drop the file in the directory.
+
+### Refresh Command
+
+Use `/refresh` to reload settings and callbacks without restarting the CLI:
+
+- Reloads `settings.json` from disk
+- Re-discovers project-level callbacks
+- Re-loads user-level callbacks based on updated settings
+- Recreates the workflow with new configuration
+
+This is useful when:
+- Adding new callbacks to your project
+- Enabling/disabling callbacks in settings
+- Changing model or provider settings
+
 ## Model Selection Interface
 
 The `/models` command uses a two-step interactive flow:
@@ -257,11 +349,12 @@ Kader stores user preferences in `~/.kader/settings.json`. This file is created 
   "sub-agent-provider": "ollama",
   "main-agent-model": "glm-5:cloud",
   "sub-agent-model": "glm-5:cloud",
-  "auto-update": false
+  "auto-update": false,
+  "callbacks": []
 }
 ```
 
-Settings are updated automatically when you switch models via `/models`. You can also edit the file directly.
+Settings are updated automatically when you switch models via `/models`. You can also edit the file directly. The `callbacks` directory at `~/.kader/custom/callbacks` is also created automatically.
 
 ### Available Settings
 
@@ -272,6 +365,31 @@ Settings are updated automatically when you switch models via `/models`. You can
 | `main-agent-model` | Model name for the planner agent | `glm-5:cloud` |
 | `sub-agent-model` | Model name for executor sub-agents | `glm-5:cloud` |
 | `auto-update` | Automatically update Kader on startup | `false` |
+| `callbacks` | List of user-level callbacks to enable | `[]` |
+
+### Callbacks Configuration
+
+The `callbacks` field is an array of callback objects:
+
+```json
+{
+  "callbacks": [
+    {"name": "my_callback", "enabled": "true"},
+    {"name": "other_callback", "enabled": "false"}
+  ]
+}
+```
+
+- `name`: The filename (without `.py` extension) in `~/.kader/custom/callbacks/`
+- `enabled`: `"true"` to enable, `"false"` to disable
+
+When Kader starts, it automatically:
+1. Creates `~/.kader/custom/callbacks/` directory if it doesn't exist
+2. Discovers any callback files in that directory
+3. Adds them to settings with `enabled: "false"` by default
+4. Loads enabled callbacks from settings
+
+Use `/refresh` to reload callbacks after making changes.
 
 ### Auto-Update
 
