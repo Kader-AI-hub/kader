@@ -56,7 +56,7 @@ class UpdateCommand(BaseCommand):
             console.print(
                 f"  [kader.yellow]Updating Kader from v{current_version} to v{latest_version}...[/kader.yellow]"
             )
-            subprocess.run(["uv", "tool", "upgrade", "kader"], check=True)
+            subprocess.run(["uv", "tool", "upgrade", "kader"], capture_output=True)
             console.print(
                 f"  [kader.green]✓ Updated to v{latest_version}. Restarting...[/kader.green]"
             )
