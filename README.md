@@ -146,10 +146,8 @@ You can also manually check for updates using the `/update` command. If a newer 
 |---------|-------------|
 | `/help` | Show command reference |
 | `/models` | Show available models (Ollama local & cloud, Google & Anthropic) |
-| `/clear` | Clear conversation |
-| `/save` | Save current session |
-| `/load <id>` | Load a saved session |
-| `/sessions` | List saved sessions |
+| `/clear` | Clear conversation and create new session |
+| `/sessions` | List and load saved sessions |
 | `/skills` | List loaded skills |
 | `/commands` | List special commands |
 | `/cost` | Show usage costs |
