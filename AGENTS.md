@@ -154,7 +154,28 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
 ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"examples/*" = ["E402", "F841", "F402"]
+"tests/*" = ["E402"]
 ```
+
+### Pytest Configuration
+```toml
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+```
+
+### Additional Guidelines
+
+- When adding new dependencies, add them to the `dependencies` list in `pyproject.toml`
+- Dev dependencies (pytest, ruff) go in `[dependency-groups].dev`
+- Use `uv sync` to install dependencies after any changes to pyproject.toml
+- When running tests, use `-v` for verbose output to debug failures
+- Test file naming: `test_<module_name>.py` (e.g., `test_base_agent.py` for `kader/base_agent.py`)
+- Mock `Path.home()` in tests to avoid touching real ~/.kader directory
+- Clean up logger handlers in tests to prevent duplicate logs
 
 ### Special Files
 - `.kader/` directory in home: Stores config, sessions, memory

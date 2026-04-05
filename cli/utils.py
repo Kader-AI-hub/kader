@@ -42,14 +42,7 @@ COMMANDS: list[CLICommand] = [
     CLICommand(name="/help", description="Show help message"),
     CLICommand(name="/models", description="Show and switch LLM models"),
     CLICommand(name="/clear", description="Clear the conversation"),
-    CLICommand(name="/save", description="Save current session"),
-    CLICommand(
-        name="/load",
-        description="Load a saved session",
-        has_args=True,
-        arg_hint="<session_id>",
-    ),
-    CLICommand(name="/sessions", description="List saved sessions"),
+    CLICommand(name="/sessions", description="List and load saved sessions"),
     CLICommand(name="/skills", description="List loaded skills"),
     CLICommand(name="/commands", description="List special commands"),
     CLICommand(name="/cost", description="Show usage costs"),
@@ -103,9 +96,7 @@ HELP_TEXT = """## Kader CLI Commands
 | `/models` | Show and switch LLM models |
 | `/help` | Show this help message |
 | `/clear` | Clear the conversation |
-| `/save` | Save current session |
-| `/load <id>` | Load a saved session |
-| `/sessions` | List saved sessions |
+| `/sessions` | List and load saved sessions |
 | `/skills` | List loaded skills |
 | `/commands` | List special commands |
 | `/cost` | Show usage costs |

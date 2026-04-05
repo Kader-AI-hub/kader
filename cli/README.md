@@ -58,10 +58,8 @@ python -m cli
 |---------|-------------|
 | `/help` | Show command reference |
 | `/models` | Show and switch available models |
-| `/clear` | Clear conversation |
-| `/save` | Save current session |
-| `/load <id>` | Load a saved session |
-| `/sessions` | List saved sessions |
+| `/clear` | Clear conversation and create new session |
+| `/sessions` | List and load saved sessions |
 | `/skills` | List loaded skills |
 | `/commands` | List special commands |
 | `/cost` | Show usage costs |
@@ -80,11 +78,24 @@ python -m cli
 
 ## Session Management
 
-Sessions are saved to `~/.kader/sessions/`. Use:
+Sessions are automatically saved to `~/.kader/memory/sessions/<session-id>/`. Each session contains:
 
-- `/save` to save current conversation
-- `/sessions` to list all saved sessions
-- `/load <session_id>` to restore a session
+- `session.json` — Session metadata (ID, title, timestamps)
+- `conversation.json` — Full conversation history
+- `checkpoint.md` — Context summaries from sub-agents
+- `state.json` — Agent state persistence
+
+Use:
+
+- `/sessions` — List all saved sessions and load one
+- `/clear` — Clear conversation and start a new session
+
+### Session Titles
+
+When you start a conversation, Kader automatically generates a title based on your first message. Session titles are displayed:
+
+- In the session list when using `/sessions`
+- When loading an existing session
 
 ## Tool Confirmation System
 

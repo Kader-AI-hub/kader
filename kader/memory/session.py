@@ -37,6 +37,7 @@ class Session:
         session_type: Type of session (AGENT, MULTI_AGENT)
         created_at: ISO timestamp when session was created
         updated_at: ISO timestamp when session was last updated
+        title: Optional session title for display
     """
 
     session_id: str
@@ -44,6 +45,7 @@ class Session:
     session_type: SessionType = SessionType.AGENT
     created_at: str = field(default_factory=get_timestamp)
     updated_at: str = field(default_factory=get_timestamp)
+    title: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert session to dictionary for serialization.
@@ -57,6 +59,7 @@ class Session:
             "session_type": self.session_type.value,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+            "title": self.title,
         }
 
     @classmethod
@@ -75,6 +78,7 @@ class Session:
             session_type=SessionType(data.get("session_type", "AGENT")),
             created_at=data.get("created_at", get_timestamp()),
             updated_at=data.get("updated_at", get_timestamp()),
+            title=data.get("title"),
         )
 
 
@@ -693,5 +697,18 @@ class AsyncFileSessionManager(FileSessionManager):
         """Update the session's updated_at timestamp (async)."""
         session = await self.async_get_session(session_id)
         if session:
+            session.updated_at = get_timestamp()
+            await asave_json(self._session_file(session_id), session.to_dict())
+
+    async def async_update_session_title(self, session_id: str, title: str) -> None:
+        """Update the session's title.
+
+        Args:
+            session_id: Session identifier
+            title: New title for the session
+        """
+        session = await self.async_get_session(session_id)
+        if session:
+            session.title = title
             session.updated_at = get_timestamp()
             await asave_json(self._session_file(session_id), session.to_dict())
