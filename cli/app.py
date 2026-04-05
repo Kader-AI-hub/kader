@@ -41,6 +41,7 @@ from kader.workflows import PlannerExecutorWorkflow
 from .callbacks import load_callbacks_from_settings
 from .commands import InitializeCommand, RefreshCommand, UpdateCommand
 from .llm_factory import LLMProviderFactory
+from .sessions_metadata import aupdate_sessions_metadata
 from .settings import load_settings, save_settings
 from .utils import COMMAND_NAMES, HELP_TEXT
 
@@ -119,7 +120,7 @@ class KaderApp:
 
         # Session manager
         self._session_manager = AsyncFileSessionManager(
-            MemoryConfig(memory_dir=Path.home() / ".kader")
+            MemoryConfig(memory_dir=Path.home() / ".kader" / "memory")
         )
 
         # Update check state
@@ -141,7 +142,9 @@ class KaderApp:
             complete_while_typing=True,
         )
 
-    def _create_workflow(self, model_name: str) -> PlannerExecutorWorkflow:
+    def _create_workflow(
+        self, model_name: str, session_id: str | None = None
+    ) -> PlannerExecutorWorkflow:
         """Create a new PlannerExecutorWorkflow with the specified model."""
         from kader.tools.exec_commands import CommandExecutorTool
 
@@ -166,6 +169,7 @@ class KaderApp:
             direct_execution_callback=self._direct_execution_callback,
             tool_execution_result_callback=self._tool_execution_result_callback,
             use_persistence=True,
+            session_id=session_id,
             executor_names=["executor"],
             executor_model_name=executor_model,
             executor_provider=executor_provider,
@@ -475,9 +479,7 @@ class KaderApp:
             self.console.clear()
             self._print_welcome()
             self._print_system_message("Conversation cleared!", "kader.green")
-
-        elif cmd == "/save":
-            await self._handle_save_session()
+            await aupdate_sessions_metadata()
 
         elif cmd == "/sessions":
             await self._handle_list_sessions()
@@ -487,16 +489,6 @@ class KaderApp:
 
         elif cmd == "/commands":
             await self._handle_commands()
-
-        elif cmd.startswith("/load"):
-            parts = command.strip().split(maxsplit=1)
-            if len(parts) < 2:
-                self.console.print(
-                    r"  [kader.red]\[-][/kader.red] Usage: `/load <session_id>` "
-                    "— Use `/sessions` to see available sessions."
-                )
-            else:
-                await self._handle_load_session(parts[1])
 
         elif cmd == "/cost":
             self._handle_cost()
@@ -874,6 +866,11 @@ class KaderApp:
                 query=message,
             )
             self._session_title = title
+
+            if self._current_session_id:
+                await self._session_manager.async_update_session_title(
+                    self._current_session_id, title
+                )
         except Exception:
             pass
 
@@ -922,50 +919,90 @@ class KaderApp:
         except Exception as e:
             return f"Error: {str(e)}"
 
-    async def _handle_save_session(self) -> None:
-        """Save the current session."""
-        import shutil
+    async def _handle_list_sessions(self) -> None:
+        """List all saved sessions and let user choose one to load."""
+        import json
+        from pathlib import Path
 
-        from kader.memory.types import get_default_memory_dir
+        from prompt_toolkit.shortcuts import choice as pt_choice
+        from prompt_toolkit.styles import Style
+
+        custom_style = Style.from_dict(
+            {
+                "selected": "reverse",
+                "radio-selected": "reverse",
+                "radio-checked": "reverse",
+                "selected-option": "reverse",
+                "pointer": "reverse",
+            }
+        )
 
         try:
-            if not self._current_session_id:
-                session = await self._session_manager.async_create_session("kader_cli")
-                self._current_session_id = session.session_id
+            memory_dir = Path.home() / ".kader" / "memory"
+            lock_file = memory_dir / "sessions.json.lock"
 
-            planner_session_dir = (
-                get_default_memory_dir() / "sessions" / self._current_session_id
+            if not lock_file.exists():
+                await aupdate_sessions_metadata()
+
+            metadata = json.loads(lock_file.read_text())
+
+            if not metadata:
+                self.console.print(
+                    "  [dim]No saved sessions found. "
+                    "Start a conversation to create one.[/dim]"
+                )
+                return
+
+            options = []
+            sorted_sessions = sorted(
+                metadata.items(),
+                key=lambda x: x[1].get("creation-date", ""),
+                reverse=True,
             )
-            target_session_dir = (
-                self._session_manager.sessions_dir / self._current_session_id
+            for session_id, data in sorted_sessions:
+                title = data.get("session-title")
+                if not title:
+                    title = session_id
+                created = data.get("update-date", "")[:10]
+                options.append((session_id, f"{title} ({created})"))
+
+            selected_id = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: pt_choice(
+                    message="  Choose a session to load:",
+                    options=options,
+                    style=custom_style,
+                ),
             )
 
-            if planner_session_dir.exists() and self._current_session_id:
-                target_session_dir.parent.mkdir(parents=True, exist_ok=True)
-                if target_session_dir.exists():
-                    shutil.rmtree(target_session_dir)
-                shutil.copytree(planner_session_dir, target_session_dir)
+            if selected_id:
+                await self._load_session_by_id(selected_id)
+            else:
+                self._print_system_message("Session selection cancelled.")
 
-            self._print_system_message(
-                f"[kader.green]Session saved! "
-                f"ID: `{self._current_session_id}`[/kader.green]"
-            )
+        except (KeyboardInterrupt, EOFError):
+            self._print_system_message("Session selection cancelled.")
         except Exception as e:
-            self.console.print(f"  [kader.red]✗[/kader.red] Error saving session: {e}")
+            self.console.print(
+                rf"  [kader.red]\[-][/kader.red] Error listing sessions: {e}"
+            )
 
-    async def _handle_load_session(self, session_id: str) -> None:
+    async def _load_session_by_id(self, session_id: str) -> None:
         """Load a saved session by ID."""
         try:
+            import json
+            from pathlib import Path
+
             session = await self._session_manager.async_get_session(session_id)
             if not session:
                 self.console.print(
-                    rf"  [kader.red]\[-][/kader.red] Session `{session_id}` not found. "
-                    "Use `/sessions` to see available sessions."
+                    rf"  [kader.red]\[-][/kader.red] Session `{session_id}` not found."
                 )
                 return
 
             messages = await self._session_manager.async_load_conversation(session_id)
-            self._workflow.planner.memory.clear()
+
+            self._workflow = self._create_workflow(self._current_model, session_id)
 
             for msg in messages:
                 self._workflow.planner.memory.add_message(msg)
@@ -977,52 +1014,25 @@ class KaderApp:
                     else:
                         self._print_assistant_message(content)
 
+            memory_dir = Path.home() / ".kader" / "memory"
+            lock_file = memory_dir / "sessions.json.lock"
+            session_title = session_id
+            if lock_file.exists():
+                try:
+                    metadata = json.loads(lock_file.read_text())
+                    session_data = metadata.get(session_id, {})
+                    session_title = session_data.get("session-title") or session_id
+                except Exception:
+                    pass
+
             self._current_session_id = session_id
+            self._session_title = session_title
             self._print_system_message(
-                f"[kader.green]Session `{session_id}` loaded "
-                f"with {len(messages)} messages.[/kader.green]"
+                f"[kader.green]Session loaded with {len(messages)} messages.[/kader.green]"
             )
+            await aupdate_sessions_metadata()
         except Exception as e:
             self.console.print(f"  [kader.red]✗[/kader.red] Error loading session: {e}")
-
-    async def _handle_list_sessions(self) -> None:
-        """List all saved sessions."""
-        try:
-            sessions = await self._session_manager.async_list_sessions()
-
-            if not sessions:
-                self.console.print(
-                    "  [dim]No saved sessions found. "
-                    "Use `/save` to save the current session.[/dim]"
-                )
-                return
-
-            table = Table(
-                title="[kader.cyan]Saved Sessions[/kader.cyan]",
-                border_style="cyan",
-                show_header=True,
-                header_style="bold cyan",
-            )
-            table.add_column("Session ID", style="white")
-            table.add_column("Created", style="dim")
-            table.add_column("Updated", style="dim")
-
-            for session in sessions:
-                table.add_row(
-                    session.session_id,
-                    session.created_at[:10],
-                    session.updated_at[:10],
-                )
-
-            self.console.print()
-            self.console.print(table)
-            self.console.print(
-                "  [dim]Use `/load <session_id>` to load a session.[/dim]"
-            )
-        except Exception as e:
-            self.console.print(
-                rf"  [kader.red]\[-][/kader.red] Error listing sessions: {e}"
-            )
 
     def _handle_skills(self) -> None:
         """Handle the /skills command to display loaded skills."""
@@ -1365,6 +1375,8 @@ class KaderApp:
         self._check_for_updates()
         self._print_welcome()
         self._show_update_notification()
+
+        await aupdate_sessions_metadata()
 
         while self._running:
             try:
