@@ -189,6 +189,7 @@ class PlannerExecutorWorkflow(BaseWorkflow):
             memory=memory,
             model_name=self.model_name,
             use_persistence=self.use_persistence,
+            session_id=self.session_id,
             interrupt_before_tool=False,  # Planner executes TodoTool/AgentTool directly
             tool_confirmation_callback=self.tool_confirmation_callback,
             direct_execution_callback=self.direct_execution_callback,
