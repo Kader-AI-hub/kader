@@ -629,7 +629,7 @@ wheels = [
 
 [[package]]
 name = "kader"
-version = "2.10.2"
+version = "2.11.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
