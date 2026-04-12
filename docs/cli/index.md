@@ -8,6 +8,7 @@ The Kader CLI is an interactive terminal-based AI coding assistant built with Ri
 
 - **Planner-Executor Workflow** — Intelligent agent with reasoning, planning, and tool execution
 - **Built-in Tools** — File system, command execution, web search
+- **Custom Tools** — User-level and project-level tool extension
 - **Rich Conversation** — Beautiful markdown-rendered chat with styled panels
 - **Session Persistence** — Save and load conversation sessions
 - **Tool Confirmation** — Interactive approval for tool execution
@@ -165,6 +166,129 @@ Execute a command with:
 ```
 
 ### Example: Lint and Test Command with Sub-commands
+
+## Custom Tools
+
+Custom tools extend agent capabilities beyond built-in tools. Tools can be added at user-level or project-level.
+
+### Tool Locations
+
+- **Project-level**: `./.kader/custom/tools/` (auto-loaded, always enabled)
+- **User-level**: `~/.kader/custom/tools/` (requires configuration in settings.json)
+
+### Creating a Custom Tool
+
+Create a Python file in the tools directory that defines a class extending `BaseTool`:
+
+```python
+from kader.tools.base import BaseTool, ParameterSchema, ToolCategory
+
+class MyTool(BaseTool[str]):
+    def __init__(self):
+        super().__init__(
+            name="my_tool",
+            description="What my tool does",
+            parameters=[
+                ParameterSchema(
+                    name="param1",
+                    type="string",
+                    description="Parameter description",
+                    required=True,
+                ),
+            ],
+            category=ToolCategory.UTILITY,
+        )
+
+    def execute(self, **kwargs: Any) -> str:
+        param1 = kwargs.get("param1", "")
+        return f"Processed: {param1}"
+
+    async def aexecute(self, **kwargs: Any) -> str:
+        return self.execute(**kwargs)
+
+    def get_interruption_message(self, **kwargs: Any) -> str:
+        return f"execute my_tool"
+```
+
+### Agent Targeting
+
+Custom tools can be assigned to specific agents:
+
+**For user-level tools** (in settings.json):
+```json
+{
+  "tools": [
+    {
+      "name": "my_tool.MyTool",
+      "enabled": "true",
+      "agent": "executor"
+    }
+  ]
+}
+```
+
+Agent options: `planner` | `executor` | `both` (default)
+
+**For project-level tools** (in tool directory):
+Create an `agent.json` file in the tool directory:
+```json
+{
+  "agent": "both"
+}
+```
+
+### Example: DateTimeTool
+
+Project-level tool at `.kader/custom/tools/datetime_tool/`:
+
+```
+.kader/custom/tools/datetime_tool/
+├── __init__.py
+└── agent.json
+```
+
+`agent.json`:
+```json
+{
+  "agent": "both"
+}
+```
+
+### User-Level Tools Configuration
+
+User-level tools must be explicitly enabled in `~/.kader/settings.json`:
+
+```json
+{
+  "main-agent-provider": "ollama",
+  "main-agent-model": "glm-5:cloud",
+  "tools": [
+    {"name": "my_tool", "enabled": "true", "agent": "executor"},
+    {"name": "other_tool", "enabled": "false", "agent": "both"}
+  ]
+}
+```
+
+- `name`: The filename (without `.py` extension) containing the tool class, or `module.ClassName`
+- `enabled`: `"true"` to enable, `"false"` to disable
+- `agent`: `"planner"`, `"executor"`, or `"both"`
+
+### Project-Level Tools
+
+Project-level tools in `./.kader/custom/tools/` are automatically discovered and loaded. They don't require any configuration — just add the tool to the directory.
+
+### Refresh Command
+
+Use `/refresh` to reload settings and tools without restarting the CLI:
+
+- Reloads `settings.json` from disk
+- Re-discovers project-level tools
+- Re-loads user-level tools based on updated settings
+
+This is useful when:
+- Adding new tools to your project
+- Enabling/disabling tools in settings
+- Changing model or provider settings
 
 **Directory with sub-commands:**
 ```
