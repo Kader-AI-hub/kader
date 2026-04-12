@@ -43,6 +43,7 @@ from .commands import InitializeCommand, RefreshCommand, UpdateCommand
 from .llm_factory import LLMProviderFactory
 from .sessions_metadata import aupdate_sessions_metadata
 from .settings import load_settings, save_settings
+from .tools import load_tools_from_settings
 from .utils import COMMAND_NAMES, HELP_TEXT
 
 # Suppress warnings
@@ -160,6 +161,9 @@ class KaderApp:
         # Load callbacks from settings
         callbacks = load_callbacks_from_settings(self._settings)
 
+        # Load custom tools from settings
+        planner_tools, executor_tools = load_tools_from_settings(self._settings)
+
         workflow = PlannerExecutorWorkflow(
             name="kader_cli",
             provider=provider,
@@ -174,6 +178,8 @@ class KaderApp:
             executor_model_name=executor_model,
             executor_provider=executor_provider,
             callbacks=callbacks,
+            planner_tools=planner_tools,
+            executor_tools=executor_tools,
         )
 
         if not self._current_session_id:
