@@ -41,6 +41,7 @@ _JSON_KEY_MAP: dict[str, str] = {
     "sub-agent-model": "sub_agent_model",
     "auto-update": "auto_update",
     "callbacks": "callbacks",
+    "tools": "tools",
 }
 
 _FIELD_KEY_MAP: dict[str, str] = {v: k for k, v in _JSON_KEY_MAP.items()}
@@ -58,6 +59,8 @@ class KaderSettings:
         auto_update: Whether to automatically update Kader on startup.
         callbacks: List of user-level callbacks to enable.
                    Format: [{"name": "module.ClassName", "enabled": "true/false"}]
+        tools: List of user-level custom tools to enable.
+               Format: [{"name": "module.ClassName", "enabled": "true/false", "agent": "planner|executor|both"}]
     """
 
     VALID_PROVIDERS: ClassVar[set[str]] = VALID_PROVIDERS
@@ -68,6 +71,7 @@ class KaderSettings:
     sub_agent_model: str = field(default=_DEFAULT_SUB_MODEL)
     auto_update: bool = field(default=False)
     callbacks: list[dict[str, Any]] = field(default_factory=list)
+    tools: list[dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Validate provider values after initialisation."""
@@ -103,6 +107,10 @@ class KaderSettings:
                     else:
                         kwargs[field_name] = bool(value)
                 elif field_name == "callbacks":
+                    value = data[json_key]
+                    if isinstance(value, list):
+                        kwargs[field_name] = value
+                elif field_name == "tools":
                     value = data[json_key]
                     if isinstance(value, list):
                         kwargs[field_name] = value
@@ -206,6 +214,11 @@ def migrate_settings(path: Path | None = None) -> KaderSettings:
         migrated = True
         del data["_callbacks_migrated"]
 
+    data = _migrate_user_tools(data)
+    if data.get("_tools_migrated"):
+        migrated = True
+        del data["_tools_migrated"]
+
     if migrated:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
@@ -262,5 +275,58 @@ def _migrate_user_callbacks(data: dict[str, Any]) -> dict[str, Any]:
         data["callbacks"] = existing_callbacks + discovered
         data["_callbacks_migrated"] = True
         logger.info(f"Added {len(discovered)} user callbacks to settings")
+
+    return data
+
+
+def _migrate_user_tools(data: dict[str, Any]) -> dict[str, Any]:
+    """Auto-discover user-level tools and add them to settings.
+
+    Checks ~/.kader/custom/tools for tool files and adds any
+    that are not already in the settings tools list.
+    Creates the directory if it doesn't exist.
+
+    Args:
+        data: Existing settings data dict
+
+    Returns:
+        Updated data dict with discovered tools
+    """
+    user_tools_dir = Path.home() / ".kader" / "custom" / "tools"
+
+    if not user_tools_dir.exists():
+        try:
+            user_tools_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Created user tools directory: {user_tools_dir}")
+        except Exception as e:
+            logger.warning(f"Failed to create user tools directory: {e}")
+            return data
+        return data
+
+    existing_tools = data.get("tools", [])
+    existing_names = {
+        tool.get("name") for tool in existing_tools if isinstance(tool, dict)
+    }
+
+    discovered: list[dict[str, str]] = []
+    for tool_entry in user_tools_dir.iterdir():
+        name = None
+        if (
+            tool_entry.is_file()
+            and tool_entry.suffix == ".py"
+            and not tool_entry.stem.startswith("_")
+        ):
+            name = tool_entry.stem
+        elif tool_entry.is_dir() and (tool_entry / "__init__.py").exists():
+            name = tool_entry.name
+
+        if name and name not in existing_names:
+            discovered.append({"name": name, "enabled": "false", "agent": "both"})
+            logger.info(f"Discovered user tool: {name}")
+
+    if discovered:
+        data["tools"] = existing_tools + discovered
+        data["_tools_migrated"] = True
+        logger.info(f"Added {len(discovered)} user tools to settings")
 
     return data

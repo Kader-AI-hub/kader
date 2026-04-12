@@ -17,7 +17,7 @@ from kader.memory import (
 from kader.memory.types import get_default_memory_dir
 from kader.prompts import KaderPlannerPrompt
 from kader.providers.base import BaseLLMProvider, Message
-from kader.tools import AgentTool, TodoTool, ToolRegistry
+from kader.tools import AgentTool, BaseTool, TodoTool, ToolRegistry
 from kader.tools.filesys import GlobTool, GrepTool, ReadDirectoryTool, ReadFileTool
 from kader.utils import Checkpointer
 
@@ -60,6 +60,8 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         executor_model_name: Optional[str] = None,
         executor_provider: Optional[BaseLLMProvider] = None,
         callbacks: Optional[list[BaseCallback]] = None,
+        planner_tools: Optional[list[BaseTool]] = None,
+        executor_tools: Optional[list[BaseTool]] = None,
     ) -> None:
         """
         Initialize the Planner-Executor workflow.
@@ -79,6 +81,9 @@ class PlannerExecutorWorkflow(BaseWorkflow):
             priority_dir: Optional directory checked first (higher priority) for skills.
             executor_model_name: Model name for executor sub-agents. If None, uses planner's model.
             executor_provider: Provider for executor sub-agents. If None, uses planner's provider.
+            callbacks: List of callbacks for agent lifecycle events.
+            planner_tools: Custom tools to add to the planner agent.
+            executor_tools: Custom tools to add to executor agents.
         """
         super().__init__(
             name=name,
@@ -98,6 +103,8 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         self.executor_model_name = executor_model_name
         self.executor_provider = executor_provider
         self.callbacks = callbacks or []
+        self.planner_tools = planner_tools or []
+        self.executor_tools = executor_tools or []
 
         # Build the planner agent with tools
         self._planner = self._build_planner()
@@ -137,6 +144,10 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         registry.register(GlobTool())
         registry.register(GrepTool())
 
+        # Add custom planner tools
+        for tool in self.planner_tools:
+            registry.register(tool)
+
         # Add AgentTool(s) for sub-task delegation
         for executor_name in self.executor_names:
             agent_tool = AgentTool(
@@ -156,6 +167,7 @@ class PlannerExecutorWorkflow(BaseWorkflow):
                 skills_dirs=self.skills_dirs,
                 priority_dir=self.priority_dir,
                 callbacks=self.callbacks,
+                custom_tools=self.executor_tools,
             )
             registry.register(agent_tool)
 

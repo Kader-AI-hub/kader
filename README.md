@@ -22,6 +22,7 @@ Kader is an intelligent coding agent designed to assist with software developmen
 - 🤝 **Agent-As-Tool** - Spawn sub-agents for specific tasks with isolated memory and automated context aggregation.
 - 🎯 **Agent Skills** - Modular skill system for specialized domain knowledge and task-specific instructions.
 - ⚡ **Special Commands** - Create custom command agents from `CONTENT.md` files in `~/.kader/commands`
+- 🔧 **Custom Tools** - Create custom tools for specific tasks, available to planner and/or executor agents
 
 ## Installation
 
@@ -122,7 +123,9 @@ User preferences are stored in `~/.kader/settings.json`, created automatically o
   "sub-agent-provider": "ollama",
   "main-agent-model": "glm-5:cloud",
   "sub-agent-model": "glm-5:cloud",
-  "auto-update": false
+  "auto-update": false,
+  "callbacks": [],
+  "tools": []
 }
 ```
 
@@ -133,6 +136,8 @@ User preferences are stored in `~/.kader/settings.json`, created automatically o
 | `main-agent-model` | Model name for the planner agent | `glm-5:cloud` |
 | `sub-agent-model` | Model name for executor sub-agents | `glm-5:cloud` |
 | `auto-update` | Automatically update Kader on startup | `false` |
+| `callbacks` | List of user-level callbacks to enable | `[]` |
+| `tools` | List of user-level custom tools to enable | `[]` |
 
 #### Auto-Update
 
@@ -312,6 +317,98 @@ You are a Lint and Test Agent. Run linting and tests when requested.
 ```
 
 Use `/commands` to list all available special commands.
+
+### Custom Tools
+
+Kader supports custom tools that can be added at user-level or project-level. Custom tools extend agent capabilities beyond built-in tools.
+
+#### Tool Locations
+
+- **Project-level**: `./.kader/custom/tools/` (always enabled)
+- **User-level**: `~/.kader/custom/tools/` (requires configuration in settings.json)
+
+#### Creating a Custom Tool
+
+Create a Python file in the tools directory that defines a class extending `BaseTool`:
+
+```python
+from kader.tools.base import BaseTool, ParameterSchema, ToolCategory
+
+class MyTool(BaseTool[str]):
+    def __init__(self):
+        super().__init__(
+            name="my_tool",
+            description="What my tool does",
+            parameters=[
+                ParameterSchema(
+                    name="param1",
+                    type="string",
+                    description="Parameter description",
+                    required=True,
+                ),
+            ],
+            category=ToolCategory.UTILITY,
+        )
+
+    def execute(self, **kwargs: Any) -> str:
+        param1 = kwargs.get("param1", "")
+        return f"Processed: {param1}"
+
+    async def aexecute(self, **kwargs: Any) -> str:
+        return self.execute(**kwargs)
+
+    def get_interruption_message(self, **kwargs: Any) -> str:
+        return f"execute my_tool"
+```
+
+#### Agent Targeting
+
+Custom tools can be assigned to specific agents:
+
+**For user-level tools** (in settings.json):
+```json
+{
+  "tools": [
+    {
+      "name": "my_tool.MyTool",
+      "enabled": "true",
+      "agent": "executor"
+    }
+  ]
+}
+```
+
+Agent options: `planner` | `executor` | `both` (default)
+
+**For project-level tools** (in tool directory):
+Create an `agent.json` file in the tool directory:
+```json
+{
+  "agent": "both"
+}
+```
+
+#### Example: DateTimeTool
+
+Project-level tool at `.kader/custom/tools/datetime_tool/`:
+
+```
+.kader/custom/tools/datetime_tool/
+├── __init__.py
+└── agent.json
+```
+
+`agent.json`:
+```json
+{
+  "agent": "both"
+}
+```
+
+Usage:
+```
+What time is it in Japan?
+```
 
 ### File System Tools with Gitignore Filtering
 

@@ -176,6 +176,7 @@ class AgentTool(BaseTool[str]):
         priority_dir: Path | None = None,
         custom_system_prompt: Optional[str] = None,
         callbacks: Optional[list] = None,
+        custom_tools: Optional[list[BaseTool]] = None,
     ) -> None:
         """
         Initialize the AgentTool.
@@ -198,6 +199,8 @@ class AgentTool(BaseTool[str]):
                         If None, uses default directories (~/.kader/skills and ./.kader/).
             priority_dir: Optional directory checked first (higher priority) for skills.
             custom_system_prompt: Optional custom system prompt to use instead of default ExecutorAgentPrompt.
+            callbacks: List of callbacks for agent lifecycle events.
+            custom_tools: Custom tools to add to the sub-agent.
         """
         super().__init__(
             name=name,
@@ -229,6 +232,7 @@ class AgentTool(BaseTool[str]):
         self._priority_dir = priority_dir
         self._custom_system_prompt = custom_system_prompt
         self._callbacks = callbacks or []
+        self._custom_tools = custom_tools or []
 
         # Compression Configuration
         self._enable_compression = enable_compression
@@ -381,6 +385,13 @@ class AgentTool(BaseTool[str]):
                     sub_registry.register(t)
             sub_registry.register(SkillsTool(self._skills_dirs, self._priority_dir))
             tools = sub_registry
+
+        # Add custom tools to the registry
+        for custom_tool in self._custom_tools:
+            try:
+                tools.register(custom_tool)
+            except ValueError:
+                pass  # Tool already exists, skip
 
         # Create system prompt - use custom if provided, otherwise use default ExecutorAgentPrompt
         if self._custom_system_prompt:
@@ -559,6 +570,13 @@ class AgentTool(BaseTool[str]):
                     sub_registry.register(t)
             sub_registry.register(SkillsTool(self._skills_dirs, self._priority_dir))
             tools = sub_registry
+
+        # Add custom tools to the registry
+        for custom_tool in self._custom_tools:
+            try:
+                tools.register(custom_tool)
+            except ValueError:
+                pass  # Tool already exists, skip
 
         # Create system prompt - use custom if provided, otherwise use default ExecutorAgentPrompt
         if self._custom_system_prompt:

@@ -30,6 +30,9 @@ When the kader module is imported for the first time, it automatically creates a
 │   └── sessions/         # Saved conversation sessions
 ├── skills/               # User-level skills
 ├── commands/             # User-level special commands
+├── custom/
+│   ├── callbacks/        # User-level callbacks
+│   └── tools/            # User-level custom tools
 └── KADER.md              # Agent instructions file
 ```
 
@@ -128,7 +131,9 @@ User preferences are stored in `~/.kader/settings.json`, created automatically o
   "sub-agent-provider": "ollama",
   "main-agent-model": "glm-5:cloud",
   "sub-agent-model": "glm-5:cloud",
-  "auto-update": false
+  "auto-update": false,
+  "callbacks": [],
+  "tools": []
 }
 ```
 
@@ -139,8 +144,39 @@ User preferences are stored in `~/.kader/settings.json`, created automatically o
 | `main-agent-model` | Model name for the planner agent | `glm-5:cloud` |
 | `sub-agent-model` | Model name for executor sub-agents | `glm-5:cloud` |
 | `auto-update` | Automatically update Kader on startup | `false` |
+| `callbacks` | List of user-level callbacks to enable | `[]` |
+| `tools` | List of user-level custom tools to enable | `[]` |
 
 Settings are updated automatically when switching models via the `/models` CLI command. You can also edit the file directly.
+
+### Callbacks Configuration
+
+```json
+{
+  "callbacks": [
+    {"name": "my_callback", "enabled": "true"},
+    {"name": "other_callback", "enabled": "false"}
+  ]
+}
+```
+
+- `name`: The filename (without `.py` extension) in `~/.kader/custom/callbacks/`
+- `enabled`: `"true"` to enable, `"false"` to disable
+
+### Tools Configuration
+
+```json
+{
+  "tools": [
+    {"name": "my_tool", "enabled": "true", "agent": "executor"},
+    {"name": "other_tool", "enabled": "false", "agent": "both"}
+  ]
+}
+```
+
+- `name`: The filename (without `.py` extension) in `~/.kader/custom/tools/`, or `module.ClassName`
+- `enabled`: `"true"` to enable, `"false"` to disable
+- `agent`: `"planner"`, `"executor"`, or `"both"` (which agents can use the tool)
 
 ### Auto-Update
 
