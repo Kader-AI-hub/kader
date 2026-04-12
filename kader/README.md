@@ -772,6 +772,31 @@ agent = BaseAgent(
 )
 ```
 
+#### Using Custom Tools in CLI
+
+When using Kader via the CLI, custom tools can be loaded from:
+
+- **Project-level**: `./.kader/custom/tools/` (auto-loaded, always enabled)
+- **User-level**: `~/.kader/custom/tools/` (requires configuration in settings.json)
+
+**User-level configuration** (in `~/.kader/settings.json`):
+```json
+{
+  "tools": [
+    {"name": "my_tool", "enabled": "true", "agent": "executor"}
+  ]
+}
+```
+
+Agent options: `planner` | `executor` | `both` (default)
+
+**Project-level configuration** (create `agent.json` in tool directory):
+```json
+{
+  "agent": "both"
+}
+```
+
 ## Memory Management
 
 ### AgentState
