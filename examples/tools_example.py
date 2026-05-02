@@ -5,7 +5,6 @@ Demonstrates how to use the Kader tools for various agentic operations:
 - File system operations
 - Web search and fetch
 - Command execution
-- RAG (Retrieval Augmented Generation)
 - Tool registry and management
 """
 
@@ -23,9 +22,6 @@ from kader.tools import (
     # Command execution
     CommandExecutorTool,
     GrepTool,
-    # RAG tools
-    RAGIndex,
-    RAGSearchTool,
     ReadDirectoryTool,
     # File system tools
     ReadFileTool,
@@ -189,47 +185,6 @@ def demo_command_execution():
 
     except Exception as e:
         print(f"Error with command execution: {e}")
-
-
-def demo_rag_tools():
-    """Demonstrate RAG tools."""
-    print("\n=== RAG Tools Demo ===")
-
-    # Create a sample file for RAG indexing
-    sample_file = Path("sample_document.txt")
-    sample_content = """
-Artificial Intelligence and Machine Learning are transforming various industries.
-This document discusses the fundamentals of AI, including neural networks,
-deep learning, and their applications in real-world scenarios.
-Natural Language Processing is a key area of AI that focuses on the interaction
-between computers and humans through natural language.
-"""
-    sample_file.write_text(sample_content)
-
-    try:
-        # Create RAG index
-        print("--- Creating RAG Index ---")
-        rag_index = RAGIndex(base_path=Path("."))
-        # Note: Actual indexing might require more setup, so we'll just show the concept
-
-        # RAGSearchTool
-        print("\n--- RAGSearchTool ---")
-        search_tool = RAGSearchTool()
-
-        # This would normally search through indexed documents
-        # For demo purposes, we'll show how it would be used
-        print(
-            "RAGSearchTool initialized. In a real scenario, this would search through indexed documents."
-        )
-        print(f"Tool name: {search_tool.name}")
-        print(f"Tool description: {search_tool.description}")
-
-    except Exception as e:
-        print(f"Error with RAG tools: {e}")
-    finally:
-        # Clean up sample file
-        if sample_file.exists():
-            sample_file.unlink()
 
 
 def demo_tool_registry():
@@ -447,7 +402,6 @@ def main():
     demo_file_system_tools()
     demo_web_tools()
     demo_command_execution()
-    demo_rag_tools()
     demo_tool_registry()
     demo_custom_tool()
     demo_async_operations()
