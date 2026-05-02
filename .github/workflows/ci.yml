@@ -49,6 +49,4 @@ jobs:
 
       - name: Run tests
         run: |
-          uv run pytest tests/ -v \
-            --deselect tests/tools/test_filesystem_tools.py::TestSearchInDirectoryTool::test_execute_search \
-            --deselect tests/tools/test_filesystem_tools.py::TestSearchInDirectoryTool::test_async_execute
+          uv run pytest tests/ -v

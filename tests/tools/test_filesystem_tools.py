@@ -11,7 +11,6 @@ from kader.tools.filesys import (
     GrepTool,
     ReadDirectoryTool,
     ReadFileTool,
-    SearchInDirectoryTool,
     WriteFileTool,
     get_filesystem_tools,
 )
@@ -426,51 +425,6 @@ class TestGlobTool:
         asyncio.run(run_test())
 
 
-class TestSearchInDirectoryTool:
-    """Test cases for SearchInDirectoryTool."""
-
-    def test_initialization(self):
-        """Test SearchInDirectoryTool initialization."""
-        tool = SearchInDirectoryTool()
-        assert tool.name == "search_in_directory"
-        assert tool._rag_tool is not None
-
-    def test_execute_search(self):
-        """Test semantic search functionality."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Create a test file with content
-            test_file = Path(temp_dir) / "search_test.txt"
-            test_content = (
-                "This is a test file containing information about Python programming."
-            )
-            test_file.write_text(test_content)
-
-            tool = SearchInDirectoryTool(base_path=Path(temp_dir))
-            result = tool.execute("Python programming", top_k=5)
-
-            # Should return a list of results
-            assert isinstance(result, list)
-            # Results may be empty if Ollama is not available, but should not error
-
-    def test_async_execute(self):
-        """Test async execution of SearchInDirectoryTool."""
-        import asyncio
-
-        async def run_test():
-            with tempfile.TemporaryDirectory() as temp_dir:
-                # Create a test file
-                test_file = Path(temp_dir) / "async_search_test.txt"
-                test_file.write_text("Content for async search test")
-
-                tool = SearchInDirectoryTool(base_path=Path(temp_dir))
-                result = await tool.aexecute("async search", top_k=5)
-
-                # Should return a list of results
-                assert isinstance(result, list)
-
-        asyncio.run(run_test())
-
-
 class TestGetFilesystemTools:
     """Test cases for get_filesystem_tools function."""
 
@@ -481,7 +435,7 @@ class TestGetFilesystemTools:
         # Should return a list of tools
         assert isinstance(tools, list)
         assert (
-            len(tools) == 6  ## TODO Remove SearchInDirectoryTool
+            len(tools) == 6
         )  # ReadFileTool, ReadDirectoryTool, WriteFileTool, EditFileTool, GrepTool, GlobTool
 
         # Check that all expected tools are present
@@ -493,7 +447,6 @@ class TestGetFilesystemTools:
             "edit_file",
             "grep",
             "glob",
-            # "search_in_directory", # TODO: Remove search in directory tool
         ]
         for name in expected_names:
             assert name in tool_names
