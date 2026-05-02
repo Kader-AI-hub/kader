@@ -18,7 +18,6 @@ Kader Tools provides a versatile, provider-agnostic framework for creating and m
 - **ReadDirectoryTool**: List directory contents with recursive option
 - **WriteFileTool**: Write content to a file, with optional directory creation
 - **ReplaceLinesTool**: Replace or insert lines in a file
-- **SearchInDirectoryTool**: Search for files in a directory by name or content
 
 ### Web Tools
 
@@ -29,10 +28,7 @@ Kader Tools provides a versatile, provider-agnostic framework for creating and m
 
 - **CommandExecutorTool**: Execute command line operations with OS-appropriate validation
 
-### RAG (Retrieval Augmented Generation) Tools
 
-- **RAGSearchTool**: Search through local files using semantic embeddings
-- **RAGIndex**: Build and manage semantic indexes of your local files
 
 ## Using Tools
 
