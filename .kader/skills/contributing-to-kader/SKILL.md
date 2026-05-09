@@ -108,7 +108,7 @@ kader/
 ├── cli/                  # Interactive CLI implementation
 │   ├── app.py            # Main application (Rich + prompt_toolkit)
 │   ├── commands/        # CLI commands (initialize, base)
-│   ├── llm_factory.py    # LLM provider factory
+│   ├── llm_factory.py    # LLM provider factory (in kader/providers/)
 │   └── utils.py          # CLI utilities and constants
 ├── tests/                # Test files mirroring source structure
 │   ├── providers/

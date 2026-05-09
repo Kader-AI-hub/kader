@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from .llm_factory import LLMProviderFactory
+from kader.providers import LLMProviderFactory
 
 DEFAULT_MODEL = "glm-5:cloud"
 

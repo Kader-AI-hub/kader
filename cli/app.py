@@ -34,13 +34,13 @@ from tenacity import (
 )
 
 from kader.memory import AsyncFileSessionManager, MemoryConfig
+from kader.providers import LLMProviderFactory
 from kader.utils import agenerate_session_title
 from kader.utils.todo_metadata import TodoMetadataHandler
 from kader.workflows import PlannerExecutorWorkflow
 
 from .callbacks import load_callbacks_from_settings
 from .commands import InitializeCommand, RefreshCommand, UpdateCommand
-from .llm_factory import LLMProviderFactory
 from .sessions_metadata import aupdate_sessions_metadata
 from .settings import load_settings, save_settings
 from .tools import load_tools_from_settings

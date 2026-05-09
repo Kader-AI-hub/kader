@@ -175,7 +175,7 @@ kader/
 ├── cli/                    # Interactive command-line interface
 │   ├── app.py             # Main application entry point (Rich + prompt_toolkit)
 │   ├── utils.py           # Constants and helpers
-│   ├── llm_factory.py     # Provider selection logic
+│   ├── llm_factory.py     # Provider selection logic (moved to kader/providers/)
 │   ├── __init__.py        # Package exports
 │   └── commands/          # CLI command handlers
 │       ├── base.py        # Base command class
@@ -194,7 +194,7 @@ kader/
 ├── kader/                # Core framework
 │   ├── agent/            # Agent implementations (Planning, ReAct)
 │   ├── memory/           # Memory management & persistence
-│   ├── providers/        # LLM providers (Ollama, Google, Anthropic)
+│   ├── providers/        # LLM providers + LLMProviderFactory
 │   ├── tools/            # Tools (File System, Web, Command, AgentTool)
 │   ├── prompts/          # Prompt templates (Jinja2)
 │   └── utils/            # Utilities (Checkpointer, ContextAggregator)
