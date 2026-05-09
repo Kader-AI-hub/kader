@@ -14,7 +14,7 @@ from typing import Any, ClassVar
 
 from loguru import logger
 
-# Valid provider names (kept in sync with LLMProviderFactory.PROVIDERS)
+# Valid provider names (kept in sync with kader.providers.LLMProviderFactory.PROVIDERS)
 VALID_PROVIDERS: set[str] = {
     "ollama",
     "google",
