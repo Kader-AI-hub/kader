@@ -1,4 +1,4 @@
-"""LLM Provider Factory for Kader CLI.
+"""LLM Provider Factory for Kader.
 
 Factory pattern implementation for creating LLM provider instances
 with automatic provider detection based on model name format.
@@ -7,16 +7,12 @@ with automatic provider detection based on model name format.
 import os
 from typing import Optional
 
-from kader.providers import (
-    AnthropicProvider,
-    GoogleProvider,
-    MistralProvider,
-    OllamaProvider,
-    OpenAICompatibleProvider,
-    OpenAIProviderConfig,
-)
-from kader.providers.base import BaseLLMProvider, ModelConfig
-from kader.providers.ollama import DEFAULT_CLOUD_HOST, DEFAULT_LOCAL_HOST
+from .anthropic import AnthropicProvider
+from .base import BaseLLMProvider, ModelConfig
+from .google import GoogleProvider
+from .mistral import MistralProvider
+from .ollama import DEFAULT_CLOUD_HOST, DEFAULT_LOCAL_HOST, OllamaProvider
+from .openai_compatible import OpenAICompatibleProvider, OpenAIProviderConfig
 
 
 class LLMProviderFactory:

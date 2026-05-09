@@ -467,7 +467,7 @@ Features:
 cli/
 ├── app.py          # Main application (Rich + prompt_toolkit)
 ├── utils.py        # Constants and helpers
-├── llm_factory.py  # Multi-provider LLM factory
+├── (llm_factory.py moved to kader/providers/)
 ├── __init__.py     # Package exports
 ├── __main__.py     # Entry point
 ├── settings/       # Persistent settings management
