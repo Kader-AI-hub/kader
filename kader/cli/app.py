@@ -1,20 +1,22 @@
 """Kader CLI - Typer-based command-line interface.
 
-Provides two commands:
+Provides three commands:
   kader-cli --help   Show help
   kader-cli init     Initialize .kader directory and generate KADER.md
+  kader-cli model    Show and switch LLM models
 """
 
 import asyncio
-import json
 from importlib.metadata import version as get_version
 from pathlib import Path
 
 import typer
 from rich.console import Console
 from rich.markdown import Markdown
+from rich.table import Table
 from rich.theme import Theme
 
+from cli.settings import load_settings, save_settings
 from kader.config import initialize_kader_config
 from kader.prompts.cli_prompts import InitCommandPrompt
 from kader.providers import LLMProviderFactory
@@ -44,17 +46,8 @@ console = Console(theme=KADER_THEME)
 
 def _load_model_string() -> str:
     """Load the main agent model string from ~/.kader/settings.json."""
-    settings_path = Path.home() / ".kader" / "settings.json"
-    if not settings_path.exists():
-        return "ollama:glm-5:cloud"
-
-    try:
-        data = json.loads(settings_path.read_text(encoding="utf-8"))
-        provider = data.get("main-agent-provider", "ollama")
-        model = data.get("main-agent-model", "glm-5:cloud")
-        return f"{provider}:{model}"
-    except (json.JSONDecodeError, ValueError, TypeError):
-        return "ollama:glm-5:cloud"
+    settings = load_settings()
+    return settings.get_main_model_string()
 
 
 @app.callback(invoke_without_command=True)
@@ -87,8 +80,9 @@ def app_callback(
         console.print("Commands:")
         console.print()
         console.print(
-            "  [bold]init[/bold]  Initialize .kader directory and generate KADER.md"
+            "  [bold]init[/bold]   Initialize .kader directory and generate KADER.md"
         )
+        console.print("  [bold]model[/bold]  Show and switch LLM models")
         console.print()
 
 
@@ -163,6 +157,130 @@ def init_cmd() -> None:
 
     except Exception as e:
         console.print(f"  [kader.red]\u2717[/kader.red] Error generating KADER.md: {e}")
+        raise typer.Exit(code=1)
+
+
+@app.command(name="model")
+def model_cmd(
+    agent: str | None = typer.Option(
+        None,
+        "--agent",
+        "-a",
+        help="Agent type to switch models for: 'main' (orchestrator) or 'sub' (executor).",
+    ),
+) -> None:
+    """Show and switch LLM models for an agent."""
+    settings = load_settings()
+    current_main = settings.get_main_model_string()
+    current_sub = settings.get_sub_model_string()
+
+    # Step 1: Determine agent type
+    if agent and agent.lower() in ("main", "sub"):
+        agent_type = agent.lower()
+    else:
+        console.print()
+        console.print(
+            f"  [dim]Current main agent model:[/dim] [bold]{current_main}[/bold]"
+        )
+        console.print(
+            f"  [dim]Current sub agent model:[/dim]  [bold]{current_sub}[/bold]"
+        )
+        console.print()
+        console.print("  [bold]Which agent to update?[/bold]")
+        console.print("  [1] Main Agent \u2014 planner / orchestrator")
+        console.print("  [2] Sub Agent \u2014 executor / worker")
+        console.print()
+        choice = input("  choice (1/2): ").strip()
+        if choice == "2":
+            agent_type = "sub"
+        else:
+            agent_type = "main"
+
+    is_main = agent_type == "main"
+    agent_label = "Main Agent" if is_main else "Sub Agent"
+    current_for_agent = current_main if is_main else current_sub
+
+    # Step 2: Fetch and display models
+    try:
+        models = LLMProviderFactory.get_flat_model_list()
+        if not models:
+            console.print(
+                "  [kader.red]\u2717[/kader.red] No models found. "
+                "Check provider configurations."
+            )
+            raise typer.Exit(code=1)
+
+        table = Table(
+            title=f"[kader.cyan]Available Models \u2014 {agent_label}[/kader.cyan]",
+            border_style="cyan",
+            show_header=True,
+            header_style="bold cyan",
+            padding=(0, 1),
+        )
+        table.add_column("#", style="dim", width=4, justify="right")
+        table.add_column("Model", style="white")
+        table.add_column("Status", justify="center")
+
+        for i, model in enumerate(models, 1):
+            if model == current_for_agent:
+                marker = "[kader.green]\u25cf current[/kader.green]"
+            else:
+                marker = "[dim]available[/dim]"
+            table.add_row(str(i), model, marker)
+
+        console.print()
+        console.print(table)
+        console.print(
+            "  [dim]Enter model number to switch, or press Enter to cancel:[/dim]"
+        )
+
+        model_choice = input("  model> ").strip()
+        if not model_choice:
+            console.print(
+                f"  [dim]{agent_label} model selection cancelled. "
+                f"Current: `{current_for_agent}`[/dim]"
+            )
+            return
+
+        idx = int(model_choice) - 1
+        if 0 <= idx < len(models):
+            selected_model = models[idx]
+            provider_name, model_name = LLMProviderFactory.parse_model_name(
+                selected_model
+            )
+
+            if is_main:
+                old_model = current_main
+                settings.main_agent_provider = provider_name
+                settings.main_agent_model = model_name
+            else:
+                old_model = current_sub
+                settings.sub_agent_provider = provider_name
+                settings.sub_agent_model = model_name
+
+            save_settings(settings)
+            console.print(
+                f"  [kader.green]\u2713[/kader.green] "
+                f"{agent_label} model changed from "
+                f"`{old_model}` to `{selected_model}`"
+            )
+        else:
+            console.print("  [kader.red]\u2717[/kader.red] Invalid selection.")
+            raise typer.Exit(code=1)
+
+    except ValueError:
+        console.print(
+            f"  [dim]{agent_label} model selection cancelled. "
+            f"Current: `{current_for_agent}`[/dim]"
+        )
+    except (EOFError, KeyboardInterrupt):
+        console.print()
+        console.print(
+            f"  [dim]{agent_label} model selection cancelled. "
+            f"Current: `{current_for_agent}`[/dim]"
+        )
+    except Exception as e:
+        console.print(f"  [kader.red]\u2717[/kader.red] Error fetching models: {e}")
         raise typer.Exit(code=1)
 
 
