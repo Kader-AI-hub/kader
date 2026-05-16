@@ -1,12 +1,14 @@
 """Kader CLI - Typer-based command-line interface.
 
-Provides three commands:
+Provides four commands:
   kader-cli --help   Show help
   kader-cli init     Initialize .kader directory and generate KADER.md
   kader-cli model    Show and switch LLM models
+  kader-cli update   Check for and install updates
 """
 
 import asyncio
+import subprocess
 from importlib.metadata import version as get_version
 from pathlib import Path
 
@@ -16,6 +18,7 @@ from rich.markdown import Markdown
 from rich.table import Table
 from rich.theme import Theme
 
+from cli.commands.update import check_outdated
 from cli.settings import load_settings, save_settings
 from kader.config import initialize_kader_config
 from kader.prompts.cli_prompts import InitCommandPrompt
@@ -82,7 +85,8 @@ def app_callback(
         console.print(
             "  [bold]init[/bold]   Initialize .kader directory and generate KADER.md"
         )
-        console.print("  [bold]model[/bold]  Show and switch LLM models")
+        console.print("  [bold]model[/bold]   Show and switch LLM models")
+        console.print("  [bold]update[/bold]  Check for and install updates")
         console.print()
 
 
@@ -282,6 +286,39 @@ def model_cmd(
     except Exception as e:
         console.print(f"  [kader.red]\u2717[/kader.red] Error fetching models: {e}")
         raise typer.Exit(code=1)
+
+
+@app.command(name="update")
+def update_cmd() -> None:
+    """Check for updates and update Kader if a newer version is available."""
+    try:
+        current_version = get_version("kader")
+    except Exception:
+        current_version = "unknown"
+
+    is_outdated, latest_version = check_outdated("kader", current_version)
+
+    if is_outdated:
+        console.print(
+            f"  [kader.yellow]Updating Kader from v{current_version} "
+            f"to v{latest_version}...[/kader.yellow]"
+        )
+        result = subprocess.run(["uv", "tool", "upgrade", "kader"], capture_output=True)
+        if result.returncode == 0:
+            console.print(
+                f"  [kader.green]\u2713[/kader.green] Updated to v{latest_version}"
+            )
+        else:
+            console.print(
+                "  [kader.red]\u2717[/kader.red] Update failed.\n"
+                "  Try running: uv tool upgrade kader"
+            )
+            raise typer.Exit(code=1)
+    else:
+        console.print(
+            f"  [kader.green]\u2713[/kader.green] "
+            f"You are running the latest version v{current_version}"
+        )
 
 
 def main() -> None:
