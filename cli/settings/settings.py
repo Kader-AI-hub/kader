@@ -14,19 +14,9 @@ from typing import Any, ClassVar
 
 from loguru import logger
 
-# Valid provider names (kept in sync with kader.providers.LLMProviderFactory.PROVIDERS)
-VALID_PROVIDERS: set[str] = {
-    "ollama",
-    "google",
-    "mistral",
-    "anthropic",
-    "openai",
-    "moonshot",
-    "zai",
-    "openrouter",
-    "opencode",
-    "groq",
-}
+from kader.providers.llm_factory import LLMProviderFactory
+
+VALID_PROVIDERS: set[str] = set(LLMProviderFactory.PROVIDERS.keys())
 
 # Defaults matching the current DEFAULT_MODEL = "glm-5:cloud" (ollama)
 _DEFAULT_PROVIDER = "ollama"
