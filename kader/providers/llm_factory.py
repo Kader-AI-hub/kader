@@ -63,6 +63,7 @@ class LLMProviderFactory:
         "zai": OpenAICompatibleProvider,
         "openrouter": OpenAICompatibleProvider,
         "opencode": OpenAICompatibleProvider,
+        "opencode_go": OpenAICompatibleProvider,
         "groq": OpenAICompatibleProvider,
     }
 
@@ -87,6 +88,10 @@ class LLMProviderFactory:
         "opencode": {
             "base_url": "https://opencode.ai/zen/v1",
             "env_key": "OPENCODE_API_KEY",
+        },
+        "opencode_go": {
+            "base_url": "https://opencode.ai/zen/go/v1",
+            "env_key": "OPENCODE_GO_API_KEY",
         },
         "groq": {
             "base_url": "https://api.groq.com/openai/v1",
@@ -291,6 +296,7 @@ class LLMProviderFactory:
             "zai",
             "openrouter",
             "opencode",
+            "opencode_go",
             "groq",
         ]:
             try:

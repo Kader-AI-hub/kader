@@ -3,7 +3,7 @@ OpenAI-Compatible LLM Provider implementation.
 
 Provides synchronous and asynchronous access to OpenAI-compatible LLM providers
 including OpenAI, Moonshot AI (kimi-k2.5), Z.ai (GLM-5), OpenRouter, OpenCode Zen,
-and other providers that implement the OpenAI API specification.
+OpenCode Go, Groq, and other providers that implement the OpenAI API specification.
 """
 
 import os
@@ -485,6 +485,61 @@ GROQ_PRICING: dict[str, ModelPricing] = {
     ),
 }
 
+# Pricing data for OpenCode Go models (per 1M tokens, in USD)
+# Note: OpenCode Go is a flat-rate subscription ($10/month) with usage limits.
+# There is no per-token cost to the user; these models are included in the plan.
+# Source: https://opencode.ai/go
+OPENCODE_GO_PRICING: dict[str, ModelPricing] = {
+    "glm-5": ModelPricing(
+        input_cost_per_million=0.00,
+        output_cost_per_million=0.00,
+    ),
+    "glm-5.1": ModelPricing(
+        input_cost_per_million=0.00,
+        output_cost_per_million=0.00,
+    ),
+    "kimi-k2.5": ModelPricing(
+        input_cost_per_million=0.00,
+        output_cost_per_million=0.00,
+    ),
+    "kimi-k2.6": ModelPricing(
+        input_cost_per_million=0.00,
+        output_cost_per_million=0.00,
+    ),
+    "mimo-v2.5": ModelPricing(
+        input_cost_per_million=0.00,
+        output_cost_per_million=0.00,
+    ),
+    "mimo-v2.5-pro": ModelPricing(
+        input_cost_per_million=0.00,
+        output_cost_per_million=0.00,
+    ),
+    "minimax-m2.5": ModelPricing(
+        input_cost_per_million=0.00,
+        output_cost_per_million=0.00,
+    ),
+    "minimax-m2.7": ModelPricing(
+        input_cost_per_million=0.00,
+        output_cost_per_million=0.00,
+    ),
+    "qwen3.5-plus": ModelPricing(
+        input_cost_per_million=0.00,
+        output_cost_per_million=0.00,
+    ),
+    "qwen3.6-plus": ModelPricing(
+        input_cost_per_million=0.00,
+        output_cost_per_million=0.00,
+    ),
+    "deepseek-v4-pro": ModelPricing(
+        input_cost_per_million=0.00,
+        output_cost_per_million=0.00,
+    ),
+    "deepseek-v4-flash": ModelPricing(
+        input_cost_per_million=0.00,
+        output_cost_per_million=0.00,
+    ),
+}
+
 # Combine all pricing data
 PROVIDER_PRICING: dict[str, dict[str, ModelPricing]] = {
     "openai": OPENAI_PRICING,
@@ -492,6 +547,7 @@ PROVIDER_PRICING: dict[str, dict[str, ModelPricing]] = {
     "zai": ZAI_PRICING,
     "openrouter": OPENROUTER_PRICING,
     "opencode": OPENCODE_PRICING,
+    "opencode_go": OPENCODE_GO_PRICING,
     "groq": GROQ_PRICING,
 }
 
@@ -504,7 +560,7 @@ def _detect_provider(base_url: str | None, model: str) -> str:
         model: The model identifier
 
     Returns:
-        Provider identifier ("openai", "moonshot", "zai", "openrouter", "opencode", "groq", or "unknown")
+        Provider identifier ("openai", "moonshot", "zai", "openrouter", "opencode", "opencode_go", "groq", or "unknown")
     """
     if base_url:
         base_url_lower = base_url.lower()
@@ -514,6 +570,8 @@ def _detect_provider(base_url: str | None, model: str) -> str:
             return "zai"
         elif "openrouter" in base_url_lower:
             return "openrouter"
+        elif "opencode.ai/zen/go" in base_url_lower:
+            return "opencode_go"
         elif "opencode" in base_url_lower:
             return "opencode"
         elif "groq" in base_url_lower:
@@ -543,6 +601,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
     - Z.ai (GLM-5, GLM-4 series)
     - OpenRouter (access to 200+ models from various providers)
     - OpenCode Zen (Claude, Gemini, GPT, GLM, Kimi, and more)
+    - OpenCode Go (GLM-5, Kimi K2.6, Qwen3.6 Plus, DeepSeek V4, and more)
     - Groq (Llama 4, Llama 3, Qwen, GPT OSS, and more with ultra-fast inference)
     - Any other provider implementing the OpenAI API specification
 
@@ -593,6 +652,15 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             provider_config=OpenAIProviderConfig(
                 api_key="your-api-key",
                 base_url="https://opencode.ai/zen/v1",
+            )
+        )
+
+        # OpenCode Go (flat-rate subscription for open coding models)
+        provider = OpenAICompatibleProvider(
+            model="glm-5.1",
+            provider_config=OpenAIProviderConfig(
+                api_key="your-api-key",
+                base_url="https://opencode.ai/zen/go/v1",
             )
         )
 
