@@ -3,11 +3,13 @@ Unit tests for the OpenAI-Compatible provider.
 """
 
 from kader.providers.base import (
+    LLMResponse,
     Message,
     ModelConfig,
     Usage,
 )
 from kader.providers.openai_compatible import (
+    DEEPSEEK_V4_MODELS,
     GROQ_PRICING,
     MOONSHOT_PRICING,
     OPENAI_PRICING,
@@ -26,7 +28,10 @@ class TestOpenAICompatibleProviderInit:
 
     def test_initialization_with_model(self):
         """Test provider initialization with model only."""
-        provider = OpenAICompatibleProvider(model="gpt-4o")
+        provider = OpenAICompatibleProvider(
+            model="gpt-4o",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
         assert provider.model == "gpt-4o"
 
     def test_initialization_with_config(self):
@@ -34,6 +39,7 @@ class TestOpenAICompatibleProviderInit:
         config = ModelConfig(temperature=0.7, max_tokens=100)
         provider = OpenAICompatibleProvider(
             model="gpt-4o",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
             default_config=config,
         )
 
@@ -57,7 +63,10 @@ class TestOpenAICompatibleProviderInit:
 
     def test_repr(self):
         """Test string representation."""
-        provider = OpenAICompatibleProvider(model="gpt-4o")
+        provider = OpenAICompatibleProvider(
+            model="gpt-4o",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
         assert repr(provider) == "OpenAICompatibleProvider(model='gpt-4o')"
 
 
@@ -119,7 +128,10 @@ class TestOpenAICompatibleProviderConvertMessages:
 
     def test_convert_simple_messages(self):
         """Test converting simple messages."""
-        provider = OpenAICompatibleProvider(model="gpt-4o")
+        provider = OpenAICompatibleProvider(
+            model="gpt-4o",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
         messages = [
             Message.system("You are a helpful assistant."),
             Message.user("Hello!"),
@@ -138,7 +150,10 @@ class TestOpenAICompatibleProviderConvertMessages:
 
     def test_convert_tool_message(self):
         """Test converting tool message."""
-        provider = OpenAICompatibleProvider(model="gpt-4o")
+        provider = OpenAICompatibleProvider(
+            model="gpt-4o",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
         messages = [
             Message.tool("call_123", "Tool result content"),
         ]
@@ -156,7 +171,10 @@ class TestOpenAICompatibleProviderConvertConfig:
 
     def test_convert_default_config(self):
         """Test converting default config."""
-        provider = OpenAICompatibleProvider(model="gpt-4o")
+        provider = OpenAICompatibleProvider(
+            model="gpt-4o",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
         config = ModelConfig()
 
         params = provider._convert_config_to_params(config)
@@ -168,7 +186,10 @@ class TestOpenAICompatibleProviderConvertConfig:
 
     def test_convert_custom_config(self):
         """Test converting custom config."""
-        provider = OpenAICompatibleProvider(model="gpt-4o")
+        provider = OpenAICompatibleProvider(
+            model="gpt-4o",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
         config = ModelConfig(
             temperature=0.7,
             max_tokens=100,
@@ -193,7 +214,10 @@ class TestOpenAICompatibleProviderConvertConfig:
 
     def test_convert_config_with_tools(self):
         """Test converting config with tools."""
-        provider = OpenAICompatibleProvider(model="gpt-4o")
+        provider = OpenAICompatibleProvider(
+            model="gpt-4o",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
         tools = [
             {
                 "type": "function",
@@ -213,7 +237,10 @@ class TestOpenAICompatibleProviderConvertConfig:
 
     def test_convert_config_with_response_format(self):
         """Test converting config with response format."""
-        provider = OpenAICompatibleProvider(model="gpt-4o")
+        provider = OpenAICompatibleProvider(
+            model="gpt-4o",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
         config = ModelConfig(response_format={"type": "json_object"})
 
         params = provider._convert_config_to_params(config)
@@ -226,7 +253,10 @@ class TestOpenAICompatibleProviderEstimateCost:
 
     def test_estimate_cost_openai_model(self):
         """Test estimating cost for OpenAI model."""
-        provider = OpenAICompatibleProvider(model="gpt-4o")
+        provider = OpenAICompatibleProvider(
+            model="gpt-4o",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
         usage = Usage(prompt_tokens=1000, completion_tokens=500)
 
         cost = provider.estimate_cost(usage)
@@ -370,7 +400,10 @@ class TestOpenAICompatibleProviderEstimateCost:
 
     def test_estimate_cost_zero_usage(self):
         """Test estimating cost with zero usage."""
-        provider = OpenAICompatibleProvider(model="gpt-4o")
+        provider = OpenAICompatibleProvider(
+            model="gpt-4o",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
         usage = Usage(prompt_tokens=0, completion_tokens=0)
 
         cost = provider.estimate_cost(usage)
@@ -385,7 +418,10 @@ class TestOpenAICompatibleProviderCountTokens:
 
     def test_count_tokens_string(self):
         """Test counting tokens in a string."""
-        provider = OpenAICompatibleProvider(model="gpt-4o")
+        provider = OpenAICompatibleProvider(
+            model="gpt-4o",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
         text = "Hello, world! This is a test."
 
         tokens = provider.count_tokens(text)
@@ -395,7 +431,10 @@ class TestOpenAICompatibleProviderCountTokens:
 
     def test_count_tokens_messages(self):
         """Test counting tokens in messages."""
-        provider = OpenAICompatibleProvider(model="gpt-4o")
+        provider = OpenAICompatibleProvider(
+            model="gpt-4o",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
         messages = [
             Message.user("Hello"),
             Message.assistant("Hi there"),
@@ -412,7 +451,10 @@ class TestOpenAICompatibleProviderModelInfo:
 
     def test_get_model_info_openai(self):
         """Test getting model info for OpenAI model."""
-        provider = OpenAICompatibleProvider(model="gpt-4o")
+        provider = OpenAICompatibleProvider(
+            model="gpt-4o",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
         model_info = provider.get_model_info()
 
         assert model_info is not None
@@ -508,12 +550,18 @@ class TestOpenAICompatibleProviderModelInfo:
     def test_get_model_info_context_window(self):
         """Test context window sizes."""
         # Test GPT-4 32k
-        provider_32k = OpenAICompatibleProvider(model="gpt-4-32k")
+        provider_32k = OpenAICompatibleProvider(
+            model="gpt-4-32k",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
         info_32k = provider_32k.get_model_info()
         assert info_32k.context_window == 32768
 
         # Test model with 8k in name
-        provider_8k = OpenAICompatibleProvider(model="moonshot-v1-8k")
+        provider_8k = OpenAICompatibleProvider(
+            model="moonshot-v1-8k",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
         info_8k = provider_8k.get_model_info()
         assert info_8k.context_window == 8192
 
@@ -622,3 +670,147 @@ class TestPricingData:
             assert hasattr(pricing, "output_cost_per_million")
             assert pricing.input_cost_per_million >= 0
             assert pricing.output_cost_per_million >= 0
+
+
+class TestDeepSeekV4ThinkingMode:
+    """Test cases for DeepSeek V4 thinking mode support."""
+
+    def test_is_deepseek_v4_model_pro(self):
+        """Test _is_deepseek_v4_model returns True for deepseek-v4-pro."""
+        provider = OpenAICompatibleProvider(
+            model="deepseek-v4-pro",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
+        assert provider._is_deepseek_v4_model() is True
+
+    def test_is_deepseek_v4_model_flash(self):
+        """Test _is_deepseek_v4_model returns True for deepseek-v4-flash."""
+        provider = OpenAICompatibleProvider(
+            model="deepseek-v4-flash",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
+        assert provider._is_deepseek_v4_model() is True
+
+    def test_is_deepseek_v4_model_case_insensitive(self):
+        """Test _is_deepseek_v4_model is case insensitive."""
+        provider = OpenAICompatibleProvider(
+            model="DEEPSEEK-V4-PRO",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
+        assert provider._is_deepseek_v4_model() is True
+
+    def test_is_not_deepseek_v4_model(self):
+        """Test _is_deepseek_v4_model returns False for non-DeepSeek models."""
+        provider = OpenAICompatibleProvider(
+            model="gpt-4o",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
+        assert provider._is_deepseek_v4_model() is False
+
+    def test_is_not_deepseek_v3_model(self):
+        """Test _is_deepseek_v4_model returns False for DeepSeek V3."""
+        provider = OpenAICompatibleProvider(
+            model="deepseek-v3",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
+        assert provider._is_deepseek_v4_model() is False
+
+    def test_get_thinking_kwargs_deepseek_default(self):
+        """Test _get_thinking_kwargs returns correct params for DeepSeek V4."""
+        provider = OpenAICompatibleProvider(
+            model="deepseek-v4-pro",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
+        config = ModelConfig()
+        kwargs = provider._get_thinking_kwargs(config)
+        assert kwargs["reasoning_effort"] == "high"
+        assert kwargs["extra_body"] == {"thinking": {"type": "enabled"}}
+
+    def test_get_thinking_kwargs_custom_effort(self):
+        """Test _get_thinking_kwargs uses custom reasoning_effort from config."""
+        provider = OpenAICompatibleProvider(
+            model="deepseek-v4-pro",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
+        config = ModelConfig(reasoning_effort="low")
+        kwargs = provider._get_thinking_kwargs(config)
+        assert kwargs["reasoning_effort"] == "low"
+        assert kwargs["extra_body"] == {"thinking": {"type": "enabled"}}
+
+    def test_get_thinking_kwargs_defaults_to_high_for_none(self):
+        """Test _get_thinking_kwargs defaults to 'high' when reasoning_effort is None."""
+        provider = OpenAICompatibleProvider(
+            model="deepseek-v4-flash",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
+        config = ModelConfig(reasoning_effort=None)
+        kwargs = provider._get_thinking_kwargs(config)
+        assert kwargs["reasoning_effort"] == "high"
+
+    def test_get_thinking_kwargs_non_deepseek(self):
+        """Test _get_thinking_kwargs returns empty dict for non-DeepSeek models."""
+        provider = OpenAICompatibleProvider(
+            model="glm-5.1",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
+        config = ModelConfig()
+        kwargs = provider._get_thinking_kwargs(config)
+        assert kwargs == {}
+
+    def test_convert_messages_with_reasoning_content(self):
+        """Test _convert_messages includes reasoning_content when present."""
+        provider = OpenAICompatibleProvider(
+            model="deepseek-v4-pro",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
+        messages = [
+            Message.user("Hello!"),
+            Message.assistant(
+                "Hi!", reasoning_content="Let me think about that..."
+            ),
+        ]
+        converted = provider._convert_messages(messages)
+        assert len(converted) == 2
+        assert converted[0]["role"] == "user"
+        assert "reasoning_content" not in converted[0]
+        assert converted[1]["role"] == "assistant"
+        assert converted[1]["reasoning_content"] == "Let me think about that..."
+
+    def test_convert_messages_without_reasoning_content(self):
+        """Test _convert_messages omits reasoning_content when not present."""
+        provider = OpenAICompatibleProvider(
+            model="deepseek-v4-pro",
+            provider_config=OpenAIProviderConfig(api_key="test-key"),
+        )
+        messages = [
+            Message.user("Hello!"),
+            Message.assistant("Hi!"),
+        ]
+        converted = provider._convert_messages(messages)
+        assert len(converted) == 2
+        assert "reasoning_content" not in converted[0]
+        assert "reasoning_content" not in converted[1]
+
+    def test_message_has_reasoning_content(self):
+        """Test Message stores reasoning_content when set."""
+        msg = Message.assistant("Hi!", reasoning_content="thinking...")
+        assert msg.reasoning_content == "thinking..."
+        assert msg.role == "assistant"
+        assert msg.content == "Hi!"
+
+    def test_llm_response_to_message_preserves_reasoning_content(self):
+        """Test LLMResponse.to_message preserves reasoning_content."""
+        response = LLMResponse(
+            content="Hi!",
+            model="deepseek-v4-pro",
+            usage=Usage(),
+            reasoning_content="thinking...",
+        )
+        msg = response.to_message()
+        assert msg.reasoning_content == "thinking..."
+
+    def test_deepseek_v4_models_set(self):
+        """Test DEEPSEEK_V4_MODELS contains expected models."""
+        assert "deepseek-v4-pro" in DEEPSEEK_V4_MODELS
+        assert "deepseek-v4-flash" in DEEPSEEK_V4_MODELS
+        assert len(DEEPSEEK_V4_MODELS) == 2
