@@ -525,8 +525,9 @@ class BaseTool(ABC, Generic[T]):
             type_checks = {
                 "string": lambda v: isinstance(v, str),
                 "integer": lambda v: isinstance(v, int) and not isinstance(v, bool),
-                "number": lambda v: isinstance(v, (int, float))
-                and not isinstance(v, bool),
+                "number": lambda v: (
+                    isinstance(v, (int, float)) and not isinstance(v, bool)
+                ),
                 "boolean": lambda v: isinstance(v, bool),
                 "array": lambda v: isinstance(v, list),
                 "object": lambda v: isinstance(v, dict),

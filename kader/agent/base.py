@@ -397,6 +397,7 @@ class BaseAgent:
                 name=msg_dict.get("name"),
                 tool_call_id=msg_dict.get("tool_call_id"),
                 tool_calls=msg_dict.get("tool_calls"),
+                reasoning_content=msg_dict.get("reasoning_content"),
             )
             final_messages.append(msg)
 
@@ -1279,9 +1280,12 @@ class BaseAgent:
 
         aggregated_content = ""
         aggregated_tool_calls = []
+        aggregated_reasoning = None
 
         async for chunk in stream_iterator:
             aggregated_content += chunk.content
+            if chunk.reasoning_content:
+                aggregated_reasoning = chunk.reasoning_content
             if chunk.tool_calls:
                 # TODO: robust tool call aggregation if streaming partial JSON
                 # For now, assume provider yields complete tool calls in chunks or we just collect them
@@ -1296,6 +1300,7 @@ class BaseAgent:
             role="assistant",
             content=aggregated_content,
             tool_calls=aggregated_tool_calls if aggregated_tool_calls else None,
+            reasoning_content=aggregated_reasoning,
         )
 
         self.memory.add_message(final_msg)
