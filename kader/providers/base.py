@@ -41,6 +41,7 @@ class Message:
     name: str | None = None
     tool_call_id: str | None = None
     tool_calls: list[dict[str, Any]] | None = None
+    reasoning_content: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert message to dictionary format for API calls."""
@@ -54,6 +55,8 @@ class Message:
             data["tool_call_id"] = self.tool_call_id
         if self.tool_calls:
             data["tool_calls"] = self.tool_calls
+        if self.reasoning_content is not None:
+            data["reasoning_content"] = self.reasoning_content
         return data
 
     @classmethod
@@ -67,9 +70,9 @@ class Message:
         return cls(role="user", content=content)
 
     @classmethod
-    def assistant(cls, content: str) -> "Message":
+    def assistant(cls, content: str, reasoning_content: str | None = None) -> "Message":
         """Create an assistant message."""
-        return cls(role="assistant", content=content)
+        return cls(role="assistant", content=content, reasoning_content=reasoning_content)
 
     @classmethod
     def tool(cls, tool_call_id: str, content: str) -> "Message":
@@ -174,6 +177,9 @@ class ModelConfig:
     # Additional provider-specific parameters
     extra: dict[str, Any] = field(default_factory=dict)
 
+    # Reasoning effort for models that support extended thinking
+    reasoning_effort: str | None = None
+
     def to_dict(self) -> dict[str, Any]:
         """Convert config to dictionary, excluding None values."""
         data: dict[str, Any] = {}
@@ -200,6 +206,8 @@ class ModelConfig:
             data["response_format"] = self.response_format
         if self.seed is not None:
             data["seed"] = self.seed
+        if self.reasoning_effort is not None:
+            data["reasoning_effort"] = self.reasoning_effort
 
         # Merge extra parameters
         data.update(self.extra)
@@ -225,6 +233,9 @@ class LLMResponse:
     # Raw response from provider (for debugging/extension)
     raw_response: Any = None
 
+    # Thinking/reasoning content (e.g. DeepSeek V4 thinking mode)
+    reasoning_content: str | None = None
+
     # Additional metadata
     id: str | None = None
     created: int | None = None
@@ -240,6 +251,7 @@ class LLMResponse:
             role="assistant",
             content=self.content,
             tool_calls=self.tool_calls,
+            reasoning_content=self.reasoning_content,
         )
 
 
@@ -256,6 +268,9 @@ class StreamChunk:
 
     # Tool call deltas
     tool_calls: list[dict[str, Any]] | None = None
+
+    # Accumulated reasoning/thinking content (e.g. DeepSeek V4)
+    reasoning_content: str | None = None
 
     # Index of this chunk in the stream
     index: int = 0
@@ -393,6 +408,7 @@ class BaseLLMProvider(ABC):
             response_format=config.response_format
             or self._default_config.response_format,
             seed=config.seed or self._default_config.seed,
+            reasoning_effort=config.reasoning_effort or self._default_config.reasoning_effort,
             extra={**self._default_config.extra, **config.extra},
         )
 

@@ -552,6 +552,10 @@ PROVIDER_PRICING: dict[str, dict[str, ModelPricing]] = {
 }
 
 
+# DeepSeek V4 models that require thinking mode
+DEEPSEEK_V4_MODELS = {"deepseek-v4-pro", "deepseek-v4-flash"}
+
+
 def _detect_provider(base_url: str | None, model: str) -> str:
     """Detect the provider based on base_url or model name.
 
@@ -734,7 +738,13 @@ class OpenAICompatibleProvider(BaseLLMProvider):
 
     def _convert_messages(self, messages: list[Message]) -> list[dict]:
         """Convert Message objects to OpenAI format."""
-        return [msg.to_dict() for msg in messages]
+        converted = []
+        for msg in messages:
+            data = msg.to_dict()
+            if msg.reasoning_content is not None:
+                data["reasoning_content"] = msg.reasoning_content
+            converted.append(data)
+        return converted
 
     def _convert_config_to_params(self, config: ModelConfig) -> dict:
         """Convert ModelConfig to OpenAI API parameters."""
@@ -772,12 +782,27 @@ class OpenAICompatibleProvider(BaseLLMProvider):
 
         return params
 
+    def _is_deepseek_v4_model(self) -> bool:
+        """Check if the current model is a DeepSeek V4 model requiring thinking mode."""
+        return self._model.lower() in DEEPSEEK_V4_MODELS
+
+    def _get_thinking_kwargs(self, config: ModelConfig) -> dict:
+        """Get additional kwargs for DeepSeek V4 thinking mode."""
+        if not self._is_deepseek_v4_model():
+            return {}
+        reasoning_effort = config.reasoning_effort or "high"
+        return {
+            "reasoning_effort": reasoning_effort,
+            "extra_body": {"thinking": {"type": "enabled"}},
+        }
+
     def _parse_response(self, response) -> LLMResponse:
         """Parse OpenAI ChatCompletion to LLMResponse."""
         # Extract content and tool calls from the first choice
         content = ""
         tool_calls = None
         finish_reason = None
+        reasoning_content = None
 
         if response.choices and len(response.choices) > 0:
             choice = response.choices[0]
@@ -802,6 +827,10 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             if choice.finish_reason:
                 finish_reason = choice.finish_reason
 
+            reasoning_content = getattr(message, "reasoning_content", None)
+            if not reasoning_content:
+                reasoning_content = None
+
         # Extract usage information
         usage = Usage()
         if response.usage:
@@ -821,16 +850,23 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             cost=cost,
             tool_calls=tool_calls,
             raw_response=response,
+            reasoning_content=reasoning_content,
             id=response.id,
             created=response.created,
         )
 
-    def _parse_stream_chunk(self, chunk, accumulated_content: str) -> StreamChunk:
+    def _parse_stream_chunk(
+        self,
+        chunk,
+        accumulated_content: str,
+        accumulated_reasoning: str = "",
+    ) -> StreamChunk:
         """Parse streaming chunk to StreamChunk."""
         delta = ""
         tool_calls = None
         finish_reason = None
         usage = None
+        reasoning_delta = ""
 
         if chunk.choices and len(chunk.choices) > 0:
             choice = chunk.choices[0]
@@ -838,6 +874,12 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             # Extract delta content
             if choice.delta and choice.delta.content:
                 delta = choice.delta.content
+
+            # Extract reasoning_content delta (DeepSeek V4 thinking mode)
+            if choice.delta:
+                delta_reasoning = getattr(choice.delta, "reasoning_content", None) or ""
+                if delta_reasoning:
+                    reasoning_delta = delta_reasoning
 
             # Extract tool calls from delta
             if choice.delta and choice.delta.tool_calls:
@@ -870,6 +912,9 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             finish_reason=finish_reason,
             usage=usage,
             tool_calls=tool_calls,
+            reasoning_content=accumulated_reasoning + reasoning_delta
+            if (accumulated_reasoning or reasoning_delta)
+            else None,
         )
 
     # -------------------------------------------------------------------------
@@ -892,12 +937,14 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         """
         merged_config = self._merge_config(config)
         params = self._convert_config_to_params(merged_config)
+        thinking_kwargs = self._get_thinking_kwargs(merged_config)
 
         response = self._client.chat.completions.create(
             model=self._model,
             messages=self._convert_messages(messages),
             stream=False,
             **params,
+            **thinking_kwargs,
         )
 
         llm_response = self._parse_response(response)
@@ -920,20 +967,27 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         """
         merged_config = self._merge_config(config)
         params = self._convert_config_to_params(merged_config)
+        thinking_kwargs = self._get_thinking_kwargs(merged_config)
 
         response_stream = self._client.chat.completions.create(
             model=self._model,
             messages=self._convert_messages(messages),
             stream=True,
             **params,
+            **thinking_kwargs,
         )
 
         accumulated_content = ""
+        accumulated_reasoning = ""
         final_usage: Usage | None = None
 
         for chunk in response_stream:
-            stream_chunk = self._parse_stream_chunk(chunk, accumulated_content)
+            stream_chunk = self._parse_stream_chunk(
+                chunk, accumulated_content, accumulated_reasoning
+            )
             accumulated_content = stream_chunk.content
+            if stream_chunk.reasoning_content:
+                accumulated_reasoning = stream_chunk.reasoning_content
 
             # Capture usage from final chunk if available
             if stream_chunk.is_final and stream_chunk.usage:
@@ -955,6 +1009,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             usage=final_usage,
             finish_reason=stream_chunk.finish_reason,
             cost=self.estimate_cost(final_usage),
+            reasoning_content=accumulated_reasoning or None,
         )
         self._update_tracking(final_response)
 
@@ -978,12 +1033,14 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         """
         merged_config = self._merge_config(config)
         params = self._convert_config_to_params(merged_config)
+        thinking_kwargs = self._get_thinking_kwargs(merged_config)
 
         response = await self._async_client.chat.completions.create(
             model=self._model,
             messages=self._convert_messages(messages),
             stream=False,
             **params,
+            **thinking_kwargs,
         )
 
         llm_response = self._parse_response(response)
@@ -1006,20 +1063,27 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         """
         merged_config = self._merge_config(config)
         params = self._convert_config_to_params(merged_config)
+        thinking_kwargs = self._get_thinking_kwargs(merged_config)
 
         response_stream = await self._async_client.chat.completions.create(
             model=self._model,
             messages=self._convert_messages(messages),
             stream=True,
             **params,
+            **thinking_kwargs,
         )
 
         accumulated_content = ""
+        accumulated_reasoning = ""
         final_usage: Usage | None = None
 
         async for chunk in response_stream:
-            stream_chunk = self._parse_stream_chunk(chunk, accumulated_content)
+            stream_chunk = self._parse_stream_chunk(
+                chunk, accumulated_content, accumulated_reasoning
+            )
             accumulated_content = stream_chunk.content
+            if stream_chunk.reasoning_content:
+                accumulated_reasoning = stream_chunk.reasoning_content
 
             # Capture usage from final chunk if available
             if stream_chunk.is_final and stream_chunk.usage:
@@ -1040,6 +1104,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             usage=final_usage,
             finish_reason=stream_chunk.finish_reason,
             cost=self.estimate_cost(final_usage),
+            reasoning_content=accumulated_reasoning or None,
         )
         self._update_tracking(final_response)
 

@@ -126,6 +126,7 @@ class ConversationMessage:
                 name=self.message.get("name"),
                 tool_call_id=self.message.get("tool_call_id"),
                 tool_calls=self.message.get("tool_calls"),
+                reasoning_content=self.message.get("reasoning_content"),
             )
         return self.message
 
