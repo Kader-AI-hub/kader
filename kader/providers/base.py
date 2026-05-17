@@ -72,7 +72,9 @@ class Message:
     @classmethod
     def assistant(cls, content: str, reasoning_content: str | None = None) -> "Message":
         """Create an assistant message."""
-        return cls(role="assistant", content=content, reasoning_content=reasoning_content)
+        return cls(
+            role="assistant", content=content, reasoning_content=reasoning_content
+        )
 
     @classmethod
     def tool(cls, tool_call_id: str, content: str) -> "Message":
@@ -408,7 +410,8 @@ class BaseLLMProvider(ABC):
             response_format=config.response_format
             or self._default_config.response_format,
             seed=config.seed or self._default_config.seed,
-            reasoning_effort=config.reasoning_effort or self._default_config.reasoning_effort,
+            reasoning_effort=config.reasoning_effort
+            or self._default_config.reasoning_effort,
             extra={**self._default_config.extra, **config.extra},
         )
 

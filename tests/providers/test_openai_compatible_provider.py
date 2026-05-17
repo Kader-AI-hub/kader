@@ -112,7 +112,9 @@ class TestProviderDetection:
 
     def test_detect_opencode_go_by_url(self):
         """Test detecting OpenCode Go by base URL."""
-        assert _detect_provider("https://opencode.ai/zen/go/v1", "model") == "opencode_go"
+        assert (
+            _detect_provider("https://opencode.ai/zen/go/v1", "model") == "opencode_go"
+        )
 
     def test_detect_groq_by_url(self):
         """Test detecting Groq by base URL."""
@@ -765,9 +767,7 @@ class TestDeepSeekV4ThinkingMode:
         )
         messages = [
             Message.user("Hello!"),
-            Message.assistant(
-                "Hi!", reasoning_content="Let me think about that..."
-            ),
+            Message.assistant("Hi!", reasoning_content="Let me think about that..."),
         ]
         converted = provider._convert_messages(messages)
         assert len(converted) == 2
