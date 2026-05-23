@@ -398,6 +398,35 @@ class LLMProviderFactory:
             return False
 
     @classmethod
+    def get_provider_env_key(cls, provider_name: str) -> str:
+        """
+        Get the environment variable name for a provider's API key.
+
+        Args:
+            provider_name: Name of the provider (e.g., "openai", "google")
+
+        Returns:
+            Environment variable name (e.g., "OPENAI_API_KEY", "GEMINI_API_KEY")
+        """
+        provider_name = provider_name.lower()
+
+        # OpenAI-compatible providers use PROVIDER_CONFIGS env_key
+        if provider_name in cls.PROVIDER_CONFIGS:
+            return cls.PROVIDER_CONFIGS[provider_name]["env_key"]
+
+        # Non-OpenAI-compatible providers
+        provider_env_keys = {
+            "ollama": "OLLAMA_API_KEY",
+            "google": "GEMINI_API_KEY",
+            "mistral": "MISTRAL_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY",
+        }
+        if provider_name in provider_env_keys:
+            return provider_env_keys[provider_name]
+
+        raise ValueError(f"Unknown provider: {provider_name}")
+
+    @classmethod
     def get_provider_name(cls, model_string: str) -> str:
         """
         Get the provider name for a given model string.

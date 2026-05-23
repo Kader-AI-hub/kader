@@ -40,7 +40,7 @@ from kader.utils.todo_metadata import TodoMetadataHandler
 from kader.workflows import PlannerExecutorWorkflow
 
 from .callbacks import load_callbacks_from_settings
-from .commands import InitializeCommand, RefreshCommand, UpdateCommand
+from .commands import ConnectCommand, InitializeCommand, RefreshCommand, UpdateCommand
 from .sessions_metadata import aupdate_sessions_metadata
 from .settings import load_settings, save_settings
 from .tools import load_tools_from_settings
@@ -473,6 +473,10 @@ class KaderApp:
         if cmd == "/help":
             self.console.print()
             self.console.print(Markdown(HELP_TEXT))
+
+        elif cmd == "/connect":
+            connect_cmd = ConnectCommand(self)
+            await connect_cmd.execute()
 
         elif cmd == "/models":
             await self._handle_models()
