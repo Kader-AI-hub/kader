@@ -35,6 +35,7 @@ uv run python -m cli
 
 | Command | Description |
 |---------|-------------|
+| `/connect` | Connect a provider by setting its API key |
 | `/help` | Show command reference |
 | `/models` | Switch models per agent (main/sub) |
 | `/clear` | Clear conversation and create new session |
@@ -392,6 +393,16 @@ Project-level callbacks in `./.kader/custom/callbacks/` are automatically discov
 
 Use `/refresh` to reload settings and callbacks without restarting the CLI.
 
+## Connect Command
+
+The `/connect` command provides an interactive way to set up provider API keys without manually editing `~/.kader/.env`:
+
+1. **Provider selection** — Shows an interactive radio-button list of all supported providers with arrow-key navigation
+2. **API key input** — Prompts you to enter or paste the API key for the selected provider
+3. **Automatic saving** — Saves the key to `~/.kader/.env` and loads it into the current session
+
+After connecting a provider, use `/models` to browse available models from that provider.
+
 ## Model Selection
 
 The `/models` command uses a two-step interactive flow:
@@ -461,6 +472,8 @@ You can also manually check for updates using the `/update` command:
 | Groq | `groq:model` | `groq:llama-3.3-70b-versatile` |
 
 ### Setting API Keys
+
+API keys can be set interactively using `/connect` in the CLI. Alternatively, set them directly:
 
 ```bash
 # Ollama Cloud (get from https://ollama.com/settings)

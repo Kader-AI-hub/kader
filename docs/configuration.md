@@ -18,6 +18,8 @@ Kader can be configured through environment variables, YAML files, and the `.kad
 | `OPENCODE_API_KEY` | OpenCode API key | For OpenCode Provider |
 | `GROQ_API_KEY` | Groq API key | For Groq Provider |
 
+API keys can be set interactively using the `/connect` command in the CLI, or manually by editing `~/.kader/.env`.
+
 ## .kader Directory
 
 When the kader module is imported for the first time, it automatically creates a `.kader` directory in your home directory:

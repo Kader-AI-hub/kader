@@ -40,6 +40,9 @@ def get_special_commands() -> list[CLICommand]:
 
 COMMANDS: list[CLICommand] = [
     CLICommand(name="/help", description="Show help message"),
+    CLICommand(
+        name="/connect", description="Connect a provider by setting its API key"
+    ),
     CLICommand(name="/models", description="Show and switch LLM models"),
     CLICommand(name="/clear", description="Clear the conversation"),
     CLICommand(name="/sessions", description="List and load saved sessions"),
@@ -93,6 +96,7 @@ HELP_TEXT = """## Kader CLI Commands
 
 | Command | Description |
 |---------|-------------|
+| `/connect` | Connect a provider by setting its API key |
 | `/models` | Show and switch LLM models |
 | `/help` | Show this help message |
 | `/clear` | Clear the conversation |
