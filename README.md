@@ -90,8 +90,9 @@ Once the CLI is running:
 
 1. Type any question to start chatting with the agent.
 2. Use `/help` to see available commands.
-3. Use `/models` to check and interactively switch available models.
-4. Run terminal commands directly by prefixing with `!` (e.g. `!ls -la`).
+3. Use `/connect` to set up a provider's API key interactively.
+4. Use `/models` to check and interactively switch available models.
+5. Run terminal commands directly by prefixing with `!` (e.g. `!ls -la`).
 
 ## Configuration
 
@@ -149,6 +150,7 @@ You can also manually check for updates using the `/update` command. If a newer 
 
 | Command | Description |
 |---------|-------------|
+| `/connect` | Connect a provider by setting its API key |
 | `/help` | Show command reference |
 | `/models` | Show available models (Ollama local & cloud, Google & Anthropic) |
 | `/clear` | Clear conversation and create new session |
@@ -502,7 +504,7 @@ uv run ruff format .
 
 ### Common Issues
 
-- **No models found**: Ensure your providers are correctly configured. For Ollama, run `ollama serve`. For Google, ensure `GOOGLE_API_KEY` is set. For Anthropic, ensure `ANTHROPIC_API_KEY` is set.
+- **No models found**: Ensure your providers are correctly configured. Use `/connect` to set API keys interactively. For Ollama, run `ollama serve`.
 - **Connection errors**: Verify internet access for cloud providers and local service availability for Ollama.
 
 ## Contributing
