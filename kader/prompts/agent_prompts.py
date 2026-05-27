@@ -35,11 +35,13 @@ class KaderPlannerPrompt(PromptBase):
     Enhanced planning prompt with specific instructions for:
     - Using Agent as a Tool with proper task/context parameters
     - Tracking completed actions to avoid repetition
+    - Available sub-agents with their objectives (for routing decisions)
     """
 
     def __init__(self, **kwargs: Any) -> None:
         kader_md_path = Path(".kader/KADER.md")
         kwargs.setdefault("kader_md_exists", kader_md_path.exists())
+        kwargs.setdefault("subagents", [])
         super().__init__(template_path="kader_planner.j2", **kwargs)
 
 

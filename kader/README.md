@@ -1069,6 +1069,89 @@ The workflow:
 4. Updates todo status as tasks complete
 5. Summarizes completed work
 
+#### Using Subagents with PlannerExecutorWorkflow
+
+The workflow supports **custom subagents** — specialized agents defined as YAML files that are automatically discovered and registered as tools. This allows you to create domain-specific agents (code reviewer, researcher, tester) that the planner can delegate to.
+
+```python
+from kader.workflows import PlannerExecutorWorkflow
+from kader.workflows.subagents import SubagentLoader, SubagentConfig
+
+# The workflow automatically discovers subagents from:
+# - ~/.kader/subagents/ (user-level)
+# - ./.kader/subagents/ (project-level)
+
+workflow = PlannerExecutorWorkflow(
+    name="project_workflow",
+    provider=OllamaProvider(model="llama3.2"),
+    interrupt_before_tool=True,
+    # Subagents are loaded automatically from default directories
+    # You can also specify custom directories:
+    subagents_dirs=[Path("./custom_subagents")],
+    # And filter by settings:
+    enabled_subagents=[{"name": "code-reviewer", "enabled": "true"}],
+)
+
+result = workflow.run("Review the code in src/ and fix any issues")
+```
+
+### Creating Subagents
+
+Subagents are defined as YAML files in the subagents directories. Each subagent becomes a dedicated tool that the planner can invoke.
+
+#### YAML Structure
+
+```yaml
+name: code-reviewer
+objective: "Use for code review tasks including analyzing code quality, finding bugs, suggesting improvements, and reviewing pull requests"
+system_prompt: |
+  You are an expert code reviewer. Focus on:
+  - Code quality and readability
+  - Bug detection and edge case analysis
+  - Performance optimization
+  - Security vulnerability identification
+tools:
+  - read_file
+  - read_directory
+  - grep
+  - glob
+```
+
+#### SubagentConfig
+
+Programmatic access to subagent configuration:
+
+```python
+from kader.workflows.subagents import SubagentConfig, SubagentLoader
+
+# Create a subagent config manually
+config = SubagentConfig(
+    name="research-agent",
+    objective="Use for web research and information gathering",
+    system_prompt="You are a research agent...",
+    tools=["web_search", "web_fetch"],
+)
+
+# Or load from YAML
+loader = SubagentLoader()
+all_subagents = loader.list_subagents()
+print(loader.get_description())
+
+# Load a specific subagent by name
+config = loader.load_subagent("code-reviewer")
+print(f"Name: {config.name}")
+print(f"Objective: {config.objective}")
+```
+
+#### Subagent Discovery
+
+Subagents follow the same priority pattern as skills:
+- `~/.kader/subagents/` takes priority over `./.kader/subagents/` on name collision
+- Flat file: `{name}.yaml`
+- Directory: `{name}/template.yaml`
+- User-level subagents are gated by `settings.json` (`subagents` field)
+- Project-level subagents are always enabled
+
 ### Custom Workflows
 
 Extend `BaseWorkflow` for custom patterns:
