@@ -69,6 +69,9 @@ class InitializeCommand(BaseCommand):
                 model_name=model_name,
                 interrupt_before_tool=False,
                 tool_confirmation_callback=self._tool_confirmation_callback,
+                callbacks=[self.app._subagent_tracker]
+                if self.app._subagent_tracker
+                else [],
             )
 
             if self.app._current_session_id:
