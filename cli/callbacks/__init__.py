@@ -4,12 +4,49 @@ Provides functionality to load custom callbacks from user and project directorie
 """
 
 from pathlib import Path
+from typing import Callable
 
 from loguru import logger
 
 from cli.settings.settings import KaderSettings
-from kader.callbacks.base import BaseCallback
+from kader.callbacks.base import BaseCallback, CallbackContext
 from kader.callbacks.loader import CallbackLoader
+
+
+class SubagentTrackerCallback(BaseCallback):
+    """
+    Tracks entry/exit of executor/subagent agents for CLI UI enhancements.
+
+    Detects subagent agents by their naming convention (names ending in
+    ``_worker``) and notifies the CLI app via callbacks when a subagent
+    starts or finishes execution.
+
+    Attributes:
+        on_subagent_start: Callable(agent_name) invoked when a subagent starts.
+        on_subagent_end: Callable(agent_name) invoked when a subagent ends.
+    """
+
+    _SUBAGENT_SUFFIX = "_worker"
+
+    def __init__(
+        self,
+        on_subagent_start: Callable[[str], None],
+        on_subagent_end: Callable[[str], None],
+    ) -> None:
+        super().__init__(enabled=True)
+        self._on_subagent_start = on_subagent_start
+        self._on_subagent_end = on_subagent_end
+
+    def _is_subagent(self, agent_name: str) -> bool:
+        return agent_name.endswith(self._SUBAGENT_SUFFIX)
+
+    def on_agent_start(self, context: CallbackContext) -> None:
+        if self._is_subagent(context.agent_name):
+            self._on_subagent_start(context.agent_name)
+
+    def on_agent_end(self, context: CallbackContext) -> None:
+        if self._is_subagent(context.agent_name):
+            self._on_subagent_end(context.agent_name)
 
 
 def load_callbacks_from_settings(settings: KaderSettings) -> list[BaseCallback]:
@@ -82,4 +119,4 @@ def load_callbacks_from_settings(settings: KaderSettings) -> list[BaseCallback]:
     return callbacks
 
 
-__all__ = ["load_callbacks_from_settings"]
+__all__ = ["load_callbacks_from_settings", "SubagentTrackerCallback"]

@@ -101,6 +101,7 @@ When the kader module is imported for the first time, it automatically creates a
 ### Environment Variables
 
 The application automatically loads environment variables from `~/.kader/.env`:
+
 - `OLLAMA_API_KEY`: API key for Ollama Cloud (for cloud models at ollama.com). Get your key from https://ollama.com/settings
 - `GOOGLE_API_KEY`: API key for Google Gemini (required for Google Provider).
 - `ANTHROPIC_API_KEY`: API key for Anthropic Claude (required for Anthropic Provider).
@@ -109,6 +110,7 @@ The application automatically loads environment variables from `~/.kader/.env`:
 ### Memory and Sessions
 
 Kader stores data in `~/.kader/`:
+
 - Sessions: `~/.kader/memory/sessions/`
 - Configuration: `~/.kader/`
 - Memory files: `~/.kader/memory/`
@@ -130,15 +132,15 @@ User preferences are stored in `~/.kader/settings.json`, created automatically o
 }
 ```
 
-| Field | Description | Default |
-|-------|-------------|---------|
-| `main-agent-provider` | LLM provider for the planner agent | `ollama` |
-| `sub-agent-provider` | LLM provider for executor sub-agents | `ollama` |
-| `main-agent-model` | Model name for the planner agent | `glm-5:cloud` |
-| `sub-agent-model` | Model name for executor sub-agents | `glm-5:cloud` |
-| `auto-update` | Automatically update Kader on startup | `false` |
-| `callbacks` | List of user-level callbacks to enable | `[]` |
-| `tools` | List of user-level custom tools to enable | `[]` |
+| Field                 | Description                               | Default       |
+| --------------------- | ----------------------------------------- | ------------- |
+| `main-agent-provider` | LLM provider for the planner agent        | `ollama`      |
+| `sub-agent-provider`  | LLM provider for executor sub-agents      | `ollama`      |
+| `main-agent-model`    | Model name for the planner agent          | `glm-5:cloud` |
+| `sub-agent-model`     | Model name for executor sub-agents        | `glm-5:cloud` |
+| `auto-update`         | Automatically update Kader on startup     | `false`       |
+| `callbacks`           | List of user-level callbacks to enable    | `[]`          |
+| `tools`               | List of user-level custom tools to enable | `[]`          |
 
 #### Auto-Update
 
@@ -148,27 +150,27 @@ You can also manually check for updates using the `/update` command. If a newer 
 
 ## CLI Commands
 
-| Command | Description |
-|---------|-------------|
-| `/connect` | Connect a provider by setting its API key |
-| `/help` | Show command reference |
-| `/models` | Show available models (Ollama local & cloud, Google & Anthropic) |
-| `/clear` | Clear conversation and create new session |
-| `/sessions` | List and load saved sessions |
-| `/skills` | List loaded skills |
-| `/commands` | List special commands |
-| `/cost` | Show usage costs |
-| `/init` | Initialize .kader directory with KADER.md |
-| `/update` | Check for updates and update Kader if newer version available |
-| `/exit` | Exit the CLI |
-| `!cmd` | Run terminal command |
+| Command     | Description                                                      |
+| ----------- | ---------------------------------------------------------------- |
+| `/connect`  | Connect a provider by setting its API key                        |
+| `/help`     | Show command reference                                           |
+| `/models`   | Show available models (Ollama local & cloud, Google & Anthropic) |
+| `/clear`    | Clear conversation and create new session                        |
+| `/sessions` | List and load saved sessions                                     |
+| `/skills`   | List loaded skills                                               |
+| `/commands` | List special commands                                            |
+| `/cost`     | Show usage costs                                                 |
+| `/init`     | Initialize .kader directory with KADER.md                        |
+| `/update`   | Check for updates and update Kader if newer version available    |
+| `/exit`     | Exit the CLI                                                     |
+| `!cmd`      | Run terminal command                                             |
 
 ### Keyboard Shortcuts
 
-| Shortcut | Action |
-|----------|--------|
+| Shortcut | Action                   |
+| -------- | ------------------------ |
 | `Ctrl+C` | Cancel current operation |
-| `Ctrl+D` | Exit the CLI |
+| `Ctrl+D` | Exit the CLI             |
 
 ## Project Structure
 
@@ -218,6 +220,7 @@ Kader provides a robust agent architecture:
 ### LLM Providers
 
 Kader supports multiple backends:
+
 - **OllamaProvider**: Connects to locally running Ollama instances.
 - **OllamaProvider (Cloud)**: Connects to cloud models at ollama.com (requires OLLAMA_API_KEY).
 - **GoogleProvider**: High-performance access to Gemini models.
@@ -226,6 +229,7 @@ Kader supports multiple backends:
 ### Agent-As-Tool (AgentTool)
 
 The `AgentTool` allows a `PlanningAgent` (Architect) to delegate work to a `ReActAgent` (Worker). It features:
+
 - **Persistent Memory**: Sub-agent conversations are saved to JSON.
 - **Context Aggregation**: Sub-agent research and actions are automatically merged into the main session's `checkpoint.md` via `ContextAggregator`.
 
@@ -253,6 +257,7 @@ Kader supports special commands — custom command agents that can be invoked fr
 #### Creating a Special Command
 
 **Option 1: Directory format** (with additional files)
+
 ```
 ~/.kader/commands/mycommand/
 ├── CONTENT.md          # Required - command instructions
@@ -261,11 +266,13 @@ Kader supports special commands — custom command agents that can be invoked fr
 ```
 
 **Option 2: Simple file format**
+
 ```
 ~/.kader/commands/mycommand.md
 ```
 
 **Option 3: Directory with sub-commands**
+
 ```
 ~/.kader/commands/mycommand/
 ├── CONTENT.md           # Main command (/mycommand)
@@ -276,6 +283,7 @@ Kader supports special commands — custom command agents that can be invoked fr
 ```
 
 **CONTENT.md or .md file format:**
+
 ```yaml
 ---
 description: What this command does
@@ -313,12 +321,111 @@ You are a Lint and Test Agent. Run linting and tests when requested.
 ```
 
 **Usage:**
+
 ```
 /lint-test
 /lint-test run full check
 ```
 
 Use `/commands` to list all available special commands.
+
+### Subagents (Custom Sub-Agents)
+
+Subagents are specialized AI agents that can be delegated to by the planner in the Planner-Executor workflow. They are defined as YAML files and automatically discovered and registered as tools that the planner can invoke.
+
+#### Subagent File Format
+
+Subagents are loaded from:
+
+- `./.kader/subagents/` — Project-level subagents (always enabled)
+- `~/.kader/subagents/` — User-level subagents (gated by `settings.json`)
+
+Each subagent is a YAML file with the following structure:
+
+**Option 1: Flat file format**
+
+```
+~/.kader/subagents/code_reviewer.yaml
+```
+
+**Option 2: Directory format** (with additional template files)
+
+```
+~/.kader/subagents/code_reviewer/
+└── template.yaml
+```
+
+**YAML format:**
+
+```yaml
+name: code-reviewer
+objective: >
+  Use for code review tasks including analyzing code quality,
+  finding bugs, suggesting improvements, and reviewing pull requests
+system_prompt: |
+  You are an expert code reviewer specializing in thorough,
+  constructive code reviews. Focus on code quality, bug detection,
+  and best practices.
+tools:
+  - read_file
+  - read_directory
+  - grep
+  - glob
+```
+
+| Field           | Description                                                               |
+| --------------- | ------------------------------------------------------------------------- |
+| `name`          | Unique subagent identifier (kebab-case, used as tool name)                |
+| `objective`     | Description to help the planner decide when to use this subagent          |
+| `system_prompt` | The system prompt defining the subagent's behavior and instructions       |
+| `tools`         | List of tool names available to the subagent (empty = all standard tools) |
+
+#### How Subagents Work
+
+1. **Discovery**: On workflow startup, Kader scans subagent directories for YAML files
+2. **Registration**: Each discovered subagent becomes an `AgentTool` registered with the planner
+3. **Delegation**: The planner can invoke subagents by name (e.g., `code-reviewer`) to handle specialized tasks
+4. **Isolation**: Each subagent runs with its own memory context, tool set, and provider
+5. **Context Aggregation**: Subagent outputs are automatically aggregated into the session's checkpoint
+
+#### User-Level Subagent Configuration
+
+User-level subagents are controlled via `~/.kader/settings.json`:
+
+```json
+{
+  "subagents": [
+    { "name": "code-reviewer", "enabled": "true" },
+    { "name": "research-agent", "enabled": "false" }
+  ]
+}
+```
+
+- `name`: Matches the YAML file stem (e.g., `code-reviewer` from `code_reviewer.yaml`)
+- `enabled`: `"true"` to enable, `"false"` to disable
+- Subagents not listed in settings are skipped
+- Project-level subagents are always enabled regardless of settings
+
+### Subagent UI Context
+
+When your planner delegates tasks to an executor or custom subagent, the CLI shows a distinct UI indicating you are inside a subagent context:
+
+```
+[Kader is thinking... spinner]
+
+[^^] Executor Started
+│ Entering subagent mode — actions are now executed by Executor │
+
+[Executor is working... spinner]
+
+  ⚡ [executor] read_file: Reading file...
+  [+] [executor] read_file completed successfully
+
+[✓] Executor finished
+  [+] executor completed successfully
+```
+
+This visual distinction helps you understand which agent is executing actions at any point during a conversation.
 
 ### Custom Tools
 
@@ -368,6 +475,7 @@ class MyTool(BaseTool[str]):
 Custom tools can be assigned to specific agents:
 
 **For user-level tools** (in settings.json):
+
 ```json
 {
   "tools": [
@@ -384,6 +492,7 @@ Agent options: `planner` | `executor` | `both` (default)
 
 **For project-level tools** (in tool directory):
 Create an `agent.json` file in the tool directory:
+
 ```json
 {
   "agent": "both"
@@ -401,6 +510,7 @@ Project-level tool at `.kader/custom/tools/datetime_tool/`:
 ```
 
 `agent.json`:
+
 ```json
 {
   "agent": "both"
@@ -408,6 +518,7 @@ Project-level tool at `.kader/custom/tools/datetime_tool/`:
 ```
 
 Usage:
+
 ```
 What time is it in Japan?
 ```
@@ -430,6 +541,7 @@ tools = get_filesystem_tools(base_path=Path.cwd(), apply_gitignore_filter=False)
 ```
 
 Example skill structure:
+
 ```
 ~/.kader/skills/hello/
 ├── SKILL.md
@@ -438,6 +550,7 @@ Example skill structure:
 ```
 
 Example skill (`SKILL.md`):
+
 ```yaml
 ---
 name: hello

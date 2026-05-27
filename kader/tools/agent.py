@@ -683,6 +683,76 @@ class AgentTool(BaseTool[str]):
         except Exception as e:
             return f"Agent execution failed: {str(e)}"
 
+    @classmethod
+    def from_subagent_config(
+        cls,
+        name: str,
+        objective: str,
+        system_prompt: str,
+        tool_names: list[str],
+        provider: Optional[BaseLLMProvider] = None,
+        model_name: str = "qwen3-coder:480b-cloud",
+        interrupt_before_tool: bool = True,
+        tool_confirmation_callback: Optional[
+            Callable[..., Tuple[bool, Optional[str]]]
+        ] = None,
+        direct_execution_callback: Optional[Callable[..., None]] = None,
+        tool_execution_result_callback: Optional[Callable[..., None]] = None,
+        memory_manager_type: str = "hierarchical",
+        skills_dirs: list[Path] | None = None,
+        priority_dir: Path | None = None,
+        callbacks: Optional[list] = None,
+    ) -> "AgentTool":
+        """
+        Create an AgentTool from a SubagentConfig.
+
+        Resolves tool names to BaseTool instances from the default cached registry.
+        Tool names that don't exist in the registry are silently skipped.
+
+        Args:
+            name: Name of the subagent (used as tool name and agent identifier).
+            objective: Description of what the subagent does (used as tool description).
+            system_prompt: Custom system prompt for the subagent.
+            tool_names: List of tool name strings to resolve.
+            provider: LLM provider for the subagent.
+            model_name: Model name for the subagent.
+            interrupt_before_tool: Whether to pause before tool execution.
+            tool_confirmation_callback: Callback for tool confirmation.
+            direct_execution_callback: Callback for direct execution display.
+            tool_execution_result_callback: Callback for tool execution results.
+            memory_manager_type: Type of memory manager.
+            skills_dirs: Optional list of custom skill directories.
+            priority_dir: Optional priority directory for skills.
+            callbacks: List of callbacks for agent lifecycle events.
+
+        Returns:
+            Configured AgentTool instance.
+        """
+        custom_tools: list[BaseTool] = []
+        if tool_names:
+            registry = get_cached_default_registry()
+            for t_name in tool_names:
+                t = registry.get(t_name)
+                if t:
+                    custom_tools.append(t)
+
+        return cls(
+            name=name,
+            description=objective,
+            provider=provider,
+            model_name=model_name,
+            interrupt_before_tool=interrupt_before_tool,
+            tool_confirmation_callback=tool_confirmation_callback,
+            direct_execution_callback=direct_execution_callback,
+            tool_execution_result_callback=tool_execution_result_callback,
+            memory_manager_type=memory_manager_type,
+            skills_dirs=skills_dirs,
+            priority_dir=priority_dir,
+            custom_system_prompt=system_prompt,
+            callbacks=callbacks or [],
+            custom_tools=custom_tools,
+        )
+
     def get_interruption_message(self, task: str, **kwargs: Any) -> str:
         """
         Get a message describing the agent action for user confirmation.

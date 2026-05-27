@@ -149,6 +149,9 @@ _DEFAULT_SETTINGS = {
     "sub-agent-provider": "ollama",
     "main-agent-model": "glm-5:cloud",
     "sub-agent-model": "glm-5:cloud",
+    "callbacks": [],
+    "tools": [],
+    "subagents": [],
 }
 
 

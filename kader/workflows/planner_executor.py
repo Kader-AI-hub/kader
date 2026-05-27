@@ -22,6 +22,7 @@ from kader.tools.filesys import GlobTool, GrepTool, ReadDirectoryTool, ReadFileT
 from kader.utils import Checkpointer
 
 from .base import BaseWorkflow
+from .subagents import SubagentLoader, load_subagents_from_settings
 
 
 class PlannerExecutorWorkflow(BaseWorkflow):
@@ -62,6 +63,8 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         callbacks: Optional[list[BaseCallback]] = None,
         planner_tools: Optional[list[BaseTool]] = None,
         executor_tools: Optional[list[BaseTool]] = None,
+        subagents_dirs: list[Path] | None = None,
+        enabled_subagents: Optional[list[dict[str, str]]] = None,
     ) -> None:
         """
         Initialize the Planner-Executor workflow.
@@ -84,6 +87,10 @@ class PlannerExecutorWorkflow(BaseWorkflow):
             callbacks: List of callbacks for agent lifecycle events.
             planner_tools: Custom tools to add to the planner agent.
             executor_tools: Custom tools to add to executor agents.
+            subagents_dirs: Optional list of subagent directories.
+                           If None, defaults to ~/.kader/subagents and ./.kader/subagents.
+            enabled_subagents: List of {"name": "...", "enabled": "true/false"} dicts
+                              from settings.json. Used to filter user-level subagents.
         """
         super().__init__(
             name=name,
@@ -105,6 +112,8 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         self.callbacks = callbacks or []
         self.planner_tools = planner_tools or []
         self.executor_tools = executor_tools or []
+        self.subagents_dirs = subagents_dirs
+        self.enabled_subagents = enabled_subagents or []
 
         # Build the planner agent with tools
         self._planner = self._build_planner()
@@ -148,17 +157,51 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         for tool in self.planner_tools:
             registry.register(tool)
 
-        # Add AgentTool(s) for sub-task delegation
-        for executor_name in self.executor_names:
-            agent_tool = AgentTool(
-                name=executor_name,
-                description=(
-                    f"Delegate a sub-task to the '{executor_name}' agent. "
-                    "Use this when a specific task needs to be executed by a "
-                    "specialized worker agent. Provide a clear task description."
-                ),
-                provider=self.executor_provider or self.provider,
-                model_name=self.executor_model_name or self.model_name,
+        # Load subagent configs from disk, filtered by settings
+        subagent_loader = SubagentLoader(subagents_dirs=self.subagents_dirs)
+        subagent_configs = load_subagents_from_settings(
+            loader=subagent_loader,
+            enabled_subagents=self.enabled_subagents,
+        )
+
+        executor_provider = self.executor_provider or self.provider
+        executor_model_name = self.executor_model_name or self.model_name
+
+        # Always register the default "executor" AgentTool (general-purpose)
+        executor_description = (
+            "Delegate a sub-task to the 'executor' agent. "
+            "This is the general-purpose sub-agent for tasks that don't match "
+            "any specialized sub-agent. Use when no specific sub-agent fits the task."
+        )
+        executor_tool = AgentTool(
+            name="executor",
+            description=executor_description,
+            provider=executor_provider,
+            model_name=executor_model_name,
+            interrupt_before_tool=self.interrupt_before_tool,
+            tool_confirmation_callback=self.tool_confirmation_callback,
+            direct_execution_callback=self.direct_execution_callback,
+            tool_execution_result_callback=self.tool_execution_result_callback,
+            memory_manager_type=self.memory_manager_type,
+            skills_dirs=self.skills_dirs,
+            priority_dir=self.priority_dir,
+            callbacks=self.callbacks,
+            custom_tools=self.executor_tools,
+        )
+        registry.register(executor_tool)
+
+        # Build subagent info list for the planner prompt
+        subagent_infos: list[dict[str, str]] = []
+
+        # Register subagent AgentTools from discovered configs
+        for config in subagent_configs:
+            agent_tool = AgentTool.from_subagent_config(
+                name=config.name,
+                objective=config.objective,
+                system_prompt=config.system_prompt,
+                tool_names=config.tools,
+                provider=executor_provider,
+                model_name=executor_model_name,
                 interrupt_before_tool=self.interrupt_before_tool,
                 tool_confirmation_callback=self.tool_confirmation_callback,
                 direct_execution_callback=self.direct_execution_callback,
@@ -167,9 +210,13 @@ class PlannerExecutorWorkflow(BaseWorkflow):
                 skills_dirs=self.skills_dirs,
                 priority_dir=self.priority_dir,
                 callbacks=self.callbacks,
-                custom_tools=self.executor_tools,
             )
-            registry.register(agent_tool)
+            try:
+                registry.register(agent_tool)
+            except ValueError:
+                pass  # Tool with this name already registered (e.g. "executor"), skip
+
+            subagent_infos.append({"name": config.name, "objective": config.objective})
 
         # Create memory for the planner based on configured type
         if self.memory_manager_type == "hierarchical":
@@ -184,10 +231,11 @@ class PlannerExecutorWorkflow(BaseWorkflow):
         # Load checkpoint context if it exists from previous iterations
         checkpoint_context = self._load_checkpoint_context()
 
-        # Create the Kader system prompt with tool descriptions and context
+        # Create the Kader system prompt with tool descriptions, context, and subagents
         system_prompt = KaderPlannerPrompt(
             tools=registry.tools,
             context=checkpoint_context,
+            subagents=subagent_infos if subagent_infos else None,
         )
 
         # Build the PlanningAgent

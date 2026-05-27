@@ -135,7 +135,8 @@ User preferences are stored in `~/.kader/settings.json`, created automatically o
   "sub-agent-model": "glm-5:cloud",
   "auto-update": false,
   "callbacks": [],
-  "tools": []
+  "tools": [],
+  "subagents": []
 }
 ```
 
@@ -148,6 +149,7 @@ User preferences are stored in `~/.kader/settings.json`, created automatically o
 | `auto-update` | Automatically update Kader on startup | `false` |
 | `callbacks` | List of user-level callbacks to enable | `[]` |
 | `tools` | List of user-level custom tools to enable | `[]` |
+| `subagents` | List of user-level subagents to enable | `[]` |
 
 Settings are updated automatically when switching models via the `/models` CLI command. You can also edit the file directly.
 
@@ -179,6 +181,24 @@ Settings are updated automatically when switching models via the `/models` CLI c
 - `name`: The filename (without `.py` extension) in `~/.kader/custom/tools/`, or `module.ClassName`
 - `enabled`: `"true"` to enable, `"false"` to disable
 - `agent`: `"planner"`, `"executor"`, or `"both"` (which agents can use the tool)
+
+### Subagents Configuration
+
+User-level subagents in `~/.kader/subagents/` are gated by the `subagents` field in settings:
+
+```json
+{
+  "subagents": [
+    {"name": "code-reviewer", "enabled": "true"},
+    {"name": "research-agent", "enabled": "false"}
+  ]
+}
+```
+
+- `name`: Matches the subagent YAML name field (or the YAML file stem)
+- `enabled`: `"true"` to enable, `"false"` to disable
+- Subagents not listed in settings are **skipped**
+- **Project-level subagents** in `./.kader/subagents/` are always enabled regardless of settings
 
 ### Auto-Update
 
