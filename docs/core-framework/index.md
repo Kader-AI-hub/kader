@@ -78,5 +78,6 @@ conv_mgr.add_message(Message.user("Hello"))
 - [Agents](agents.md) - BaseAgent, ReActAgent, PlanningAgent
 - [Providers](providers.md) - Ollama, Google, Anthropic, Mistral, OpenAI-compatible
 - [Tools](tools.md) - Built-in tools and custom tool creation
+- [Subagents](subagents.md) - Custom sub-agents for the Planner-Executor workflow
 - [Memory](memory.md) - Session management and conversation history
 - [Callbacks](callbacks.md) - Hook system for agent execution lifecycle

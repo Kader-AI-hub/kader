@@ -120,7 +120,7 @@ result = todo.execute(action="read", todo_id="project-tasks")
 
 ## Agent Tool (Sub-agents)
 
-Spawn sub-agents with isolated memory:
+Spawn sub-agents with isolated memory for specific tasks:
 
 ```python
 from kader.tools import AgentTool
@@ -137,6 +137,41 @@ parent_agent = BaseAgent(
 
 response = parent_agent.invoke(
     "Use the agent tool to research Python async patterns"
+)
+```
+
+### AgentTool Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `name` | str | required | Tool name (used as subagent identifier) |
+| `description` | str | `"Execute a specific task using an AI agent"` | Tool description for the LLM |
+| `provider` | BaseLLMProvider | `None` | LLM provider for the subagent |
+| `model_name` | str | `"qwen3-coder:480b-cloud"` | Model for the subagent |
+| `interrupt_before_tool` | bool | `True` | Pause before tool execution for confirmation |
+| `memory_manager_type` | str | `"hierarchical"` | `"hierarchical"` or `"sliding_window"` |
+| `custom_system_prompt` | str | `None` | Custom system prompt instead of default |
+| `custom_tools` | list[BaseTool] | `[]` | Custom tools to add to the subagent |
+
+### Creating Subagents from YAML
+
+The preferred way to create subagents is via YAML files in the subagent directories. See the [Subagents documentation](subagents.md) for detailed information.
+
+### AgentTool.from_subagent_config()
+
+For programmatic subagent creation, use `from_subagent_config()`:
+
+```python
+from kader.tools import AgentTool
+from kader.providers import OllamaProvider
+
+agent_tool = AgentTool.from_subagent_config(
+    name="code-reviewer",
+    objective="Review code for quality issues and bugs",
+    system_prompt="You are an expert code reviewer...",
+    tool_names=["read_file", "grep", "glob"],
+    provider=OllamaProvider(model="llama3.2"),
+    interrupt_before_tool=True,
 )
 ```
 
