@@ -17,6 +17,7 @@ nav:
     - Tools: core-framework/tools.md
     - Memory: core-framework/memory.md
     - Callbacks: core-framework/callbacks.md
+    - Subagents: core-framework/subagents.md
   - CLI Reference: cli/index.md
 
 theme:

@@ -56,6 +56,7 @@ python -m cli
 
 | Command | Description |
 |---------|-------------|
+| `/connect` | Connect a provider by setting its API key |
 | `/help` | Show command reference |
 | `/models` | Show and switch available models |
 | `/clear` | Clear conversation and create new session |
@@ -68,6 +69,16 @@ python -m cli
 | `/update` | Check for updates and update Kader if newer version available |
 | `/exit` | Exit the CLI |
 | `!cmd` | Run terminal command |
+
+## Connect Command
+
+The `/connect` command provides an interactive way to set up provider API keys without manually editing files:
+
+1. **Provider selection** — Shows an interactive list of all supported providers with arrow-key navigation
+2. **API key input** — Prompts you to enter or paste the API key for the selected provider
+3. **Automatic saving** — Saves the key to `~/.kader/.env` and loads it into the current session
+
+After connecting a provider, use `/models` to browse available models from that provider.
 
 ## Keyboard Shortcuts
 
@@ -559,7 +570,7 @@ Use the `/models` command to interactively switch models per agent. Kader suppor
 
 ### Environment Variables
 
-Set API keys for cloud providers:
+API keys can be set interactively using `/connect` in the CLI. Alternatively, set them directly:
 
 ```bash
 # Ollama Cloud (get from https://ollama.com/settings)

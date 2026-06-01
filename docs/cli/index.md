@@ -7,6 +7,7 @@ The Kader CLI is an interactive terminal-based AI coding assistant built with Ri
 ## Features
 
 - **Planner-Executor Workflow** — Intelligent agent with reasoning, planning, and tool execution
+- **Custom Subagents** — YAML-defined specialized agents (code reviewer, researcher, etc.)
 - **Built-in Tools** — File system, command execution, web search
 - **Custom Tools** — User-level and project-level tool extension
 - **Rich Conversation** — Beautiful markdown-rendered chat with styled panels
@@ -33,27 +34,28 @@ uv run python -m cli
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `/help` | Show command reference |
-| `/models` | Switch models per agent (main/sub) |
-| `/clear` | Clear conversation and create new session |
-| `/sessions` | List and load saved sessions |
-| `/skills` | List loaded skills |
-| `/commands` | List special commands |
-| `/cost` | Show usage costs |
-| `/init` | Initialize .kader directory with KADER.md |
-| `/refresh` | Refresh settings and reload callbacks |
-| `/update` | Check for updates and update Kader if newer version available |
-| `/exit` | Exit the CLI |
-| `!cmd` | Run terminal command |
+| Command     | Description                                                   |
+| ----------- | ------------------------------------------------------------- |
+| `/connect`  | Connect a provider by setting its API key                     |
+| `/help`     | Show command reference                                        |
+| `/models`   | Switch models per agent (main/sub)                            |
+| `/clear`    | Clear conversation and create new session                     |
+| `/sessions` | List and load saved sessions                                  |
+| `/skills`   | List loaded skills                                            |
+| `/commands` | List special commands                                         |
+| `/cost`     | Show usage costs                                              |
+| `/init`     | Initialize .kader directory with KADER.md                     |
+| `/refresh`  | Refresh settings and reload callbacks                         |
+| `/update`   | Check for updates and update Kader if newer version available |
+| `/exit`     | Exit the CLI                                                  |
+| `!cmd`      | Run terminal command                                          |
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-|----------|--------|
+| Shortcut | Action                   |
+| -------- | ------------------------ |
 | `Ctrl+C` | Cancel current operation |
-| `Ctrl+D` | Exit the CLI |
+| `Ctrl+D` | Exit the CLI             |
 
 ## Session Management
 
@@ -97,11 +99,71 @@ Use `/skills` to list all available skills.
 name: python-expert
 description: Expert in Python programming and best practices
 ---
-
 # Python Expert Skill
 
 You are an expert Python developer...
 ```
+
+## Subagents
+
+Subagents are specialized agents that the planner can delegate tasks to. They are defined as YAML files and automatically discovered.
+
+### Subagent Locations
+
+- `./.kader/subagents/` — Project-level subagents (always enabled)
+- `~/.kader/subagents/` — User-level subagents (gated by settings.json)
+
+### Subagent File Format
+
+```yaml
+name: code-reviewer
+objective: Use for code review tasks including analyzing code quality,
+  finding bugs, and suggesting improvements
+system_prompt: |
+  You are an expert code reviewer...
+tools:
+  - read_file
+  - grep
+  - glob
+```
+
+### User-Level Subagent Configuration
+
+User-level subagents are controlled via `~/.kader/settings.json`:
+
+```json
+{
+  "subagents": [
+    { "name": "code-reviewer", "enabled": "true" },
+    { "name": "research-agent", "enabled": "false" }
+  ]
+}
+```
+
+### Subagent UI Context
+
+When the planner delegates tasks to an executor or custom subagent, the CLI shows distinct visual indicators to help you understand which agent is executing:
+
+```
+[Kader is thinking... spinner]
+
+[^^] Executor Started
+│ Entering subagent mode — actions are now executed by Executor │
+
+[Executor is working... spinner]
+
+  ⚡ [executor] read_file: Analyzing codebase structure...
+  [+] [executor] read_file completed successfully
+  [✓] Executor finished
+  [+] executor completed successfully
+```
+
+Visual indicators:
+
+- **Entry banner**: Cyan `[^^] Executor Started` panel
+- **Context prefix**: `⚡ [executor] read_file:` in tool messages
+- **Dynamic spinner**: Shows `Executor is working...` instead of generic thinking
+- **Exit footer**: `[✓] Executor finished` on completion
 
 ## Special Commands
 
@@ -117,6 +179,7 @@ Use `/commands` to list all available special commands.
 Commands can be defined in three formats:
 
 **Option 1: Directory format** (with additional files)
+
 ```bash
 mkdir -p ~/.kader/commands/mycommand
 ```
@@ -129,12 +192,14 @@ mkdir -p ~/.kader/commands/mycommand
 ```
 
 **Option 2: Simple file format**
+
 ```bash
 # Just create a .md file directly
 ~/.kader/commands/mycommand.md
 ```
 
 **Option 3: Directory with sub-commands**
+
 ```
 ~/.kader/commands/mycommand/
 ├── CONTENT.md           # Main command (/mycommand)
@@ -150,7 +215,6 @@ mkdir -p ~/.kader/commands/mycommand
 ---
 description: What this command does
 ---
-
 # Command Instructions
 
 Your command agent instructions here...
@@ -159,6 +223,7 @@ Your command agent instructions here...
 ### Using Commands
 
 Execute a command with:
+
 ```
 /mycommand
 /mycommand do something specific
@@ -215,6 +280,7 @@ class MyTool(BaseTool[str]):
 Custom tools can be assigned to specific agents:
 
 **For user-level tools** (in settings.json):
+
 ```json
 {
   "tools": [
@@ -231,6 +297,7 @@ Agent options: `planner` | `executor` | `both` (default)
 
 **For project-level tools** (in tool directory):
 Create an `agent.json` file in the tool directory:
+
 ```json
 {
   "agent": "both"
@@ -248,6 +315,7 @@ Project-level tool at `.kader/custom/tools/datetime_tool/`:
 ```
 
 `agent.json`:
+
 ```json
 {
   "agent": "both"
@@ -263,8 +331,8 @@ User-level tools must be explicitly enabled in `~/.kader/settings.json`:
   "main-agent-provider": "ollama",
   "main-agent-model": "glm-5:cloud",
   "tools": [
-    {"name": "my_tool", "enabled": "true", "agent": "executor"},
-    {"name": "other_tool", "enabled": "false", "agent": "both"}
+    { "name": "my_tool", "enabled": "true", "agent": "executor" },
+    { "name": "other_tool", "enabled": "false", "agent": "both" }
   ]
 }
 ```
@@ -286,11 +354,13 @@ Use `/refresh` to reload settings and tools without restarting the CLI:
 - Re-loads user-level tools based on updated settings
 
 This is useful when:
+
 - Adding new tools to your project
 - Enabling/disabling tools in settings
 - Changing model or provider settings
 
 **Directory with sub-commands:**
+
 ```
 ~/.kader/commands/lint-test/
 ├── CONTENT.md     # Main command: /lint-test
@@ -299,24 +369,25 @@ This is useful when:
 ```
 
 **lint.md:**
+
 ```yaml
 ---
 description: Run only linting
 ---
-
 Run linting only using ruff.
 ```
 
 **test.md:**
+
 ```yaml
 ---
 description: Run only tests
 ---
-
 Run tests only using pytest.
 ```
 
 Usage:
+
 - `/lint-test` - Run full lint and test
 - `/lint-test/lint` - Run linting only
 - `/lint-test/test` - Run tests only
@@ -353,23 +424,23 @@ class MyCallback(ToolCallback):
 
 ### Available Callback Base Classes
 
-| Class | Description |
-|-------|-------------|
-| `BaseCallback` | Abstract base class for all callbacks |
+| Class          | Description                              |
+| -------------- | ---------------------------------------- |
+| `BaseCallback` | Abstract base class for all callbacks    |
 | `ToolCallback` | For tool execution events (before/after) |
-| `LLMCallback` | For LLM invocation events (before/after) |
+| `LLMCallback`  | For LLM invocation events (before/after) |
 
 ### Callback Events
 
-| Event | Description |
-|-------|-------------|
-| `on_tool_before` | Called before a tool is executed |
-| `on_tool_after` | Called after a tool is executed |
-| `on_agent_start` | Called when agent starts execution |
-| `on_agent_end` | Called when agent finishes execution |
-| `on_llm_start` | Called before LLM is invoked |
-| `on_llm_end` | Called after LLM response is received |
-| `on_error` | Called when an error occurs |
+| Event            | Description                           |
+| ---------------- | ------------------------------------- |
+| `on_tool_before` | Called before a tool is executed      |
+| `on_tool_after`  | Called after a tool is executed       |
+| `on_agent_start` | Called when agent starts execution    |
+| `on_agent_end`   | Called when agent finishes execution  |
+| `on_llm_start`   | Called before LLM is invoked          |
+| `on_llm_end`     | Called after LLM response is received |
+| `on_error`       | Called when an error occurs           |
 
 ### User-Level Callbacks Configuration
 
@@ -378,8 +449,8 @@ User-level callbacks must be explicitly enabled in `~/.kader/settings.json`:
 ```json
 {
   "callbacks": [
-    {"name": "my_callback", "enabled": "true"},
-    {"name": "other_callback", "enabled": "false"}
+    { "name": "my_callback", "enabled": "true" },
+    { "name": "other_callback", "enabled": "false" }
   ]
 }
 ```
@@ -391,6 +462,16 @@ Project-level callbacks in `./.kader/custom/callbacks/` are automatically discov
 ### Refresh Command
 
 Use `/refresh` to reload settings and callbacks without restarting the CLI.
+
+## Connect Command
+
+The `/connect` command provides an interactive way to set up provider API keys without manually editing `~/.kader/.env`:
+
+1. **Provider selection** — Shows an interactive radio-button list of all supported providers with arrow-key navigation
+2. **API key input** — Prompts you to enter or paste the API key for the selected provider
+3. **Automatic saving** — Saves the key to `~/.kader/.env` and loads it into the current session
+
+After connecting a provider, use `/models` to browse available models from that provider.
 
 ## Model Selection
 
@@ -424,14 +505,14 @@ Settings update automatically when switching models via `/models`. The `~/.kader
 
 ### Available Settings
 
-| Field | Description | Default |
-|-------|-------------|---------|
-| `main-agent-provider` | LLM provider for the planner agent | `ollama` |
-| `sub-agent-provider` | LLM provider for executor sub-agents | `ollama` |
-| `main-agent-model` | Model name for the planner agent | `glm-5:cloud` |
-| `sub-agent-model` | Model name for executor sub-agents | `glm-5:cloud` |
-| `auto-update` | Automatically update Kader on startup | `false` |
-| `callbacks` | List of user-level callbacks to enable | `[]` |
+| Field                 | Description                            | Default       |
+| --------------------- | -------------------------------------- | ------------- |
+| `main-agent-provider` | LLM provider for the planner agent     | `ollama`      |
+| `sub-agent-provider`  | LLM provider for executor sub-agents   | `ollama`      |
+| `main-agent-model`    | Model name for the planner agent       | `glm-5:cloud` |
+| `sub-agent-model`     | Model name for executor sub-agents     | `glm-5:cloud` |
+| `auto-update`         | Automatically update Kader on startup  | `false`       |
+| `callbacks`           | List of user-level callbacks to enable | `[]`          |
 
 ### Auto-Update
 
@@ -446,21 +527,23 @@ You can also manually check for updates using the `/update` command:
 
 ### Supported Providers
 
-| Provider | Format | Example |
-|----------|--------|---------|
-| Ollama (local) | `ollama:model` | `ollama:llama3` |
-| Ollama (cloud) | `ollama:model:cloud` | `ollama:minimax-m2.5:cloud` |
-| Google Gemini | `google:model` | `google:gemini-2.5-flash` |
-| Mistral | `mistral:model` | `mistral:small-3.1` |
-| Anthropic | `anthropic:model` | `anthropic:claude-3.5-sonnet` |
-| OpenAI | `openai:model` | `openai:gpt-4o` |
-| Moonshot | `moonshot:model` | `moonshot:kimi-k2.5` |
-| Z.ai | `zai:model` | `zai:glm-5` |
-| OpenRouter | `openrouter:model` | `openrouter:anthropic/claude-3.5-sonnet` |
-| OpenCode | `opencode:model` | `opencode:claude-3.5-sonnet` |
-| Groq | `groq:model` | `groq:llama-3.3-70b-versatile` |
+| Provider       | Format               | Example                                  |
+| -------------- | -------------------- | ---------------------------------------- |
+| Ollama (local) | `ollama:model`       | `ollama:llama3`                          |
+| Ollama (cloud) | `ollama:model:cloud` | `ollama:minimax-m2.5:cloud`              |
+| Google Gemini  | `google:model`       | `google:gemini-2.5-flash`                |
+| Mistral        | `mistral:model`      | `mistral:small-3.1`                      |
+| Anthropic      | `anthropic:model`    | `anthropic:claude-3.5-sonnet`            |
+| OpenAI         | `openai:model`       | `openai:gpt-4o`                          |
+| Moonshot       | `moonshot:model`     | `moonshot:kimi-k2.5`                     |
+| Z.ai           | `zai:model`          | `zai:glm-5`                              |
+| OpenRouter     | `openrouter:model`   | `openrouter:anthropic/claude-3.5-sonnet` |
+| OpenCode       | `opencode:model`     | `opencode:claude-3.5-sonnet`             |
+| Groq           | `groq:model`         | `groq:llama-3.3-70b-versatile`           |
 
 ### Setting API Keys
+
+API keys can be set interactively using `/connect` in the CLI. Alternatively, set them directly:
 
 ```bash
 # Ollama Cloud (get from https://ollama.com/settings)

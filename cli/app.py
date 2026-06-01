@@ -39,8 +39,8 @@ from kader.utils import agenerate_session_title
 from kader.utils.todo_metadata import TodoMetadataHandler
 from kader.workflows import PlannerExecutorWorkflow
 
-from .callbacks import load_callbacks_from_settings
-from .commands import InitializeCommand, RefreshCommand, UpdateCommand
+from .callbacks import SubagentTrackerCallback, load_callbacks_from_settings
+from .commands import ConnectCommand, InitializeCommand, RefreshCommand, UpdateCommand
 from .sessions_metadata import aupdate_sessions_metadata
 from .settings import load_settings, save_settings
 from .tools import load_tools_from_settings
@@ -130,6 +130,11 @@ class KaderApp:
         # Spinner state for Live display
         self._spinner_live: Optional[Live] = None
 
+        # Subagent tracking state for UI context
+        self._subagent_depth: int = 0
+        self._subagent_stack: list[str] = []
+        self._subagent_tracker: SubagentTrackerCallback | None = None
+
         self._workflow = self._create_workflow(self._current_model)
 
         # Prompt session for input with autocomplete
@@ -161,8 +166,19 @@ class KaderApp:
         # Load callbacks from settings
         callbacks = load_callbacks_from_settings(self._settings)
 
+        # Add subagent tracker callback for executor/subagent UI context
+        subagent_tracker = SubagentTrackerCallback(
+            on_subagent_start=self._on_subagent_start,
+            on_subagent_end=self._on_subagent_end,
+        )
+        callbacks.append(subagent_tracker)
+        self._subagent_tracker = subagent_tracker
+
         # Load custom tools from settings
         planner_tools, executor_tools = load_tools_from_settings(self._settings)
+
+        # Get enabled subagents from settings for filtering
+        enabled_subagents = self._settings.subagents
 
         workflow = PlannerExecutorWorkflow(
             name="kader_cli",
@@ -180,6 +196,7 @@ class KaderApp:
             callbacks=callbacks,
             planner_tools=planner_tools,
             executor_tools=executor_tools,
+            enabled_subagents=enabled_subagents,
         )
 
         if not self._current_session_id:
@@ -194,7 +211,13 @@ class KaderApp:
     ) -> None:
         """Callback for direct execution tools - called from agent thread."""
         self._stop_spinner()
-        self.console.print(f"  [kader.cyan]⚡ {tool_name}:[/kader.cyan] {message}")
+        if self._subagent_depth > 0 and self._subagent_stack:
+            subagent = self._subagent_stack[-1]
+            self.console.print(
+                f"  [kader.cyan]⚡ [{subagent}] {tool_name}:[/kader.cyan] {message}"
+            )
+        else:
+            self.console.print(f"  [kader.cyan]⚡ {tool_name}:[/kader.cyan] {message}")
 
         if tool_args:
             self._display_tool_content(tool_name, tool_args)
@@ -295,9 +318,13 @@ class KaderApp:
     ) -> None:
         """Callback for tool execution results - called from agent thread."""
         self._stop_spinner()
+        prefix = ""
+        if self._subagent_depth > 0 and self._subagent_stack:
+            subagent = self._subagent_stack[-1]
+            prefix = f"[{subagent}] "
         if success:
             self.console.print(
-                rf"  [kader.green]\[+] {tool_name}[/kader.green] completed successfully"
+                rf"  [kader.green]\[+] {prefix}{tool_name}[/kader.green] completed successfully"
             )
             if tool_name == "todo_tool" and result:
                 try:
@@ -311,7 +338,7 @@ class KaderApp:
         else:
             error_preview = result[:100] + "..." if len(result) > 100 else result
             self.console.print(
-                rf"  [kader.red]\[-] {tool_name}[/kader.red] failed: {error_preview}"
+                rf"  [kader.red]\[-] {prefix}{tool_name}[/kader.red] failed: {error_preview}"
             )
         self._start_spinner()
 
@@ -339,20 +366,36 @@ class KaderApp:
 
         Prompts the user directly via synchronous input since this runs
         in the agent thread while the main loop is blocked on chat input.
+        Shows subagent context when running inside an executor/subagent.
         """
         from prompt_toolkit.shortcuts import choice
         from prompt_toolkit.styles import Style
 
         self._stop_spinner()
         self.console.print()
-        self.console.print(
-            Panel(
-                message,
-                title=r"[kader.yellow]\[?] Tool Confirmation[/kader.yellow]",
-                border_style="yellow",
-                padding=(0, 1),
+
+        if self._subagent_depth > 0 and self._subagent_stack:
+            current_subagent = self._subagent_stack[-1]
+            self.console.print(
+                Panel(
+                    message,
+                    title=(
+                        f"[kader.cyan][^^] {current_subagent.title()}"
+                        r" — Tool Confirmation[/kader.cyan]"
+                    ),
+                    border_style="cyan",
+                    padding=(0, 1),
+                )
             )
-        )
+        else:
+            self.console.print(
+                Panel(
+                    message,
+                    title=r"[kader.yellow]\[?] Tool Confirmation[/kader.yellow]",
+                    border_style="yellow",
+                    padding=(0, 1),
+                )
+            )
 
         custom_style = Style.from_dict(
             {
@@ -398,9 +441,14 @@ class KaderApp:
     # ── Spinner helpers ───────────────────────────────────────────────
 
     def _start_spinner(self) -> None:
-        """Start the thinking spinner."""
+        """Start the thinking spinner with subagent context awareness."""
         if self._spinner_live is None:
-            spinner = Spinner("dots", text="[kader.yellow] Kader is thinking...[/]")
+            if self._subagent_depth > 0 and self._subagent_stack:
+                current_subagent = self._subagent_stack[-1]
+                text = f"[kader.cyan] {current_subagent.title()} is working...[/]"
+            else:
+                text = "[kader.yellow] Kader is thinking...[/]"
+            spinner = Spinner("dots", text=text)
             self._spinner_live = Live(
                 spinner, console=self.console, transient=True, refresh_per_second=10
             )
@@ -411,6 +459,38 @@ class KaderApp:
         if self._spinner_live is not None:
             self._spinner_live.stop()
             self._spinner_live = None
+
+    # ── Subagent context helpers ──────────────────────────────────────
+
+    def _on_subagent_start(self, agent_name: str) -> None:
+        """Called when a subagent (executor/subagent) starts execution."""
+        display_name = agent_name.replace("_worker", "")
+        self._subagent_stack.append(display_name)
+        self._subagent_depth += 1
+        self._stop_spinner()
+        self.console.print()
+        self.console.print(
+            Panel(
+                f"Entering subagent mode — "
+                f"actions are now executed by [bold]{display_name.title()}[/bold]",
+                title=f"[kader.cyan][^^] {display_name.title()} Started[/kader.cyan]",
+                border_style="cyan",
+                padding=(0, 1),
+            )
+        )
+        self._start_spinner()
+
+    def _on_subagent_end(self, agent_name: str) -> None:
+        """Called when a subagent (executor/subagent) finishes execution."""
+        display_name = agent_name.replace("_worker", "")
+        self._stop_spinner()
+        self.console.print(
+            rf"  [kader.green]\[✓][/kader.green] {display_name.title()} finished"
+        )
+        if self._subagent_stack:
+            self._subagent_stack.pop()
+        self._subagent_depth = max(0, self._subagent_depth - 1)
+        self._start_spinner()
 
     # ── Display helpers ──────────────────────────────────────────────
 
@@ -473,6 +553,10 @@ class KaderApp:
         if cmd == "/help":
             self.console.print()
             self.console.print(Markdown(HELP_TEXT))
+
+        elif cmd == "/connect":
+            connect_cmd = ConnectCommand(self)
+            await connect_cmd.execute()
 
         elif cmd == "/models":
             await self._handle_models()
@@ -1215,6 +1299,8 @@ class KaderApp:
 
             self._start_spinner()
 
+            callbacks = [self._subagent_tracker] if self._subagent_tracker else []
+
             agent_tool = AgentTool(
                 name=command_name,
                 description=command.description,
@@ -1225,6 +1311,7 @@ class KaderApp:
                 direct_execution_callback=self._direct_execution_callback,
                 tool_execution_result_callback=self._tool_execution_result_callback,
                 custom_system_prompt=command.content,
+                callbacks=callbacks,
             )
 
             result = await agent_tool.aexecute(

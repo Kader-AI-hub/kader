@@ -115,14 +115,16 @@ uv sync
 Once the CLI is running:
 
 1. Type any question to start chatting with the agent
-2. Use `/help` to see available commands
-3. Use `/models` to switch models per agent (main or sub)
-4. Run terminal commands directly by prefixing with `!` (e.g., `!ls -la`)
+2. Use `/connect` to set up a provider's API key interactively
+3. Use `/help` to see available commands
+4. Use `/models` to switch models per agent (main or sub)
+5. Run terminal commands directly by prefixing with `!` (e.g., `!ls -la`)
 
 ## CLI Commands
 
 | Command | Description |
 |---------|-------------|
+| `/connect` | Connect a provider by setting its API key |
 | `/help` | Show command reference |
 | `/models` | Switch models per agent (main/sub) |
 | `/clear` | Clear conversation |

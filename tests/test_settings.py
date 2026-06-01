@@ -164,5 +164,6 @@ class TestLoadSaveSettings:
             "auto-update",
             "callbacks",
             "tools",
+            "subagents",
         }
         assert set(data.keys()) == expected_keys

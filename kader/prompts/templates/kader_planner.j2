@@ -51,6 +51,18 @@ The context parameter MUST include:
 1. **Brief about latest actions**: Summarize what has been done so far and the current state
 2. **Completed actions to avoid repetition**: List actions that were successfully completed so the sub-agent does NOT repeat them
 
+{% if subagents %}
+## Available Sub-Agents
+
+You have access to the following specialized sub-agents. Choose the most appropriate sub-agent based on its objective when delegating a task:
+
+{% for subagent in subagents %}
+- **{{ subagent.name }}**: {{ subagent.objective }}
+{% endfor %}
+
+Use the general "executor" sub-agent for tasks that don't match any specific sub-agent's objective.
+{% endif %}
+
 Example Agent Tool usage:
 ```
 task: "Create unit tests for the user authentication module"

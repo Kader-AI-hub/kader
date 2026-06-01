@@ -142,9 +142,9 @@ def main():
     # Map commands to functions
     commands = {
         "sync": sync_dependencies,
-        "test": lambda: run_specific_test(sys.argv[2])
-        if len(sys.argv) > 2
-        else run_tests(),
+        "test": lambda: (
+            run_specific_test(sys.argv[2]) if len(sys.argv) > 2 else run_tests()
+        ),
         "lint": lint_code,
         "lint-fix": lint_fix,
         "format": format_code,

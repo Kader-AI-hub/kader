@@ -14,19 +14,9 @@ from typing import Any, ClassVar
 
 from loguru import logger
 
-# Valid provider names (kept in sync with kader.providers.LLMProviderFactory.PROVIDERS)
-VALID_PROVIDERS: set[str] = {
-    "ollama",
-    "google",
-    "mistral",
-    "anthropic",
-    "openai",
-    "moonshot",
-    "zai",
-    "openrouter",
-    "opencode",
-    "groq",
-}
+from kader.providers.llm_factory import LLMProviderFactory
+
+VALID_PROVIDERS: set[str] = set(LLMProviderFactory.PROVIDERS.keys())
 
 # Defaults matching the current DEFAULT_MODEL = "glm-5:cloud" (ollama)
 _DEFAULT_PROVIDER = "ollama"
@@ -42,6 +32,7 @@ _JSON_KEY_MAP: dict[str, str] = {
     "auto-update": "auto_update",
     "callbacks": "callbacks",
     "tools": "tools",
+    "subagents": "subagents",
 }
 
 _FIELD_KEY_MAP: dict[str, str] = {v: k for k, v in _JSON_KEY_MAP.items()}
@@ -61,6 +52,8 @@ class KaderSettings:
                    Format: [{"name": "module.ClassName", "enabled": "true/false"}]
         tools: List of user-level custom tools to enable.
                Format: [{"name": "module.ClassName", "enabled": "true/false", "agent": "planner|executor|both"}]
+        subagents: List of user-level subagents to enable.
+                  Format: [{"name": "subagent-name", "enabled": "true/false"}]
     """
 
     VALID_PROVIDERS: ClassVar[set[str]] = VALID_PROVIDERS
@@ -72,6 +65,7 @@ class KaderSettings:
     auto_update: bool = field(default=False)
     callbacks: list[dict[str, Any]] = field(default_factory=list)
     tools: list[dict[str, Any]] = field(default_factory=list)
+    subagents: list[dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Validate provider values after initialisation."""
@@ -111,6 +105,10 @@ class KaderSettings:
                     if isinstance(value, list):
                         kwargs[field_name] = value
                 elif field_name == "tools":
+                    value = data[json_key]
+                    if isinstance(value, list):
+                        kwargs[field_name] = value
+                elif field_name == "subagents":
                     value = data[json_key]
                     if isinstance(value, list):
                         kwargs[field_name] = value
@@ -218,6 +216,11 @@ def migrate_settings(path: Path | None = None) -> KaderSettings:
     if data.get("_tools_migrated"):
         migrated = True
         del data["_tools_migrated"]
+
+    data = _migrate_user_subagents(data)
+    if data.get("_subagents_migrated"):
+        migrated = True
+        del data["_subagents_migrated"]
 
     if migrated:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -328,5 +331,54 @@ def _migrate_user_tools(data: dict[str, Any]) -> dict[str, Any]:
         data["tools"] = existing_tools + discovered
         data["_tools_migrated"] = True
         logger.info(f"Added {len(discovered)} user tools to settings")
+
+    return data
+
+
+def _migrate_user_subagents(data: dict[str, Any]) -> dict[str, Any]:
+    """Auto-discover user-level subagents and add them to settings.
+
+    Checks ~/.kader/subagents for subagent YAML files and adds any
+    that are not already in the settings subagents list.
+    Creates the directory if it doesn't exist.
+
+    Args:
+        data: Existing settings data dict
+
+    Returns:
+        Updated data dict with discovered subagents
+    """
+    user_subagents_dir = Path.home() / ".kader" / "subagents"
+
+    if not user_subagents_dir.exists():
+        try:
+            user_subagents_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Created user subagents directory: {user_subagents_dir}")
+        except Exception as e:
+            logger.warning(f"Failed to create user subagents directory: {e}")
+            return data
+        return data
+
+    existing_subagents = data.get("subagents", [])
+    existing_names = {
+        sa.get("name") for sa in existing_subagents if isinstance(sa, dict)
+    }
+
+    discovered: list[dict[str, str]] = []
+    for entry in sorted(user_subagents_dir.iterdir()):
+        name = None
+        if entry.is_file() and entry.suffix == ".yaml":
+            name = entry.stem
+        elif entry.is_dir() and (entry / "template.yaml").exists():
+            name = entry.name
+
+        if name and name not in existing_names:
+            discovered.append({"name": name, "enabled": "true"})
+            logger.info(f"Discovered user subagent: {name}")
+
+    if discovered:
+        data["subagents"] = existing_subagents + discovered
+        data["_subagents_migrated"] = True
+        logger.info(f"Added {len(discovered)} user subagents to settings")
 
     return data

@@ -45,6 +45,53 @@ def load_env_file(env_file_path):
         return False
 
 
+def save_env_var(env_file_path: Path, key: str, value: str) -> bool:
+    """
+    Save or update an environment variable in the .env file.
+
+    Reads the existing .env file, updates or appends the given key=value pair,
+    and writes the result back. Also sets the variable in os.environ for the
+    current session.
+
+    Args:
+        env_file_path: Path to the .env file.
+        key: The environment variable name (e.g., "OPENAI_API_KEY").
+        value: The value to set.
+
+    Returns:
+        True if successful, False otherwise.
+    """
+    try:
+        lines: list[str] = []
+        key_found = False
+
+        if env_file_path.exists():
+            with open(env_file_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    stripped = line.strip()
+                    if not stripped or stripped.startswith("#") or "=" not in stripped:
+                        lines.append(line.rstrip("\n"))
+                        continue
+
+                    line_key, _ = stripped.split("=", 1)
+                    if line_key.strip() == key:
+                        lines.append(f"{key}='{value}'")
+                        key_found = True
+                    else:
+                        lines.append(line.rstrip("\n"))
+
+        if not key_found:
+            lines.append(f"{key}='{value}'")
+
+        env_file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+        os.environ[key] = value
+        return True
+    except Exception as e:
+        print(f"Error saving env var {key}: {e}")
+        return False
+
+
 def get_kader_directory():
     """Get the path to the .kader directory in the user's home directory."""
     return Path.home() / ".kader"
@@ -102,6 +149,9 @@ _DEFAULT_SETTINGS = {
     "sub-agent-provider": "ollama",
     "main-agent-model": "glm-5:cloud",
     "sub-agent-model": "glm-5:cloud",
+    "callbacks": [],
+    "tools": [],
+    "subagents": [],
 }
 
 
