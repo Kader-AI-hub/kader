@@ -1,10 +1,12 @@
 """Kader CLI - Typer-based command-line interface.
 
-Provides four commands:
-  kader-cli --help   Show help
-  kader-cli init     Initialize .kader directory and generate KADER.md
-  kader-cli model    Show and switch LLM models
-  kader-cli update   Check for and install updates
+Usage:
+  kader              Launch the interactive Kader AI coding agent
+  kader init         Initialize .kader directory and generate KADER.md
+  kader model        Show and switch LLM models
+  kader update       Check for and install updates
+  kader --version    Show the installed version
+  kader --help       Show this help message
 """
 
 import asyncio
@@ -14,7 +16,6 @@ from pathlib import Path
 
 import typer
 from rich.console import Console
-from rich.markdown import Markdown
 from rich.table import Table
 from rich.theme import Theme
 
@@ -38,9 +39,8 @@ KADER_THEME = Theme(
 )
 
 app = typer.Typer(
-    name="kader-cli",
-    help="Kader CLI - AI coding agent framework.",
-    no_args_is_help=True,
+    name="kader",
+    help="Kader - AI coding agent framework.",
     add_completion=False,
 )
 
@@ -63,7 +63,7 @@ def app_callback(
         help="Show the installed version of Kader.",
     ),
 ) -> None:
-    """Kader CLI - AI coding agent framework."""
+    """Kader - AI coding agent framework."""
     if version:
         try:
             ver = get_version("kader")
@@ -73,21 +73,10 @@ def app_callback(
         raise typer.Exit()
 
     if ctx.invoked_subcommand is None:
-        console.print(Markdown("# Kader CLI"))
-        console.print()
-        console.print(
-            "Run [bold]kader-cli init[/bold] to initialize a .kader directory "
-            "and generate KADER.md."
-        )
-        console.print()
-        console.print("Commands:")
-        console.print()
-        console.print(
-            "  [bold]init[/bold]   Initialize .kader directory and generate KADER.md"
-        )
-        console.print("  [bold]model[/bold]   Show and switch LLM models")
-        console.print("  [bold]update[/bold]  Check for and install updates")
-        console.print()
+        from cli.app import KaderApp
+
+        interactive_app = KaderApp()
+        interactive_app.run()
 
 
 @app.command(name="init")
@@ -322,7 +311,7 @@ def update_cmd() -> None:
 
 
 def main() -> None:
-    """Entry point for the kader-cli command."""
+    """Entry point for the kader command."""
     app()
 
 

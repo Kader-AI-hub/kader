@@ -27,8 +27,7 @@ dependencies = [
 ]
 
 [project.scripts]
-kader = "cli.app:main"
-kader-cli = "kader.cli.app:main"
+kader = "kader.cli.app:main"
 
 [build-system]
 requires = ["hatchling"]
