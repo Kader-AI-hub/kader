@@ -1,13 +1,14 @@
 """Kader CLI - Typer-based command-line interface.
 
 Usage:
-  kader              Launch the interactive Kader AI coding agent
+  kader                Launch the interactive Kader AI coding agent
   kader chat -q "..."  Send a one-shot query to the AI agent (no persistence)
-  kader init         Initialize .kader directory and generate KADER.md
-  kader model        Show and switch LLM models
-  kader update       Check for and install updates
-  kader --version    Show the installed version
-  kader --help       Show this help message
+  kader connect        Connect an LLM provider by setting its API key
+  kader init           Initialize .kader directory and generate KADER.md
+  kader model          Show and switch LLM models
+  kader update         Check for and install updates
+  kader --version      Show the installed version
+  kader --help         Show this help message
 """
 
 import asyncio
@@ -27,7 +28,7 @@ from cli.callbacks import load_callbacks_from_settings
 from cli.commands.update import check_outdated
 from cli.settings import load_settings, save_settings
 from cli.tools import load_tools_from_settings
-from kader.config import initialize_kader_config
+from kader.config import ENV_FILE_PATH, initialize_kader_config, save_env_var
 from kader.prompts.cli_prompts import InitCommandPrompt
 from kader.providers import LLMProviderFactory
 from kader.tools.agent import AgentTool
@@ -422,6 +423,82 @@ def chat_cmd(
         raise typer.Exit(code=1)
     except Exception as e:
         console.print(f"  [kader.red]\u2717[/kader.red] Error: {e}")
+        raise typer.Exit(code=1)
+
+
+@app.command(name="connect")
+def connect_cmd(
+    provider: str | None = typer.Option(
+        None,
+        "--provider",
+        "-p",
+        help="Provider name (e.g., 'openai', 'google', 'anthropic'). Skips selection prompt.",
+    ),
+) -> None:
+    """Connect an LLM provider by setting its API key."""
+    provider_names = list(LLMProviderFactory.PROVIDERS.keys())
+    provider_names_lower = {p.lower(): p for p in provider_names}
+
+    # Step 1: Determine provider
+    if provider and provider.lower() in provider_names_lower:
+        provider_name = provider_names_lower[provider.lower()]
+    else:
+        console.print()
+        console.print("  [bold cyan]Connect a Provider[/bold cyan]")
+        console.print("  [dim]Select a provider below to set its API key.[/dim]")
+        console.print()
+        for i, name in enumerate(provider_names, 1):
+            env_key = LLMProviderFactory.get_provider_env_key(name)
+            console.print(f"  [{i}] {name.title()} \u2014 {env_key}")
+        console.print()
+        try:
+            choice = input("  Provider (number): ").strip()
+            idx = int(choice) - 1
+            if 0 <= idx < len(provider_names):
+                provider_name = provider_names[idx]
+            else:
+                console.print("  [kader.red]\u2717[/kader.red] Invalid selection.")
+                raise typer.Exit(code=1)
+        except (ValueError, EOFError, KeyboardInterrupt):
+            console.print("  [dim]Provider selection cancelled.[/dim]")
+            raise typer.Exit()
+
+    env_key = LLMProviderFactory.get_provider_env_key(provider_name)
+
+    # Step 2: Prompt for API key
+    console.print()
+    console.print(
+        f"  [dim]Enter API key for[/dim] [bold]{provider_name.title()}[/bold]"
+        f" [dim]({env_key})[/dim]:"
+    )
+    try:
+        api_key = input(f"  {env_key}> ").strip()
+    except (EOFError, KeyboardInterrupt):
+        console.print(f"\n  [dim]{provider_name.title()} not connected.[/dim]")
+        raise typer.Exit()
+
+    if not api_key:
+        console.print(
+            f"  [dim]No API key entered. {provider_name.title()} not connected.[/dim]"
+        )
+        raise typer.Exit()
+
+    # Step 3: Save API key
+    success = save_env_var(ENV_FILE_PATH, env_key, api_key)
+    if success:
+        console.print()
+        console.print(
+            f"  [kader.green]\u2713[/kader.green] [bold]{provider_name.title()}[/bold]"
+            " connected successfully!"
+        )
+        console.print(f"  [dim]API key saved to {ENV_FILE_PATH}[/dim]")
+        console.print(
+            "  [dim]Use [/dim][bold]kader model[/bold][dim] to browse available models.[/dim]"
+        )
+    else:
+        console.print(
+            f"  [kader.red]\u2717[/kader.red] Failed to save API key for {provider_name.title()}."
+        )
         raise typer.Exit(code=1)
 
 
