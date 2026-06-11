@@ -2,6 +2,7 @@
 
 Usage:
   kader              Launch the interactive Kader AI coding agent
+  kader chat -q "..."  Send a one-shot query to the AI agent (no persistence)
   kader init         Initialize .kader directory and generate KADER.md
   kader model        Show and switch LLM models
   kader update       Check for and install updates
@@ -16,15 +17,21 @@ from pathlib import Path
 
 import typer
 from rich.console import Console
+from rich.markdown import Markdown
+from rich.panel import Panel
 from rich.table import Table
 from rich.theme import Theme
+from tenacity import RetryError
 
+from cli.callbacks import load_callbacks_from_settings
 from cli.commands.update import check_outdated
 from cli.settings import load_settings, save_settings
+from cli.tools import load_tools_from_settings
 from kader.config import initialize_kader_config
 from kader.prompts.cli_prompts import InitCommandPrompt
 from kader.providers import LLMProviderFactory
 from kader.tools.agent import AgentTool
+from kader.workflows import PlannerExecutorWorkflow
 
 KADER_THEME = Theme(
     {
@@ -308,6 +315,114 @@ def update_cmd() -> None:
             f"  [kader.green]\u2713[/kader.green] "
             f"You are running the latest version v{current_version}"
         )
+
+
+@app.command(name="chat")
+def chat_cmd(
+    query: str = typer.Option(
+        ...,
+        "--query",
+        "-q",
+        help="The query to send to the AI agent.",
+    ),
+) -> None:
+    """Send a one-shot query to the Kader AI agent (no session persistence)."""
+    initialize_kader_config()
+    settings = load_settings()
+    model_string = settings.get_main_model_string()
+    executor_model = settings.get_sub_model_string()
+
+    provider = LLMProviderFactory.create_provider(model_string)
+    executor_provider = LLMProviderFactory.create_provider(executor_model)
+
+    callbacks = load_callbacks_from_settings(settings)
+    planner_tools, executor_tools = load_tools_from_settings(settings)
+    enabled_subagents = settings.subagents
+
+    def _direct_execution_callback(
+        message: str, tool_name: str, tool_args: dict | None = None
+    ) -> None:
+        console.print(f"  [kader.cyan]\u26a1 {tool_name}:[/kader.cyan] {message}")
+
+    def _tool_result_callback(
+        tool_name: str,
+        success: bool,
+        result: str,
+        tool_args: dict | None = None,
+    ) -> None:
+        if success:
+            console.print(f"  [kader.green]\u2713[/kader.green] {tool_name} completed")
+        else:
+            preview = result[:200] + "..." if len(result) > 200 else result
+            console.print(
+                f"  [kader.red]\u2717[/kader.red] {tool_name} failed: {preview}"
+            )
+
+    def _tool_confirmation_callback(message: str) -> tuple[bool, str | None]:
+        """Prompt user for tool approval via stdin."""
+        console.print()
+        console.print(
+            Panel(
+                message,
+                title="[kader.yellow]Tool Confirmation[/kader.yellow]",
+                border_style="yellow",
+                padding=(0, 1),
+            )
+        )
+        try:
+            answer = input("  Approve? (y/n): ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            return (False, None)
+        if answer in ("y", "yes"):
+            console.print("  [kader.green]\u2713[/kader.green] Approved")
+            return (True, None)
+        else:
+            try:
+                reason = input("  Reason for rejection: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                reason = ""
+            return (False, reason or None)
+
+    workflow = PlannerExecutorWorkflow(
+        name="kader_chat",
+        provider=provider,
+        model_name=model_string,
+        interrupt_before_tool=True,
+        tool_confirmation_callback=_tool_confirmation_callback,
+        direct_execution_callback=_direct_execution_callback,
+        tool_execution_result_callback=_tool_result_callback,
+        use_persistence=False,
+        executor_model_name=executor_model,
+        executor_provider=executor_provider,
+        callbacks=callbacks,
+        planner_tools=planner_tools,
+        executor_tools=executor_tools,
+        enabled_subagents=enabled_subagents,
+    )
+
+    console.print(f"  [kader.cyan]\u25b6[/kader.cyan] Processing: {query[:100]}...")
+
+    try:
+        response = asyncio.run(workflow.arun(query))
+
+        console.print()
+        console.print(
+            Panel(
+                Markdown(response),
+                title="[kader.assistant]Kader[/kader.assistant]",
+                border_style="cyan",
+                padding=(0, 1),
+            )
+        )
+    except ConnectionError as e:
+        console.print(f"  [kader.red]\u2717[/kader.red] Connection Error: {e}")
+        raise typer.Exit(code=1)
+    except RetryError as e:
+        console.print(f"  [kader.red]\u2717[/kader.red] Retry Exhausted: {e}")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        console.print(f"  [kader.red]\u2717[/kader.red] Error: {e}")
+        raise typer.Exit(code=1)
 
 
 def main() -> None:
