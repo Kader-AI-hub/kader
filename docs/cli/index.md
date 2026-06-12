@@ -2,7 +2,82 @@
 
 ![Kader CLI](../assets/imgs/kader-cli.png)
 
-The Kader CLI is an interactive terminal-based AI coding assistant built with Rich and prompt_toolkit.
+Kader provides two ways to interact: an **interactive CLI** (full conversational session) and a **core CLI** (one-shot commands).
+
+## Core CLI
+
+The `kader` command-line tool provides one-shot operations without entering an interactive session.
+
+| Command | Description |
+| ------- | ----------- |
+| `kader` | Launch the interactive AI coding agent |
+| `kader chat -q "query"` | Send a one-shot query to the AI agent (no session persistence) |
+| `kader init` | Initialize `.kader` directory and generate KADER.md |
+| `kader model` | Show and switch LLM models (supports `--agent main\|sub`) |
+| `kader update` | Check for and install updates |
+| `kader connect` | Connect an LLM provider by setting its API key (supports `--provider`) |
+| `kader --version` / `-v` | Show the installed version |
+| `kader --help` | Show help with all commands |
+
+### kader chat
+
+Send a one-shot query without session persistence. Tools require confirmation via `y/n` prompts.
+
+```bash
+kader chat -q "Write a hello world function in Python"
+kader chat --query "Create a README.md for this project"
+```
+
+### kader connect
+
+Connect an LLM provider by saving its API key to `~/.kader/.env`.
+
+```bash
+# Interactive provider selection
+kader connect
+
+# Skip selection, go straight to API key prompt
+kader connect --provider openai
+kader connect -p anthropic
+```
+
+### kader model
+
+Switch the LLM model for the main agent (orchestrator) or sub agent (executor).
+
+```bash
+# Interactive agent and model selection
+kader model
+
+# Skip agent selection
+kader model --agent main
+kader model -a sub
+```
+
+### kader update
+
+Check PyPI for a newer version. If available, runs `uv tool upgrade kader`.
+
+```bash
+kader update
+```
+
+### kader init
+
+Analyze the codebase and generate a `KADER.md` file in `.kader/` with build/lint/test commands and code style guidelines.
+
+```bash
+kader init
+```
+
+## Interactive CLI
+
+The interactive CLI provides a full conversational session with tool confirmation, session persistence, and real-time updates.
+
+```bash
+# Launch the interactive session
+kader
+```
 
 ## Features
 
@@ -17,22 +92,7 @@ The Kader CLI is an interactive terminal-based AI coding assistant built with Ri
 - **Persistent Settings** — User preferences stored in `~/.kader/settings.json`
 - **Multi-Provider Support** — Ollama, Google Gemini, Anthropic, Mistral, OpenAI, and more
 
-## Running the CLI
-
-```bash
-# Using uv tool (recommended - installs globally)
-kader
-
-# Or using uv run
-uv run python -m cli
-
-# Or clone and run
-git clone https://github.com/Kader-AI-hub/kader.git
-cd kader
-uv run python -m cli
-```
-
-## Commands
+## Interactive CLI Commands
 
 | Command     | Description                                                   |
 | ----------- | ------------------------------------------------------------- |

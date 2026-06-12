@@ -12,6 +12,13 @@ Kader is an intelligent coding agent designed to assist with software developmen
 - 🖥️ **Interactive CLI** - Modern terminal interface built with Rich & prompt_toolkit:
   - **Beautiful Output**: Markdown rendering, styled panels, and dynamic tables.
   - **Interactive Tools**: Built-in interactive prompts for model selection and tool confirmation.
+- ⚡ **Core CLI** - Lightweight command-line interface for one-shot operations:
+  - `kader` - Launch the interactive AI coding agent
+  - `kader chat -q "..."` - Send a one-shot query (no persistence)
+  - `kader init` - Initialize `.kader` directory and generate KADER.md
+  - `kader model` - Show and switch LLM models
+  - `kader update` - Check for and install updates
+  - `kader connect` - Connect an LLM provider by setting its API key
 - 🛠️ **Tool Integration** - File system, command execution, web search, and more.
 - 🧠 **Memory Management** - State persistence, conversation history, and isolated sub-agent memory.
 - 🔁 **Session Management** - Save and load conversation sessions.
@@ -77,12 +84,19 @@ python -m cli
 ### Running the CLI
 
 ```bash
-# Run the Kader CLI using uv
-uv run python -m cli
+# Launch the interactive Kader CLI
+kader
 
-# Or using pip
+# Or run a one-shot operation
+kader init       # Initialize .kader directory
+kader model      # Show and switch LLM models
+kader update     # Check for and install updates
+kader connect    # Set up provider API keys
+kader chat -q "Write a hello world in Python"  # One-shot query
+
+# Using uv or pip
+uv run python -m cli
 python -m cli
-```
 
 ### First Steps in CLI
 
@@ -150,6 +164,20 @@ You can also manually check for updates using the `/update` command. If a newer 
 
 ## CLI Commands
 
+### Core CLI Commands
+
+| Command | Description |
+| ------- | ----------- |
+| `kader` | Launch the interactive AI coding agent |
+| `kader chat -q "..."` | Send a one-shot query to the AI agent (no persistence) |
+| `kader init` | Initialize .kader directory and generate KADER.md |
+| `kader model` | Show and switch LLM models |
+| `kader update` | Check for and install updates |
+| `kader connect` | Connect an LLM provider by setting its API key |
+| `kader --version` / `-v` | Show the installed version |
+
+### Interactive CLI Commands
+
 | Command     | Description                                                      |
 | ----------- | ---------------------------------------------------------------- |
 | `/connect`  | Connect a provider by setting its API key                        |
@@ -179,12 +207,12 @@ kader/
 ├── cli/                    # Interactive command-line interface
 │   ├── app.py             # Main application entry point (Rich + prompt_toolkit)
 │   ├── utils.py           # Constants and helpers
-│   ├── llm_factory.py     # Provider selection logic (moved to kader/providers/)
 │   ├── __init__.py        # Package exports
 │   └── commands/          # CLI command handlers
 │       ├── base.py        # Base command class
-│       └── initialize.py  # /init command
-│   └── README.md          # CLI documentation
+│       ├── connect.py     # /connect command
+│       ├── initialize.py  # /init command
+│       └── update.py      # /update command
 ├── examples/              # Example implementations
 │   ├── memory_example.py  # Memory management examples
 │   ├── google_example.py  # Google Gemini provider examples
@@ -197,10 +225,12 @@ kader/
 │   └── README.md         # Examples documentation
 ├── kader/                # Core framework
 │   ├── agent/            # Agent implementations (Planning, ReAct)
+│   ├── cli/              # Core CLI (kader command-line interface)
 │   ├── memory/           # Memory management & persistence
 │   ├── providers/        # LLM providers + LLMProviderFactory
 │   ├── tools/            # Tools (File System, Web, Command, AgentTool)
 │   ├── prompts/          # Prompt templates (Jinja2)
+│   ├── workflows/        # Workflow executors (PlannerExecutorWorkflow)
 │   └── utils/            # Utilities (Checkpointer, ContextAggregator)
 ├── pyproject.toml        # Project dependencies
 ├── README.md             # This file
