@@ -107,7 +107,7 @@ def format_plan_display(items: list[dict]) -> None:
 class KaderApp:
     """Main Kader CLI application using Rich."""
 
-    def __init__(self) -> None:
+    def __init__(self, session_id: str | None = None) -> None:
         self.console = Console(theme=KADER_THEME)
         self._is_processing = False
 
@@ -118,6 +118,9 @@ class KaderApp:
         self._current_session_id: str | None = None
         self._running = True
         self._session_title: Optional[str] = None
+
+        # Initial session to load on startup (from kader sessions --resume)
+        self._initial_session_id = session_id
 
         # Session manager
         self._session_manager = AsyncFileSessionManager(
@@ -1470,6 +1473,9 @@ class KaderApp:
         self._show_update_notification()
 
         await aupdate_sessions_metadata()
+
+        if self._initial_session_id:
+            await self._load_session_by_id(self._initial_session_id)
 
         while self._running:
             try:
