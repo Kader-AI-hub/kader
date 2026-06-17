@@ -1,18 +1,21 @@
 """Kader CLI - Typer-based command-line interface.
 
 Usage:
-  kader                Launch the interactive Kader AI coding agent
-  kader chat -q "..."  Send a one-shot query to the AI agent (no persistence)
-  kader connect        Connect an LLM provider by setting its API key
-  kader init           Initialize .kader directory and generate KADER.md
-  kader model          Show and switch LLM models
-  kader update         Check for and install updates
-  kader --version      Show the installed version
-  kader --help         Show this help message
+  kader                    Launch the interactive Kader AI coding agent
+  kader chat -q "..."      Send a one-shot query to the AI agent (no persistence)
+  kader connect            Connect an LLM provider by setting its API key
+  kader init               Initialize .kader directory and generate KADER.md
+  kader model              Show and switch LLM models
+  kader sessions           List saved sessions and resume one
+  kader sessions --resume  Resume a session by ID
+  kader update             Check for and install updates
+  kader --version          Show the installed version
+  kader --help             Show this help message
 """
 
 import asyncio
 import subprocess
+import sys
 from importlib.metadata import version as get_version
 from pathlib import Path
 
@@ -26,6 +29,7 @@ from tenacity import RetryError
 
 from cli.callbacks import load_callbacks_from_settings
 from cli.commands.update import check_outdated
+from cli.sessions_metadata import SessionsMetadataManager
 from cli.settings import load_settings, save_settings
 from cli.tools import load_tools_from_settings
 from kader.config import ENV_FILE_PATH, initialize_kader_config, save_env_var
@@ -46,10 +50,31 @@ KADER_THEME = Theme(
     }
 )
 
-app = typer.Typer(
+WELCOME_BANNER = """\
+[bold magenta]
+  _  __    _    ____  _____ ____
+ | |/ /   / \\  |  _ \\| ____|  _ \\
+ | ' /   / _ \\ | | | |  _| | |_) |
+ | . \\  / ___ \\| |_| | |___|  _ <
+ |_|\\_\\/_/   \\_\\____/|_____|_| \\_\\
+[/bold magenta]"""
+
+
+class BannerTyper(typer.Typer):
+    """Typer app that prints the Kader welcome banner before any --help output."""
+
+    def __call__(self, *args: object, **kwargs: object) -> None:
+        if "--help" in sys.argv or "-h" in sys.argv:
+            console.print(WELCOME_BANNER)
+            console.print()
+        super().__call__(*args, **kwargs)
+
+
+app = BannerTyper(
     name="kader",
     help="Kader - AI coding agent framework.",
     add_completion=False,
+    context_settings={"help_option_names": ["--help", "-h"]},
 )
 
 console = Console(theme=KADER_THEME)
@@ -499,6 +524,134 @@ def connect_cmd(
         console.print(
             f"  [kader.red]\u2717[/kader.red] Failed to save API key for {provider_name.title()}."
         )
+        raise typer.Exit(code=1)
+
+
+@app.command(name="sessions")
+def sessions_cmd(
+    resume: str | None = typer.Option(
+        None,
+        "--resume",
+        "-r",
+        help="Resume a specific session by ID (skips selection prompt).",
+    ),
+) -> None:
+    """List saved sessions and resume a session."""
+    import json
+
+    from cli.app import KaderApp
+
+    manager = SessionsMetadataManager()
+    memory_dir = Path.home() / ".kader" / "memory"
+    lock_file = memory_dir / "sessions.json.lock"
+
+    if resume:
+        if not lock_file.exists():
+            manager.update()
+
+        try:
+            metadata = json.loads(lock_file.read_text())
+        except (json.JSONDecodeError, OSError):
+            console.print(
+                "  [kader.red]\u2717[/kader.red] "
+                f"Session `{resume}` not found \u2014 no valid metadata."
+            )
+            raise typer.Exit(code=1)
+
+        if resume not in metadata:
+            console.print(
+                f"  [kader.red]\u2717[/kader.red] Session `{resume}` not found."
+            )
+            raise typer.Exit(code=1)
+
+        console.print(
+            f"  [kader.cyan]\u25b6[/kader.cyan] Resuming session `{resume}`..."
+        )
+        interactive_app = KaderApp(session_id=resume)
+        interactive_app.run()
+        return
+
+    if not lock_file.exists():
+        manager.update()
+
+    if not lock_file.exists():
+        console.print(
+            "  [dim]No saved sessions found. Start a conversation to create one.[/dim]"
+        )
+        return
+
+    try:
+        metadata = json.loads(lock_file.read_text())
+    except (json.JSONDecodeError, OSError):
+        console.print(
+            "  [kader.red]\u2717[/kader.red] Failed to read session metadata."
+        )
+        raise typer.Exit(code=1)
+
+    if not metadata:
+        console.print(
+            "  [dim]No saved sessions found. Start a conversation to create one.[/dim]"
+        )
+        return
+
+    sorted_sessions = sorted(
+        metadata.items(),
+        key=lambda x: x[1].get("creation-date", ""),
+        reverse=True,
+    )
+
+    table = Table(
+        title="[kader.cyan]Saved Sessions[/kader.cyan]",
+        border_style="cyan",
+        show_header=True,
+        header_style="bold cyan",
+        padding=(0, 1),
+    )
+    table.add_column("#", style="dim", width=4, justify="right")
+    table.add_column("Title", style="white")
+    table.add_column("Date", style="dim")
+    table.add_column("Session ID", style="dim")
+
+    session_ids: list[str] = []
+    for i, (session_id, data) in enumerate(sorted_sessions, 1):
+        title = data.get("session-title") or session_id
+        created = data.get("creation-date", "")[:10]
+        if not created:
+            created = data.get("update-date", "")[:10]
+        table.add_row(str(i), title, created, session_id)
+        session_ids.append(session_id)
+
+    console.print()
+    console.print(table)
+    console.print(
+        "  [dim]Enter session number to resume, or press Enter to cancel:[/dim]"
+    )
+
+    try:
+        choice = input("  sessions> ").strip()
+    except (EOFError, KeyboardInterrupt):
+        console.print()
+        console.print("  [dim]Session selection cancelled.[/dim]")
+        return
+
+    if not choice:
+        console.print("  [dim]Session selection cancelled.[/dim]")
+        return
+
+    try:
+        idx = int(choice) - 1
+        if 0 <= idx < len(session_ids):
+            selected_id = session_ids[idx]
+            console.print(
+                f"  [kader.cyan]\u25b6[/kader.cyan] Resuming session `{selected_id}`..."
+            )
+            interactive_app = KaderApp(session_id=selected_id)
+            interactive_app.run()
+        else:
+            console.print("  [kader.red]\u2717[/kader.red] Invalid selection.")
+            raise typer.Exit(code=1)
+    except ValueError:
+        console.print("  [kader.red]\u2717[/kader.red] Invalid input.")
         raise typer.Exit(code=1)
 
 
