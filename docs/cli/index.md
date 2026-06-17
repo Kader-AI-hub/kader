@@ -14,6 +14,7 @@ The `kader` command-line tool provides one-shot operations without entering an i
 | `kader chat -q "query"` | Send a one-shot query to the AI agent (no session persistence) |
 | `kader init` | Initialize `.kader` directory and generate KADER.md |
 | `kader model` | Show and switch LLM models (supports `--agent main\|sub`) |
+| `kader sessions` | List saved sessions and resume one (supports `--resume <id>`) |
 | `kader update` | Check for and install updates |
 | `kader connect` | Connect an LLM provider by setting its API key (supports `--provider`) |
 | `kader --version` / `-v` | Show the installed version |
@@ -69,6 +70,21 @@ Analyze the codebase and generate a `KADER.md` file in `.kader/` with build/lint
 ```bash
 kader init
 ```
+
+### kader sessions
+
+List saved conversation sessions and optionally resume one into the interactive app.
+
+```bash
+# Interactive — list sessions and select one to resume
+kader sessions
+
+# Direct — resume a specific session by ID
+kader sessions --resume <session-id>
+kader sessions -r <session-id>
+```
+
+Sessions are read from `~/.kader/memory/sessions.json.lock` and displayed in a Rich table sorted by creation date (newest first). Selecting a session launches the interactive Kader CLI with that session loaded.
 
 ## Interactive CLI
 

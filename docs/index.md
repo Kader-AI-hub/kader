@@ -13,7 +13,7 @@ Kader is an intelligent coding agent designed to assist with software developmen
   - **Mistral**: Mistral AI models for cloud inference.
   - **OpenAI-Compatible**: Connect to OpenAI, Groq, OpenRouter, Moonshot AI, and more.
 - **Interactive CLI** - Modern terminal interface built with Rich & prompt_toolkit
-- **Core CLI** - Lightweight command-line tool for one-shot operations (`chat`, `init`, `model`, `update`, `connect`)
+- **Core CLI** - Lightweight command-line tool for one-shot operations (`chat`, `init`, `model`, `sessions`, `update`, `connect`)
 - **Tool Integration** - File system, command execution, web search, and more
 - **Memory Management** - State persistence, conversation history, and isolated sub-agent memory
 - **Callback System** - Hook into agent execution for logging, monitoring, and modification
@@ -40,6 +40,7 @@ kader
 kader chat -q "Write a hello world in Python"
 kader init
 kader model
+kader sessions
 kader update
 kader connect
 

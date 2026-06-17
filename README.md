@@ -17,6 +17,7 @@ Kader is an intelligent coding agent designed to assist with software developmen
   - `kader chat -q "..."` - Send a one-shot query (no persistence)
   - `kader init` - Initialize `.kader` directory and generate KADER.md
   - `kader model` - Show and switch LLM models
+  - `kader sessions` - List saved sessions and resume one
   - `kader update` - Check for and install updates
   - `kader connect` - Connect an LLM provider by setting its API key
 - 🛠️ **Tool Integration** - File system, command execution, web search, and more.
@@ -90,6 +91,7 @@ kader
 # Or run a one-shot operation
 kader init       # Initialize .kader directory
 kader model      # Show and switch LLM models
+kader sessions   # List saved sessions and resume one
 kader update     # Check for and install updates
 kader connect    # Set up provider API keys
 kader chat -q "Write a hello world in Python"  # One-shot query
@@ -172,6 +174,7 @@ You can also manually check for updates using the `/update` command. If a newer 
 | `kader chat -q "..."` | Send a one-shot query to the AI agent (no persistence) |
 | `kader init` | Initialize .kader directory and generate KADER.md |
 | `kader model` | Show and switch LLM models |
+| `kader sessions` | List saved sessions and resume a session |
 | `kader update` | Check for and install updates |
 | `kader connect` | Connect an LLM provider by setting its API key |
 | `kader --version` / `-v` | Show the installed version |

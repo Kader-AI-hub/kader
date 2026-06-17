@@ -15,7 +15,7 @@ Kader is a flexible framework that enables developers to create AI agents capabl
 - **Callback System**: Hook into agent execution for logging, monitoring, and argument/result transformation
 - **Workflows**: Planner-Executor pattern for complex multi-step tasks
 - **Session Persistence**: Save and resume agent conversations
-- **Core CLI**: Built-in command-line interface (`kader` command) for one-shot operations like `chat`, `init`, `model`, `update`, and `connect`
+- **Core CLI**: Built-in command-line interface (`kader` command) for one-shot operations like `chat`, `init`, `model`, `sessions`, `update`, and `connect`
 
 ## Installation
 
