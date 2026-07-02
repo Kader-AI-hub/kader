@@ -319,6 +319,16 @@ class EditFileTool(BaseTool[dict[str, Any]]):
                     required=False,
                     default=False,
                 ),
+                ParameterSchema(
+                    name="expected_mtime",
+                    type="integer",
+                    description=(
+                        "Optional st_mtime_ns token from a previous read. "
+                        "Rejects the edit if the file has been modified since then."
+                    ),
+                    required=False,
+                    default=None,
+                ),
             ],
             category=ToolCategory.FILE_SYSTEM,
         )
@@ -333,6 +343,7 @@ class EditFileTool(BaseTool[dict[str, Any]]):
         old_string: str,
         new_string: str,
         replace_all: bool = False,
+        expected_mtime: int | None = None,
     ) -> dict[str, Any]:
         """
         Edit a file by replacing string occurrences.
@@ -342,11 +353,18 @@ class EditFileTool(BaseTool[dict[str, Any]]):
             old_string: String to replace
             new_string: Replacement string
             replace_all: Whether to replace all occurrences
+            expected_mtime: Optional st_mtime_ns token for freshness check
 
         Returns:
             Dictionary with operation result
         """
-        result = self._backend.edit(path, old_string, new_string, replace_all)
+        result = self._backend.edit(
+            path,
+            old_string,
+            new_string,
+            replace_all,
+            expected_mtime=expected_mtime,
+        )
 
         if result.error:
             return {"error": result.error}
@@ -363,10 +381,11 @@ class EditFileTool(BaseTool[dict[str, Any]]):
         old_string: str,
         new_string: str,
         replace_all: bool = False,
+        expected_mtime: int | None = None,
     ) -> dict[str, Any]:
         """Async version of execute."""
         return await asyncio.to_thread(
-            self.execute, path, old_string, new_string, replace_all
+            self.execute, path, old_string, new_string, replace_all, expected_mtime
         )
 
     def get_interruption_message(self, path: str, **kwargs) -> str:

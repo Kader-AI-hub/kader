@@ -7,12 +7,18 @@ Security and search upgrades:
   and optional glob include filtering, while preserving virtual path behavior
 """
 
+import contextlib
 import json
 import os
 import re
 import subprocess
 from datetime import datetime
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None  # type: ignore
 
 import wcmatch.glob as wcglob
 
@@ -45,6 +51,8 @@ class FilesystemBackend(BackendProtocol):
         root_dir: str | Path | None = None,
         virtual_mode: bool = False,
         max_file_size_mb: int = 10,
+        use_file_lock: bool = True,
+        include_mtime: bool = False,
     ) -> None:
         """Initialize filesystem backend.
 
@@ -52,10 +60,18 @@ class FilesystemBackend(BackendProtocol):
             root_dir: Optional root directory for file operations. If provided,
                      all file paths will be resolved relative to this directory.
                      If not provided, uses the current working directory.
+            virtual_mode: Whether to treat paths as virtual absolute paths under cwd.
+            max_file_size_mb: Maximum file size in MB for search/read guards.
+            use_file_lock: Acquire an advisory file lock around edit() to serialize
+                concurrent modifications. Ignored on platforms without fcntl.
+            include_mtime: When True, read() appends a footer containing the file's
+                st_mtime_ns token, enabling edit() freshness checks.
         """
         self.cwd = Path(root_dir).resolve() if root_dir else Path.cwd()
         self.virtual_mode = virtual_mode
         self.max_file_size_bytes = max_file_size_mb * 1024 * 1024
+        self.use_file_lock = use_file_lock and fcntl is not None
+        self.include_mtime = include_mtime
 
     def _resolve_path(self, key: str) -> Path:
         """Resolve a file path with security checks.
@@ -88,6 +104,107 @@ class FilesystemBackend(BackendProtocol):
         if path.is_absolute():
             return path
         return (self.cwd / path).resolve()
+
+    @contextlib.contextmanager
+    def _file_lock(self, resolved_path: Path):
+        """Acquire an advisory exclusive lock for a file path.
+
+        The lock is implemented with a sibling lock file so that O_NOFOLLOW
+        semantics on the target are not compromised. The lock file is removed
+        after the lock is released to avoid leaving stale files in the workspace.
+        On platforms without fcntl or when use_file_lock is False, this is a
+        no-op context manager.
+        """
+        if not self.use_file_lock or fcntl is None:
+            yield
+            return
+
+        lock_path = resolved_path.parent / f".kader-lock.{resolved_path.name}"
+        fd = -1
+        try:
+            flags = os.O_RDWR | os.O_CREAT
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            fd = os.open(lock_path, flags, 0o644)
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            yield
+        finally:
+            if fd >= 0:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                except OSError:
+                    pass
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+            try:
+                lock_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+    def _atomic_write(
+        self,
+        resolved_path: Path,
+        content: str | bytes,
+        mode: str = "w",
+        encoding: str = "utf-8",
+    ) -> None:
+        """Atomically write content to resolved_path.
+
+        Writes to a sibling temp file, fsyncs data and parent directory, then
+        uses os.replace() so readers always see either the old or the new
+        content, never a partial write. Temp files are cleaned up on failure.
+        """
+        tmp_path = resolved_path.with_suffix(resolved_path.suffix + ".kader-tmp")
+        try:
+            flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            fd = os.open(tmp_path, flags, 0o644)
+            try:
+                if "b" in mode:
+                    fobj = os.fdopen(fd, mode)
+                else:
+                    fobj = os.fdopen(fd, mode, encoding=encoding)
+                with fobj as f:
+                    f.write(content)
+                    f.flush()
+                    os.fsync(fd)
+            except Exception:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+                raise
+
+            # fsync parent directory to ensure the replacement is durable
+            try:
+                parent_fd = os.open(
+                    resolved_path.parent,
+                    os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+                )
+                try:
+                    os.fsync(parent_fd)
+                finally:
+                    os.close(parent_fd)
+            except OSError:
+                # Best-effort durability on platforms where fsync on a dir fails
+                pass
+
+            os.replace(tmp_path, resolved_path)
+        except OSError:
+            # Best-effort cleanup; re-raise so caller can report the error
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise
+        finally:
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     def ls_info(self, path: str) -> list[FileInfo]:
         """List files and directories in the specified directory (non-recursive).
@@ -232,6 +349,13 @@ class FilesystemBackend(BackendProtocol):
             return f"Error: File '{file_path}' not found"
 
         try:
+            mtime_ns: int | None = None
+            if self.include_mtime:
+                try:
+                    mtime_ns = resolved_path.stat().st_mtime_ns
+                except OSError:
+                    mtime_ns = None
+
             # Open with O_NOFOLLOW where available to avoid symlink traversal
             fd = os.open(resolved_path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
             with os.fdopen(fd, "r", encoding="utf-8") as f:
@@ -239,6 +363,8 @@ class FilesystemBackend(BackendProtocol):
 
             empty_msg = check_empty_content(content)
             if empty_msg:
+                if self.include_mtime and mtime_ns is not None:
+                    return f"{empty_msg}\n# kader-mtime: {mtime_ns}"
                 return empty_msg
 
             lines = content.splitlines()
@@ -249,9 +375,12 @@ class FilesystemBackend(BackendProtocol):
                 return f"Error: Line offset {offset} exceeds file length ({len(lines)} lines)"
 
             selected_lines = lines[start_idx:end_idx]
-            return format_content_with_line_numbers(
+            result = format_content_with_line_numbers(
                 selected_lines, start_line=start_idx + 1
             )
+            if self.include_mtime and mtime_ns is not None:
+                result = f"{result}\n# kader-mtime: {mtime_ns}"
+            return result
         except (OSError, UnicodeDecodeError) as e:
             return f"Error reading file '{file_path}': {e}"
 
@@ -274,14 +403,7 @@ class FilesystemBackend(BackendProtocol):
             # Create parent directories if needed
             resolved_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Prefer O_NOFOLLOW to avoid writing through symlinks
-            flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-            if hasattr(os, "O_NOFOLLOW"):
-                flags |= os.O_NOFOLLOW
-            fd = os.open(resolved_path, flags, 0o644)
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(content)
-
+            self._atomic_write(resolved_path, content, mode="w")
             return WriteResult(path=file_path, files_update=None)
         except (OSError, UnicodeEncodeError) as e:
             return WriteResult(error=f"Error writing file '{file_path}': {e}")
@@ -292,9 +414,20 @@ class FilesystemBackend(BackendProtocol):
         old_string: str,
         new_string: str,
         replace_all: bool = False,
+        expected_mtime: int | None = None,
     ) -> EditResult:
         """Edit a file by replacing string occurrences.
-        Returns EditResult. External storage sets files_update=None.
+
+        Args:
+            file_path: Path to the file to edit.
+            old_string: Exact string to search for and replace.
+            new_string: Replacement string.
+            replace_all: If True, replace all occurrences.
+            expected_mtime: Optional st_mtime_ns token from a previous read.
+                If the file's current mtime differs, the edit is rejected as stale.
+
+        Returns:
+            EditResult. External storage sets files_update=None.
         """
         resolved_path = self._resolve_path(file_path)
 
@@ -302,31 +435,35 @@ class FilesystemBackend(BackendProtocol):
             return EditResult(error=f"Error: File '{file_path}' not found")
 
         try:
-            # Read securely
-            fd = os.open(resolved_path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
-            with os.fdopen(fd, "r", encoding="utf-8") as f:
-                content = f.read()
+            with self._file_lock(resolved_path):
+                # Read securely
+                fd = os.open(resolved_path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+                with os.fdopen(fd, "r", encoding="utf-8") as f:
+                    content = f.read()
 
-            result = perform_string_replacement(
-                content, old_string, new_string, replace_all
-            )
+                if expected_mtime is not None:
+                    current_mtime = resolved_path.stat().st_mtime_ns
+                    if current_mtime != expected_mtime:
+                        return EditResult(
+                            error=(
+                                f"stale_file: file modified since last read "
+                                f"(expected {expected_mtime}, got {current_mtime})"
+                            )
+                        )
 
-            if isinstance(result, str):
-                return EditResult(error=result)
+                result = perform_string_replacement(
+                    content, old_string, new_string, replace_all
+                )
 
-            new_content, occurrences = result
+                if isinstance(result, str):
+                    return EditResult(error=result)
 
-            # Write securely
-            flags = os.O_WRONLY | os.O_TRUNC
-            if hasattr(os, "O_NOFOLLOW"):
-                flags |= os.O_NOFOLLOW
-            fd = os.open(resolved_path, flags)
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(new_content)
+                new_content, occurrences = result
+                self._atomic_write(resolved_path, new_content, mode="w")
 
-            return EditResult(
-                path=file_path, files_update=None, occurrences=int(occurrences)
-            )
+                return EditResult(
+                    path=file_path, files_update=None, occurrences=int(occurrences)
+                )
         except (OSError, UnicodeDecodeError, UnicodeEncodeError) as e:
             return EditResult(error=f"Error editing file '{file_path}': {e}")
 
@@ -534,12 +671,7 @@ class FilesystemBackend(BackendProtocol):
                 # Create parent directories if needed
                 resolved_path.parent.mkdir(parents=True, exist_ok=True)
 
-                flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-                if hasattr(os, "O_NOFOLLOW"):
-                    flags |= os.O_NOFOLLOW
-                fd = os.open(resolved_path, flags, 0o644)
-                with os.fdopen(fd, "wb") as f:
-                    f.write(content)
+                self._atomic_write(resolved_path, content, mode="wb")
 
                 responses.append(FileUploadResponse(path=path, error=None))
             except FileNotFoundError:
