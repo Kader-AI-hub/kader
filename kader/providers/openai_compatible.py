@@ -7,6 +7,7 @@ OpenCode Go, Groq, and other providers that implement the OpenAI API specificati
 """
 
 import os
+import uuid
 from dataclasses import dataclass
 from typing import AsyncIterator, Iterator
 
@@ -54,6 +55,16 @@ class OpenAIProviderConfig:
     timeout: float | None = 60.0
     max_retries: int = 3
     default_headers: dict[str, str] | None = None
+
+
+# Providers that require an x-opencode-session header for every request.
+# OpenCode began enforcing this on 2026-09-06 — see https://github.com/Kader-AI-hub/kader/issues/112
+OPENCODE_SESSION_PROVIDERS = ("opencode", "opencode_go")
+
+
+def _generate_session_id() -> str:
+    """Generate a stable session id for OpenCode session attribution."""
+    return f"ses_{uuid.uuid4().hex}"
 
 
 # Pricing data for OpenAI models (per 1M tokens, in USD)
@@ -730,8 +741,17 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             client_kwargs["base_url"] = provider_config.base_url
         if provider_config.timeout:
             client_kwargs["timeout"] = provider_config.timeout
-        if provider_config.default_headers:
-            client_kwargs["default_headers"] = provider_config.default_headers
+
+        opencode_headers: dict[str, str] = {}
+        if self._detected_provider in OPENCODE_SESSION_PROVIDERS:
+            # OpenCode requires an x-opencode-session header (stable id per
+            # conversation). Generate one per provider instance so all requests
+            # from the same agent run share the same session id.
+            opencode_headers["x-opencode-session"] = _generate_session_id()
+            opencode_headers["x-opencode-client"] = "kader"
+        if opencode_headers or provider_config.default_headers:
+            merged = opencode_headers | (provider_config.default_headers or {})
+            client_kwargs["default_headers"] = merged
 
         self._client = OpenAI(**client_kwargs)
         self._async_client = AsyncOpenAI(**client_kwargs)
