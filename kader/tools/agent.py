@@ -220,6 +220,7 @@ class AgentTool(BaseTool[str]):
                 ),
             ],
             category=ToolCategory.UTILITY,
+            direct_execution=True,
         )
         self._provider = provider
         self._model_name = model_name

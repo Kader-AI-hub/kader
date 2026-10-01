@@ -461,6 +461,13 @@ class BaseAgent:
             fn_info = tool_call_dict
         tool_name = fn_info.get("name", "")
 
+        # Tools flagged as direct_execution skip confirmation (e.g. TodoTool,
+        # AgentTool/executor) - applies regardless of the hardcoded allowlist
+        tool = self._tool_registry.get(tool_name) if self._tool_registry else None
+        if tool is not None and tool.direct_execution:
+            self._handle_direct_execution(display_str, tool_name, tool_call_dict)
+            return True, None
+
         # List of tools to execute directly (show message but don't ask for confirmation)
         direct_execution_tools = {
             "read_file",
@@ -473,23 +480,12 @@ class BaseAgent:
             "web_search",
             "web_fetch",
             "skills_tool",
+            "todo_tool",
         }
 
         # Direct execution for specific tools - applies regardless of callback
         if tool_name in direct_execution_tools:
-            # Extract tool arguments for display purposes
-            fn_info = tool_call_dict.get("function", {})
-            raw_args = fn_info.get("arguments", {})
-            if isinstance(raw_args, str):
-                tool_args = json.loads(raw_args) if raw_args else {}
-            else:
-                tool_args = raw_args
-            # Notify via direct_execution_callback if available (for CLI/TUI display)
-            if self.direct_execution_callback:
-                self.direct_execution_callback(display_str, tool_name, tool_args)
-            else:
-                # Fallback: print to console
-                print(display_str)
+            self._handle_direct_execution(display_str, tool_name, tool_call_dict)
             return True, None
 
         # Use callback if provided (e.g., for GUI/TUI)
@@ -511,6 +507,24 @@ class BaseAgent:
                 return False, elaboration if elaboration else None
             else:
                 print("Please enter 'yes' or 'no'.")
+
+    def _handle_direct_execution(
+        self, display_str: str, tool_name: str, tool_call_dict: dict
+    ) -> None:
+        """Handle direct (no-confirmation) tool execution display."""
+        # Extract tool arguments for display purposes
+        fn_info = tool_call_dict.get("function", {})
+        raw_args = fn_info.get("arguments", {})
+        if isinstance(raw_args, str):
+            tool_args = json.loads(raw_args) if raw_args else {}
+        else:
+            tool_args = raw_args
+        # Notify via direct_execution_callback if available (for CLI/TUI display)
+        if self.direct_execution_callback:
+            self.direct_execution_callback(display_str, tool_name, tool_args)
+        else:
+            # Fallback: print to console
+            print(display_str)
 
     async def _aconfirm_tool_execution(
         self, tool_call_dict: dict, llm_content: Optional[str] = None

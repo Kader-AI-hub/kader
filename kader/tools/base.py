@@ -422,16 +422,20 @@ class BaseTool(ABC, Generic[T]):
         parameters: list[ParameterSchema] | None = None,
         category: ToolCategory = ToolCategory.CUSTOM,
         version: str = "1.0.0",
+        direct_execution: bool = False,
     ) -> None:
         """
         Initialize the tool.
 
         Args:
-            name: Unique name for the tool (used in function calls)
+            name: Unique tool name (used in function calls)
             description: Human-readable description of what the tool does
             parameters: List of parameter schemas
             category: Category for organization
             version: Version string for the tool
+            direct_execution: If True, the tool executes without user
+                confirmation even when the agent runs with
+                interrupt_before_tool enabled.
         """
         self._schema = ToolSchema(
             name=name,
@@ -440,6 +444,9 @@ class BaseTool(ABC, Generic[T]):
             category=category,
             version=version,
         )
+
+        # Whether the tool can be executed directly without confirmation
+        self._direct_execution = direct_execution
 
         # Execution tracking
         self._execution_count = 0
@@ -472,6 +479,11 @@ class BaseTool(ABC, Generic[T]):
     def schema(self) -> ToolSchema:
         """Get the full tool schema."""
         return self._schema
+
+    @property
+    def direct_execution(self) -> bool:
+        """Whether the tool can be executed directly without user confirmation."""
+        return self._direct_execution
 
     @property
     def execution_count(self) -> int:
