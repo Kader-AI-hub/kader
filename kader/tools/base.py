@@ -444,7 +444,7 @@ class BaseTool(ABC, Generic[T]):
             category=category,
             version=version,
         )
-        
+
         # Whether the tool can be executed directly without confirmation
         self._direct_execution = direct_execution
 
