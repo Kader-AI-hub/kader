@@ -60,6 +60,7 @@ class TodoTool(BaseTool[str]):
                 "If you need to change tasks, delete and recreate the list."
             ),
             category=ToolCategory.UTILITY,
+            direct_execution=True,
             parameters=[
                 ParameterSchema(
                     name="action",
