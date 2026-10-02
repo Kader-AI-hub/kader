@@ -8,9 +8,6 @@ wheels/
 .pytest_cache/
 .ruff_cache/
 
-# graphify files
-graphify-out/cost.json
-
 # Virtual environments
 .venv
 
@@ -21,8 +18,3 @@ graphify-out/cost.json
 # secret files
 .env
 
-# optimization
-optimizers/
-
-# MkDocs output
-site/
