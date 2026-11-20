@@ -86,11 +86,20 @@ class FilesystemBackend(BackendProtocol):
                      If not provided, uses the current working directory.
             virtual_mode: Whether to treat paths as virtual absolute paths under cwd.
             max_file_size_mb: Maximum file size in MB for search/read guards.
-            use_file_lock: Acquire an advisory file lock around edit() to serialize
-                concurrent modifications. Ignored on platforms without fcntl.
+            use_file_lock: Acquire a lock around edit() to serialize concurrent
+                modifications: a process-local thread lock plus a cross-process
+                lock (fcntl on POSIX, msvcrt on Windows). On a platform with
+                neither, edit() fails with RuntimeError rather than run unlocked.
             include_mtime: When True, read() appends a footer containing the file's
                 st_mtime_ns token, enabling edit() freshness checks.
-            durable_writes: When True, fsync file data and parent directories after writes.
+            durable_writes: When True, fsync the written file before replacing
+                the target, and attempt to fsync the parent directory after.
+                This is BEST-EFFORT crash durability, not a guarantee: the
+                directory sync is skipped on Windows (no directory descriptors)
+                and on filesystems that report it unsupported (EINVAL, ENOTSUP,
+                EOPNOTSUPP, ENOSYS), and in those cases the rename's survival of
+                a crash is unconfirmed. Only a directory sync that is attempted
+                and FAILS is reported (DurabilityUnconfirmedError).
         """
         self.cwd = Path(root_dir).resolve() if root_dir else Path.cwd()
         self.virtual_mode = virtual_mode
@@ -158,6 +167,8 @@ class FilesystemBackend(BackendProtocol):
 
         lock_path = resolved_path.parent / f".kader-lock.{resolved_path.name}"
         fd = -1
+        locked = False
+        body_error: BaseException | None = None
         try:
             if fcntl is not None:
                 if not hasattr(os, "O_NOFOLLOW"):
@@ -172,6 +183,7 @@ class FilesystemBackend(BackendProtocol):
                 if not stat.S_ISREG(lock_stat.st_mode):
                     raise RuntimeError("Lock path is not a regular file")
                 fcntl.flock(fd, fcntl.LOCK_EX)
+                locked = True
             elif msvcrt is not None:
                 flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_BINARY", 0)
                 fd = os.open(lock_path, flags, 0o600)
@@ -180,35 +192,60 @@ class FilesystemBackend(BackendProtocol):
                     raise RuntimeError("Lock path is not a regular file")
                 if lock_stat.st_size == 0:
                     os.write(fd, b"\0")
-                    os.lseek(fd, 0, os.SEEK_SET)
+                os.lseek(fd, 0, os.SEEK_SET)
                 msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+                locked = True
             else:
                 raise RuntimeError(
                     "Secure cross-process file locking is unsupported on this platform"
                 )
-            yield
+            try:
+                yield
+            except BaseException as exc:
+                body_error = exc
+                raise
         finally:
-            if fd >= 0:
-                try:
-                    if fcntl is not None:
-                        fcntl.flock(fd, fcntl.LOCK_UN)
-                    elif msvcrt is not None:
-                        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-                finally:
+            # Release in reverse order, and ALWAYS release the thread lock: if
+            # acquisition failed (msvcrt.locking gives up after ~10 s), an
+            # unlock of a never-locked region raises on Windows, and letting
+            # that skip the release would leave this stripe held forever.
+            try:
+                if fd >= 0:
                     try:
-                        os.close(fd)
-                    except OSError:
-                        pass
-            thread_lock.release()
+                        if locked:
+                            if fcntl is not None:
+                                fcntl.flock(fd, fcntl.LOCK_UN)
+                            elif msvcrt is not None:
+                                # msvcrt locks the region at the CURRENT file
+                                # position; unlock exactly the byte locked.
+                                os.lseek(fd, 0, os.SEEK_SET)
+                                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                    except OSError as unlock_exc:
+                        # Operation succeeded: the unlock failure is raised.
+                        # Operation failed: its error keeps precedence and the
+                        # unlock failure is recorded on it as a note.
+                        # (Closing the fd below still drops the OS lock.)
+                        if body_error is None:
+                            raise
+                        body_error.add_note(f"lock release also failed: {unlock_exc!r}")
+                    finally:
+                        try:
+                            os.close(fd)
+                        except OSError:
+                            pass
+            finally:
+                thread_lock.release()
 
     @staticmethod
     def _fsync_directory(directory: Path) -> None:
         """Flush a directory entry table so a completed rename survives a crash.
 
-        Windows cannot open a directory as a file descriptor, and NTFS journals
-        rename metadata, so this is a no-op there. Filesystems that do not
-        support fsync on a directory are tolerated; any other failure is raised
-        so the caller does not report a durable write that was not made durable.
+        Best-effort by contract. Windows cannot open a directory as a file
+        descriptor, so this is a no-op there; filesystems that report directory
+        fsync as unsupported are tolerated. In both cases the rename's crash
+        durability is UNCONFIRMED, not proven. Any other failure is raised so
+        the caller never reports a sync that was attempted and failed as a
+        success.
         """
         if os.name == "nt":
             return
@@ -250,9 +287,11 @@ class FilesystemBackend(BackendProtocol):
 
         When durable_writes is enabled, attempts to synchronize the parent
         directory so the replacement metadata is durable on filesystems that
-        support directory fsync. If that synchronization fails after a
-        successful replacement, DurabilityUnconfirmedError is raised: the
-        destination may already hold the new content.
+        support directory fsync. Where it is unsupported (Windows, or an
+        unsupported-operation errno) it is skipped and durability stays
+        best-effort. If an attempted synchronization fails after a successful
+        replacement, DurabilityUnconfirmedError is raised: the destination may
+        already hold the new content.
 
         Both synchronization steps are skipped when durable_writes is disabled.
         Temporary files are cleaned up after failed operations.

@@ -289,17 +289,56 @@ class TestAtomicWrites:
             assert not list(Path(temp_dir).glob("*.kader-tmp"))
 
     def test_successful_write_closes_descriptor_exactly_once(self):
-        """After fdopen() the file object owns the fd; no second raw close."""
+        """Track the TEMP-FILE descriptor itself: its owning file object closes
+        it, and it is never raw-closed a second time. Unrelated descriptors
+        (e.g. the directory fd on POSIX) are not counted."""
         with tempfile.TemporaryDirectory() as temp_dir:
             backend = FilesystemBackend(root_dir=temp_dir)
-            with patch("kader.tools.filesystem.os.close", wraps=os.close) as close_mock:
+            real_open, real_fdopen, real_close = os.open, os.fdopen, os.close
+            temp_fds: list[int] = []
+            owners: list = []
+            # fd numbers are reused (the POSIX directory fd often gets the temp
+            # fd's number), so attribute each raw close to whichever os.open()
+            # most recently produced that number.
+            opened_as: dict[int, str] = {}
+            temp_raw_closes: list[int] = []
+
+            def tracking_open(path, flags, *args, **kwargs):
+                fd = real_open(path, flags, *args, **kwargs)
+                is_temp = str(path).endswith(".kader-tmp")
+                opened_as[fd] = "temp" if is_temp else "other"
+                if is_temp:
+                    temp_fds.append(fd)
+                return fd
+
+            def tracking_fdopen(fd, *args, **kwargs):
+                fobj = real_fdopen(fd, *args, **kwargs)
+                if opened_as.get(fd) == "temp":
+                    owners.append(fobj)
+                return fobj
+
+            def tracking_close(fd):
+                if opened_as.get(fd) == "temp":
+                    temp_raw_closes.append(fd)
+                real_close(fd)
+
+            with (
+                patch("kader.tools.filesystem.os.open", side_effect=tracking_open),
+                patch("kader.tools.filesystem.os.fdopen", side_effect=tracking_fdopen),
+                patch("kader.tools.filesystem.os.close", side_effect=tracking_close),
+            ):
                 result = backend.write("once.txt", "content")
 
             assert result.error is None
-            # Only the directory descriptor (POSIX) may be raw-closed; never
-            # the temp-file descriptor, which its file object closed.
-            expected = 0 if os.name == "nt" else 1
-            assert close_mock.call_count == expected
+            assert len(temp_fds) == 1
+            assert len(owners) == 1
+            assert owners[0].closed, "owning file object must close the temp fd"
+            assert temp_raw_closes == [], "temp fd raw-closed a second time"
+            # The OS descriptor itself is invalid (nothing in this test opens a
+            # descriptor after the write, so the number has not been reused).
+            with pytest.raises(OSError) as fstat_exc:
+                os.fstat(temp_fds[0])
+            assert fstat_exc.value.errno == errno.EBADF
 
     def test_temp_file_creation_is_exclusive(self):
         """An existing temp path must be refused, never overwritten."""
