@@ -236,7 +236,7 @@ class FilesystemBackend(BackendProtocol):
                 raise
 
             # fsync parent directory to ensure the replacement is durable
-            if self.durable_writes:
+            if self.durable_writes and os.name != "nt":
                 try:
                     parent_fd = os.open(
                         resolved_path.parent,
@@ -252,8 +252,6 @@ class FilesystemBackend(BackendProtocol):
                         errno.EINVAL,
                         errno.ENOTSUP,
                         getattr(errno, "ENOSYS", errno.EINVAL),
-                        errno.EACCES,
-                        errno.EPERM,
                     }:
                         raise exc
 
