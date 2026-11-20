@@ -24,6 +24,12 @@ from .conversation import (
     NullConversationManager,
     SlidingWindowConversationManager,
 )
+from .persistence import (
+    CorruptHistoryError,
+    LockTimeoutError,
+    RevisionConflictError,
+    RevisionedJsonFile,
+)
 
 # Session management
 from .session import (
@@ -43,6 +49,7 @@ from .summarization import (
     HierarchicalConversationManager,
 )
 from .types import (
+    DurabilityUnconfirmedError,
     MemoryConfig,
     SessionType,
     decode_bytes_values,
@@ -63,6 +70,12 @@ __all__ = [
     "load_json",
     "encode_bytes_values",
     "decode_bytes_values",
+    # Persistence
+    "CorruptHistoryError",
+    "DurabilityUnconfirmedError",
+    "LockTimeoutError",
+    "RevisionConflictError",
+    "RevisionedJsonFile",
     # State
     "AgentState",
     "RequestState",

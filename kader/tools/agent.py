@@ -13,7 +13,8 @@ from kader.memory import (
     SlidingWindowConversationManager,
 )
 from kader.memory.compression import CompressionConfig, ToolOutputCompressor
-from kader.memory.types import aread_text, save_json
+from kader.memory.persistence import RevisionedJsonFile
+from kader.memory.types import aread_text
 from kader.providers.base import BaseLLMProvider, Message
 from kader.utils import Checkpointer, ContextAggregator
 
@@ -24,6 +25,21 @@ from .base import (
     ToolExecutionRejected,
     ToolRegistry,
 )
+
+
+def _persist_history(store: RevisionedJsonFile, messages: list[Any]) -> None:
+    """Best-effort, revision-checked save of a full message history.
+
+    The save is atomic and compare-and-write (see RevisionedJsonFile): a
+    stored history newer than the one this manager last wrote is never
+    overwritten. A refused or durability-unconfirmed save is not retried
+    here; the next save is checked against the stored revision again.
+    """
+    try:
+        store.save({"messages": [msg.message for msg in messages]})
+    except Exception:
+        # Best effort: persistence must not break the agent loop.
+        pass
 
 
 def get_cached_default_registry():
@@ -53,20 +69,11 @@ class PersistentSlidingWindowConversationManager(SlidingWindowConversationManage
         """
         super().__init__(window_size=window_size)
         self.file_path = file_path
+        self._store = RevisionedJsonFile(file_path)
 
     def _save(self) -> None:
-        """Save entire history to JSON."""
-        try:
-            # We want to save plain dicts
-            messages_dicts = [msg.message for msg in self._messages]
-            data = {"messages": messages_dicts}
-            # Ensure parent temp-directory exists is done by caller usually,
-            # but best effort here:
-            self.file_path.parent.mkdir(parents=True, exist_ok=True)
-            save_json(self.file_path, data)
-        except Exception:
-            # Best effort save
-            pass
+        """Save entire history to JSON (atomic, revision-checked)."""
+        _persist_history(self._store, self._messages)
 
     def add_message(self, message: Any) -> Any:
         # Call super
@@ -107,16 +114,11 @@ class PersistentHierarchicalConversationManager(HierarchicalConversationManager)
             provider=provider,
         )
         self.file_path = file_path
+        self._store = RevisionedJsonFile(file_path)
 
     def _save(self) -> None:
-        """Save entire history to JSON."""
-        try:
-            messages_dicts = [msg.message for msg in self._messages]
-            data = {"messages": messages_dicts}
-            self.file_path.parent.mkdir(parents=True, exist_ok=True)
-            save_json(self.file_path, data)
-        except Exception:
-            pass
+        """Save entire history to JSON (atomic, revision-checked)."""
+        _persist_history(self._store, self._messages)
 
     def add_message(self, message: Any) -> Any:
         result = super().add_message(message)
