@@ -4,6 +4,7 @@ Agent Tool - Use a ReActAgent as a callable tool.
 Allows spawning sub-agents to execute specific tasks with isolated memory contexts.
 """
 
+import threading
 import uuid
 from pathlib import Path
 from typing import Any, Callable, Optional, Tuple
@@ -43,52 +44,74 @@ class PersistentSlidingWindowConversationManager(SlidingWindowConversationManage
     """
     SlidingWindowConversationManager with JSON persistence.
 
-    Saves the entire message history (dict format) to a JSON file
-    after every add_message(s) call.
+    Batches persistence for callers that flush after a completed turn.
+    Persistence-on-add remains available for backward compatibility.
     """
 
-    def __init__(self, file_path: Path, window_size: int = 20) -> None:
+    def __init__(
+        self,
+        file_path: Path,
+        window_size: int = 20,
+        save_on_add: bool = True,
+    ) -> None:
         """
         Initialize with a file path for persistence.
         """
         super().__init__(window_size=window_size)
         self.file_path = file_path
+        self.save_on_add = save_on_add
+        self._lock = threading.RLock()
+        self._last_save_error: Exception | None = None
+
+    def flush(self) -> None:
+        """Persist the current history immediately."""
+        with self._lock:
+            self._save()
 
     def _save(self) -> None:
         """Save entire history to JSON."""
-        try:
-            # We want to save plain dicts
-            messages_dicts = [msg.message for msg in self._messages]
-            data = {"messages": messages_dicts}
-            # Ensure parent temp-directory exists is done by caller usually,
-            # but best effort here:
-            self.file_path.parent.mkdir(parents=True, exist_ok=True)
-            save_json(self.file_path, data)
-        except Exception:
-            # Best effort save
-            pass
+        with self._lock:
+            try:
+                messages_dicts = [msg.message for msg in self._messages]
+                data = {"messages": messages_dicts}
+                self.file_path.parent.mkdir(parents=True, exist_ok=True)
+                save_json(self.file_path, data)
+                self._last_save_error = None
+            except Exception as exc:
+                self._last_save_error = exc
+                raise
 
     def add_message(self, message: Any) -> Any:
-        # Call super
-        result = super().add_message(message)
-        # Save
-        self._save()
-        return result
+        with self._lock:
+            result = super().add_message(message)
+            if self.save_on_add:
+                try:
+                    self._save()
+                except Exception:
+                    pass
+            return result
 
     def add_messages(self, messages: list[Any]) -> list[Any]:
-        # Call super
-        result = super().add_messages(messages)
-        # Save
-        self._save()
-        return result
+        with self._lock:
+            result = []
+            for message in messages:
+                result.append(
+                    SlidingWindowConversationManager.add_message(self, message)
+                )
+            if self.save_on_add:
+                try:
+                    self._save()
+                except Exception:
+                    pass
+            return result
 
 
 class PersistentHierarchicalConversationManager(HierarchicalConversationManager):
     """
     HierarchicalConversationManager with JSON persistence.
 
-    Saves the entire message history (dict format) to a JSON file
-    after every add_message(s) call.
+    Batches persistence for callers that flush after a completed turn.
+    Persistence-on-add remains available for backward compatibility.
     """
 
     def __init__(
@@ -97,6 +120,7 @@ class PersistentHierarchicalConversationManager(HierarchicalConversationManager)
         window_size: int = 20,
         full_context_window: int = 5,
         provider: Any = None,
+        save_on_add: bool = True,
     ) -> None:
         """
         Initialize with a file path for persistence.
@@ -107,26 +131,51 @@ class PersistentHierarchicalConversationManager(HierarchicalConversationManager)
             provider=provider,
         )
         self.file_path = file_path
+        self.save_on_add = save_on_add
+        self._lock = threading.RLock()
+        self._last_save_error: Exception | None = None
+
+    def flush(self) -> None:
+        """Persist the current history immediately."""
+        with self._lock:
+            self._save()
 
     def _save(self) -> None:
         """Save entire history to JSON."""
-        try:
-            messages_dicts = [msg.message for msg in self._messages]
-            data = {"messages": messages_dicts}
-            self.file_path.parent.mkdir(parents=True, exist_ok=True)
-            save_json(self.file_path, data)
-        except Exception:
-            pass
+        with self._lock:
+            try:
+                messages_dicts = [msg.message for msg in self._messages]
+                data = {"messages": messages_dicts}
+                self.file_path.parent.mkdir(parents=True, exist_ok=True)
+                save_json(self.file_path, data)
+                self._last_save_error = None
+            except Exception as exc:
+                self._last_save_error = exc
+                raise
 
     def add_message(self, message: Any) -> Any:
-        result = super().add_message(message)
-        self._save()
-        return result
+        with self._lock:
+            result = super().add_message(message)
+            if self.save_on_add:
+                try:
+                    self._save()
+                except Exception:
+                    pass
+            return result
 
     def add_messages(self, messages: list[Any]) -> list[Any]:
-        result = super().add_messages(messages)
-        self._save()
-        return result
+        with self._lock:
+            result = []
+            for message in messages:
+                result.append(
+                    SlidingWindowConversationManager.add_message(self, message)
+                )
+            if self.save_on_add:
+                try:
+                    self._save()
+                except Exception:
+                    pass
+            return result
 
 
 class AgentTool(BaseTool[str]):
@@ -354,10 +403,13 @@ class AgentTool(BaseTool[str]):
                 window_size=20,
                 full_context_window=5,
                 provider=self._provider,
+                save_on_add=True,
             )
         else:
             memory = PersistentSlidingWindowConversationManager(
-                file_path=memory_file, window_size=20
+                file_path=memory_file,
+                window_size=20,
+                save_on_add=True,
             )
 
         # Load aggregated context from previous executors
@@ -373,7 +425,7 @@ class AgentTool(BaseTool[str]):
         # Get default tools (filesystem, web, command executor) - use cached version
         from kader.tools.skills import SkillLoader, SkillsTool
 
-        tools = get_cached_default_registry()
+        tools = get_cached_default_registry().copy()
 
         # Inject SkillsTool with the requested dirs into the sub-agent registry.
         # Filter out any existing skills_tool first to avoid double-registration
@@ -539,10 +591,13 @@ class AgentTool(BaseTool[str]):
                 window_size=20,
                 full_context_window=5,
                 provider=self._provider,
+                save_on_add=True,
             )
         else:
             memory = PersistentSlidingWindowConversationManager(
-                file_path=memory_file, window_size=20
+                file_path=memory_file,
+                window_size=20,
+                save_on_add=True,
             )
 
         # Load aggregated context from previous executors (async)
@@ -558,7 +613,7 @@ class AgentTool(BaseTool[str]):
         # Get default tools (filesystem, web, command executor) - use cached version
         from kader.tools.skills import SkillLoader, SkillsTool
 
-        tools = get_cached_default_registry()
+        tools = get_cached_default_registry().copy()
 
         # Inject SkillsTool with the requested dirs into the sub-agent registry.
         # Filter out any existing skills_tool first to avoid double-registration

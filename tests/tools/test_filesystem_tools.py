@@ -68,6 +68,20 @@ class TestReadFileTool:
             assert "Line 2" not in result
             assert "Line 5" not in result
 
+    def test_execute_with_zero_limit(self):
+        """A zero-limit read should validate EOF without a false offset error."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            test_file = Path(temp_dir) / "test.txt"
+            test_file.write_text("Line 1\nLine 2\nLine 3")
+
+            tool = ReadFileTool(base_path=Path(temp_dir))
+            result = tool.execute(
+                str(test_file.relative_to(temp_dir)), offset=1, limit=0
+            )
+
+            assert "Line 1" not in result
+            assert "exceeds file length" not in result
+
     def test_async_execute(self):
         """Test async execution of ReadFileTool."""
         import asyncio

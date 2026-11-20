@@ -8,10 +8,15 @@ Security and search upgrades:
 """
 
 import contextlib
+import errno
 import json
 import os
 import re
+import stat
 import subprocess
+import threading
+import time
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -19,6 +24,11 @@ try:
     import fcntl
 except ImportError:
     fcntl = None  # type: ignore
+
+try:
+    import msvcrt
+except ImportError:
+    msvcrt = None  # type: ignore
 
 import wcmatch.glob as wcglob
 
@@ -38,6 +48,16 @@ from kader.tools.utils import (
 )
 
 
+class DurabilityUnconfirmedError(OSError):
+    """os.replace() succeeded but the containing directory could not be synced.
+
+    The destination may already hold the NEW content, so this must not be
+    treated as an ordinary failed write that is safe to retry blindly.
+    """
+
+    status = "REPLACED_DURABILITY_UNCONFIRMED"
+
+
 class FilesystemBackend(BackendProtocol):
     """Backend that reads and writes files directly from the filesystem.
 
@@ -46,6 +66,9 @@ class FilesystemBackend(BackendProtocol):
     as plain text, and metadata (timestamps) are derived from filesystem stats.
     """
 
+    _in_process_locks: dict[int, threading.RLock] = {}
+    _in_process_locks_guard = threading.Lock()
+
     def __init__(
         self,
         root_dir: str | Path | None = None,
@@ -53,6 +76,7 @@ class FilesystemBackend(BackendProtocol):
         max_file_size_mb: int = 10,
         use_file_lock: bool = True,
         include_mtime: bool = False,
+        durable_writes: bool = True,
     ) -> None:
         """Initialize filesystem backend.
 
@@ -62,16 +86,27 @@ class FilesystemBackend(BackendProtocol):
                      If not provided, uses the current working directory.
             virtual_mode: Whether to treat paths as virtual absolute paths under cwd.
             max_file_size_mb: Maximum file size in MB for search/read guards.
-            use_file_lock: Acquire an advisory file lock around edit() to serialize
-                concurrent modifications. Ignored on platforms without fcntl.
+            use_file_lock: Acquire a lock around edit() to serialize concurrent
+                modifications: a process-local thread lock plus a cross-process
+                lock (fcntl on POSIX, msvcrt on Windows). On a platform with
+                neither, edit() fails with RuntimeError rather than run unlocked.
             include_mtime: When True, read() appends a footer containing the file's
                 st_mtime_ns token, enabling edit() freshness checks.
+            durable_writes: When True, fsync the written file before replacing
+                the target, and attempt to fsync the parent directory after.
+                This is BEST-EFFORT crash durability, not a guarantee: the
+                directory sync is skipped on Windows (no directory descriptors)
+                and on filesystems that report it unsupported (EINVAL, ENOTSUP,
+                EOPNOTSUPP, ENOSYS), and in those cases the rename's survival of
+                a crash is unconfirmed. Only a directory sync that is attempted
+                and FAILS is reported (DurabilityUnconfirmedError).
         """
         self.cwd = Path(root_dir).resolve() if root_dir else Path.cwd()
         self.virtual_mode = virtual_mode
         self.max_file_size_bytes = max_file_size_mb * 1024 * 1024
-        self.use_file_lock = use_file_lock and fcntl is not None
+        self.use_file_lock = use_file_lock
         self.include_mtime = include_mtime
+        self.durable_writes = durable_writes
 
     def _resolve_path(self, key: str) -> Path:
         """Resolve a file path with security checks.
@@ -110,38 +145,129 @@ class FilesystemBackend(BackendProtocol):
         """Acquire an advisory exclusive lock for a file path.
 
         The lock is implemented with a sibling lock file so that O_NOFOLLOW
-        semantics on the target are not compromised. The lock file is removed
-        after the lock is released to avoid leaving stale files in the workspace.
-        On platforms without fcntl or when use_file_lock is False, this is a
-        no-op context manager.
+        semantics on the target are not compromised. The stable lock file remains
+        after unlock so cross-process lock inodes cannot be replaced by competing
+        processes.
+        A process-local thread lock is always acquired when use_file_lock=True.
+        On POSIX, an additional cross-process advisory lock is acquired with
+        fcntl. On Windows, msvcrt provides native cross-process byte locking.
+        Platforms with neither adapter raise an explicit RuntimeError.
         """
-        if not self.use_file_lock or fcntl is None:
+        if not self.use_file_lock:
             yield
             return
 
+        lock_key = str(resolved_path)
+        with self._in_process_locks_guard:
+            thread_lock = self._in_process_locks.setdefault(
+                hash(lock_key) & 255,
+                threading.RLock(),
+            )
+        thread_lock.acquire()
+
         lock_path = resolved_path.parent / f".kader-lock.{resolved_path.name}"
         fd = -1
+        locked = False
+        body_error: BaseException | None = None
         try:
-            flags = os.O_RDWR | os.O_CREAT
-            if hasattr(os, "O_NOFOLLOW"):
-                flags |= os.O_NOFOLLOW
-            fd = os.open(lock_path, flags, 0o644)
-            fcntl.flock(fd, fcntl.LOCK_EX)
-            yield
-        finally:
-            if fd >= 0:
-                try:
-                    fcntl.flock(fd, fcntl.LOCK_UN)
-                except OSError:
-                    pass
-                try:
-                    os.close(fd)
-                except OSError:
-                    pass
+            if fcntl is not None:
+                if not hasattr(os, "O_NOFOLLOW"):
+                    raise RuntimeError("Secure POSIX file locking requires O_NOFOLLOW")
+                flags = (
+                    os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+                )
+                fd = os.open(lock_path, flags, 0o600)
+                if hasattr(os, "fchmod"):
+                    os.fchmod(fd, 0o600)
+                lock_stat = os.fstat(fd)
+                if not stat.S_ISREG(lock_stat.st_mode):
+                    raise RuntimeError("Lock path is not a regular file")
+                fcntl.flock(fd, fcntl.LOCK_EX)
+                locked = True
+            elif msvcrt is not None:
+                flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_BINARY", 0)
+                fd = os.open(lock_path, flags, 0o600)
+                lock_stat = os.fstat(fd)
+                if not stat.S_ISREG(lock_stat.st_mode):
+                    raise RuntimeError("Lock path is not a regular file")
+                if lock_stat.st_size == 0:
+                    os.write(fd, b"\0")
+                os.lseek(fd, 0, os.SEEK_SET)
+                msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+                locked = True
+            else:
+                raise RuntimeError(
+                    "Secure cross-process file locking is unsupported on this platform"
+                )
             try:
-                lock_path.unlink(missing_ok=True)
-            except OSError:
-                pass
+                yield
+            except BaseException as exc:
+                body_error = exc
+                raise
+        finally:
+            # Release in reverse order, and ALWAYS release the thread lock: if
+            # acquisition failed (msvcrt.locking gives up after ~10 s), an
+            # unlock of a never-locked region raises on Windows, and letting
+            # that skip the release would leave this stripe held forever.
+            try:
+                if fd >= 0:
+                    try:
+                        if locked:
+                            if fcntl is not None:
+                                fcntl.flock(fd, fcntl.LOCK_UN)
+                            elif msvcrt is not None:
+                                # msvcrt locks the region at the CURRENT file
+                                # position; unlock exactly the byte locked.
+                                os.lseek(fd, 0, os.SEEK_SET)
+                                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                    except OSError as unlock_exc:
+                        # Operation succeeded: the unlock failure is raised.
+                        # Operation failed: its error keeps precedence and the
+                        # unlock failure is recorded on it as a note.
+                        # (Closing the fd below still drops the OS lock.)
+                        if body_error is None:
+                            raise
+                        body_error.add_note(f"lock release also failed: {unlock_exc!r}")
+                    finally:
+                        try:
+                            os.close(fd)
+                        except OSError:
+                            pass
+            finally:
+                thread_lock.release()
+
+    @staticmethod
+    def _fsync_directory(directory: Path) -> None:
+        """Flush a directory entry table so a completed rename survives a crash.
+
+        Best-effort by contract. Windows cannot open a directory as a file
+        descriptor, so this is a no-op there; filesystems that report directory
+        fsync as unsupported are tolerated. In both cases the rename's crash
+        durability is UNCONFIRMED, not proven. Any other failure is raised so
+        the caller never reports a sync that was attempted and failed as a
+        success.
+        """
+        if os.name == "nt":
+            return
+        unsupported = {
+            errno.EINVAL,
+            errno.ENOTSUP,
+            getattr(errno, "EOPNOTSUPP", errno.ENOTSUP),
+            getattr(errno, "ENOSYS", errno.EINVAL),
+        }
+        try:
+            dir_fd = os.open(directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        except OSError as exc:
+            if exc.errno in unsupported:
+                return
+            raise
+        try:
+            os.fsync(dir_fd)
+        except OSError as exc:
+            if exc.errno not in unsupported:
+                raise
+        finally:
+            os.close(dir_fd)
 
     def _atomic_write(
         self,
@@ -152,47 +278,93 @@ class FilesystemBackend(BackendProtocol):
     ) -> None:
         """Atomically write content to resolved_path.
 
-        Writes to a sibling temp file, fsyncs data and parent directory, then
-        uses os.replace() so readers always see either the old or the new
-        content, never a partial write. Temp files are cleaned up on failure.
+        Writes to a unique sibling temporary file, flushes the content, and
+        synchronizes the temporary file when durable_writes is enabled.
+
+        Replaces the destination using os.replace(), providing atomic
+        visibility on supported same-filesystem targets. Descriptors that were
+        already open may keep reading the old file.
+
+        When durable_writes is enabled, attempts to synchronize the parent
+        directory so the replacement metadata is durable on filesystems that
+        support directory fsync. Where it is unsupported (Windows, or an
+        unsupported-operation errno) it is skipped and durability stays
+        best-effort. If an attempted synchronization fails after a successful
+        replacement, DurabilityUnconfirmedError is raised: the destination may
+        already hold the new content.
+
+        Both synchronization steps are skipped when durable_writes is disabled.
+        Temporary files are cleaned up after failed operations.
+
+        Atomic replacement does not itself guarantee crash durability,
+        cross-process writer coordination, or equivalent behavior on every
+        filesystem.
         """
-        tmp_path = resolved_path.with_suffix(resolved_path.suffix + ".kader-tmp")
+        tmp_path = resolved_path.with_name(
+            f"{resolved_path.name}.{uuid.uuid4().hex}.kader-tmp"
+        )
         try:
-            flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-            if hasattr(os, "O_NOFOLLOW"):
-                flags |= os.O_NOFOLLOW
+            # O_EXCL: a name collision must never overwrite an existing file.
+            # O_BINARY: no CRT newline translation beneath Python's own text
+            # layer on Windows (0 elsewhere).
+            flags = (
+                os.O_WRONLY
+                | os.O_CREAT
+                | os.O_EXCL
+                | getattr(os, "O_BINARY", 0)
+                | getattr(os, "O_NOFOLLOW", 0)
+            )
             fd = os.open(tmp_path, flags, 0o644)
             try:
                 if "b" in mode:
                     fobj = os.fdopen(fd, mode)
                 else:
                     fobj = os.fdopen(fd, mode, encoding=encoding)
-                with fobj as f:
-                    f.write(content)
-                    f.flush()
-                    os.fsync(fd)
             except Exception:
+                # fdopen failed, so the raw descriptor is still ours to close.
+                # Once fdopen succeeds, the file object owns the descriptor and
+                # closing it again could close an unrelated, reused descriptor.
                 try:
                     os.close(fd)
                 except OSError:
+                    # Preserve the original fdopen failure.
                     pass
                 raise
+            with fobj as f:
+                f.write(content)
+                f.flush()
+                if self.durable_writes:
+                    os.fsync(f.fileno())
 
-            # fsync parent directory to ensure the replacement is durable
-            try:
-                parent_fd = os.open(
-                    resolved_path.parent,
-                    os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
-                )
+            transient_windows_errors = frozenset({32, 33})
+            delays = (0.005, 0.010, 0.020, 0.040)
+            for attempt in range(len(delays) + 1):
                 try:
-                    os.fsync(parent_fd)
-                finally:
-                    os.close(parent_fd)
-            except OSError:
-                # Best-effort durability on platforms where fsync on a dir fails
-                pass
+                    os.replace(tmp_path, resolved_path)
+                    break
+                except OSError as exc:
+                    retryable = (
+                        os.name == "nt"
+                        and getattr(exc, "winerror", None) in transient_windows_errors
+                    )
+                    if not retryable or attempt == len(delays):
+                        raise
+                    time.sleep(delays[attempt])
 
-            os.replace(tmp_path, resolved_path)
+            # The rename is only durable once the directory entry itself is
+            # flushed, so the containing directory must be synced AFTER
+            # os.replace(), not before it.
+            if self.durable_writes:
+                try:
+                    self._fsync_directory(resolved_path.parent)
+                except OSError as exc:
+                    raise DurabilityUnconfirmedError(
+                        exc.errno,
+                        f"{DurabilityUnconfirmedError.status}: "
+                        f"'{resolved_path.name}' now holds the new content, but "
+                        f"the containing directory could not be synced "
+                        f"({exc.strerror or exc}); do not retry blindly",
+                    ) from exc
         except OSError:
             # Best-effort cleanup; re-raise so caller can report the error
             try:
@@ -349,32 +521,50 @@ class FilesystemBackend(BackendProtocol):
             return f"Error: File '{file_path}' not found"
 
         try:
-            mtime_ns: int | None = None
-            if self.include_mtime:
-                try:
-                    mtime_ns = resolved_path.stat().st_mtime_ns
-                except OSError:
-                    mtime_ns = None
+            if offset < 0:
+                return "Error: Line offset must be non-negative"
+            if limit < 0:
+                return "Error: Line limit must be non-negative"
 
             # Open with O_NOFOLLOW where available to avoid symlink traversal
             fd = os.open(resolved_path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+            mtime_ns: int | None = None
+            if self.include_mtime:
+                try:
+                    mtime_ns = os.fstat(fd).st_mtime_ns
+                except OSError:
+                    mtime_ns = None
+            selected_lines: list[str] = []
+            total_lines = 0
             with os.fdopen(fd, "r", encoding="utf-8") as f:
-                content = f.read()
+                if limit == 0:
+                    for line_number, _ in enumerate(f):
+                        total_lines = line_number + 1
+                    if offset > total_lines:
+                        return f"Error: Line offset {offset} exceeds file length ({total_lines} lines)"
+                    return ""
 
-            empty_msg = check_empty_content(content)
-            if empty_msg:
+                target_lines = offset + limit
+                for line_number, line in enumerate(f):
+                    total_lines = line_number + 1
+                    if line_number >= offset and len(selected_lines) < limit:
+                        selected_lines.append(line.rstrip("\r\n"))
+                    if line_number + 1 >= target_lines:
+                        break
+
+            if total_lines == 0:
+                empty_msg = check_empty_content("")
                 if self.include_mtime and mtime_ns is not None:
                     return f"{empty_msg}\n# kader-mtime: {mtime_ns}"
                 return empty_msg
 
-            lines = content.splitlines()
+            if offset > total_lines:
+                return f"Error: Line offset {offset} exceeds file length ({total_lines} lines)"
+
+            if offset == total_lines:
+                return ""
+
             start_idx = offset
-            end_idx = min(start_idx + limit, len(lines))
-
-            if start_idx >= len(lines):
-                return f"Error: Line offset {offset} exceeds file length ({len(lines)} lines)"
-
-            selected_lines = lines[start_idx:end_idx]
             result = format_content_with_line_numbers(
                 selected_lines, start_line=start_idx + 1
             )
@@ -674,6 +864,10 @@ class FilesystemBackend(BackendProtocol):
                 self._atomic_write(resolved_path, content, mode="wb")
 
                 responses.append(FileUploadResponse(path=path, error=None))
+            except DurabilityUnconfirmedError:
+                responses.append(
+                    FileUploadResponse(path=path, error="durability_unconfirmed")
+                )
             except FileNotFoundError:
                 responses.append(FileUploadResponse(path=path, error="file_not_found"))
             except PermissionError:

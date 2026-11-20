@@ -662,6 +662,19 @@ class TestToolRegistry:
         assert registry.names == ["test_tool"]
         assert registry.tools == [tool]
 
+    def test_copy_has_isolated_registry(self):
+        """A copy should isolate registrations while sharing tool instances."""
+        registry = ToolRegistry()
+        tool = ConcreteTool()
+        registry.register(tool)
+
+        cloned = registry.copy()
+        assert registry.get("test_tool") is tool
+        assert cloned.get("test_tool") is tool
+        cloned.unregister("test_tool")
+
+        assert cloned.get("test_tool") is None
+
     def test_register_duplicate_tool(self):
         """Test registering a duplicate tool."""
         registry = ToolRegistry()

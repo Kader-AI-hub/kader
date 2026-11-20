@@ -17,6 +17,7 @@ FileOperationError = Literal[
     "permission_denied",  # Both: access denied
     "is_directory",  # Download: tried to download directory as file
     "invalid_path",  # Both: path syntax malformed (parent dir missing, invalid chars)
+    "durability_unconfirmed",  # Upload: content REPLACED, directory sync failed
 ]
 """Standardized error codes for file upload/download operations.
 
@@ -26,6 +27,9 @@ These represent common, recoverable errors that an LLM can understand and potent
 - permission_denied: Access denied for the operation
 - is_directory: Attempted to download a directory as a file
 - invalid_path: Path syntax is malformed or contains invalid characters
+- durability_unconfirmed: The new content already REPLACED the file, but the
+  containing directory could not be synced. This is not a failed write: do not
+  retry blindly; re-read the file to confirm its state.
 """
 
 

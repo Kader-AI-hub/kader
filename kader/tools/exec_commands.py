@@ -231,7 +231,6 @@ class CommandExecutorTool(BaseTool[str]):
         Returns:
             Tuple of (return_code, captured_output)
         """
-        import pty
         import time
 
         captured_output = []
@@ -243,6 +242,15 @@ class CommandExecutorTool(BaseTool[str]):
                 timeout,
                 output_callback,
                 input_callback,
+            )
+
+        try:
+            import pty
+        except ImportError:
+            return self._execute_direct(
+                command,
+                timeout,
+                output_callback,
             )
 
         master_fd, slave_fd = pty.openpty()
