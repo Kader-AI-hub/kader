@@ -48,6 +48,16 @@ from kader.tools.utils import (
 )
 
 
+class DurabilityUnconfirmedError(OSError):
+    """os.replace() succeeded but the containing directory could not be synced.
+
+    The destination may already hold the NEW content, so this must not be
+    treated as an ordinary failed write that is safe to retry blindly.
+    """
+
+    status = "REPLACED_DURABILITY_UNCONFIRMED"
+
+
 class FilesystemBackend(BackendProtocol):
     """Backend that reads and writes files directly from the filesystem.
 
@@ -151,14 +161,9 @@ class FilesystemBackend(BackendProtocol):
         try:
             if fcntl is not None:
                 if not hasattr(os, "O_NOFOLLOW"):
-                    raise RuntimeError(
-                        "Secure POSIX file locking requires O_NOFOLLOW"
-                    )
+                    raise RuntimeError("Secure POSIX file locking requires O_NOFOLLOW")
                 flags = (
-                    os.O_RDWR
-                    | os.O_CREAT
-                    | os.O_NOFOLLOW
-                    | getattr(os, "O_CLOEXEC", 0)
+                    os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
                 )
                 fd = os.open(lock_path, flags, 0o600)
                 if hasattr(os, "fchmod"):
@@ -179,8 +184,7 @@ class FilesystemBackend(BackendProtocol):
                 msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
             else:
                 raise RuntimeError(
-                    "Secure cross-process file locking is unsupported "
-                    "on this platform"
+                    "Secure cross-process file locking is unsupported on this platform"
                 )
             yield
         finally:
@@ -197,6 +201,37 @@ class FilesystemBackend(BackendProtocol):
                         pass
             thread_lock.release()
 
+    @staticmethod
+    def _fsync_directory(directory: Path) -> None:
+        """Flush a directory entry table so a completed rename survives a crash.
+
+        Windows cannot open a directory as a file descriptor, and NTFS journals
+        rename metadata, so this is a no-op there. Filesystems that do not
+        support fsync on a directory are tolerated; any other failure is raised
+        so the caller does not report a durable write that was not made durable.
+        """
+        if os.name == "nt":
+            return
+        unsupported = {
+            errno.EINVAL,
+            errno.ENOTSUP,
+            getattr(errno, "EOPNOTSUPP", errno.ENOTSUP),
+            getattr(errno, "ENOSYS", errno.EINVAL),
+        }
+        try:
+            dir_fd = os.open(directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        except OSError as exc:
+            if exc.errno in unsupported:
+                return
+            raise
+        try:
+            os.fsync(dir_fd)
+        except OSError as exc:
+            if exc.errno not in unsupported:
+                raise
+        finally:
+            os.close(dir_fd)
+
     def _atomic_write(
         self,
         resolved_path: Path,
@@ -206,54 +241,61 @@ class FilesystemBackend(BackendProtocol):
     ) -> None:
         """Atomically write content to resolved_path.
 
-        Writes to a sibling temp file, fsyncs data and parent directory, then
-        uses os.replace() so readers always see either the old or the new
-        content, never a partial write. Temp files are cleaned up on failure.
+        Writes to a unique sibling temporary file, flushes the content, and
+        synchronizes the temporary file when durable_writes is enabled.
+
+        Replaces the destination using os.replace(), providing atomic
+        visibility on supported same-filesystem targets. Descriptors that were
+        already open may keep reading the old file.
+
+        When durable_writes is enabled, attempts to synchronize the parent
+        directory so the replacement metadata is durable on filesystems that
+        support directory fsync. If that synchronization fails after a
+        successful replacement, DurabilityUnconfirmedError is raised: the
+        destination may already hold the new content.
+
+        Both synchronization steps are skipped when durable_writes is disabled.
+        Temporary files are cleaned up after failed operations.
+
+        Atomic replacement does not itself guarantee crash durability,
+        cross-process writer coordination, or equivalent behavior on every
+        filesystem.
         """
         tmp_path = resolved_path.with_name(
             f"{resolved_path.name}.{uuid.uuid4().hex}.kader-tmp"
         )
         try:
-            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_TRUNC
-            if hasattr(os, "O_NOFOLLOW"):
-                flags |= os.O_NOFOLLOW
+            # O_EXCL: a name collision must never overwrite an existing file.
+            # O_BINARY: no CRT newline translation beneath Python's own text
+            # layer on Windows (0 elsewhere).
+            flags = (
+                os.O_WRONLY
+                | os.O_CREAT
+                | os.O_EXCL
+                | getattr(os, "O_BINARY", 0)
+                | getattr(os, "O_NOFOLLOW", 0)
+            )
             fd = os.open(tmp_path, flags, 0o644)
             try:
                 if "b" in mode:
                     fobj = os.fdopen(fd, mode)
                 else:
                     fobj = os.fdopen(fd, mode, encoding=encoding)
-                with fobj as f:
-                    f.write(content)
-                    f.flush()
-                    if self.durable_writes:
-                        os.fsync(fd)
             except Exception:
+                # fdopen failed, so the raw descriptor is still ours to close.
+                # Once fdopen succeeds, the file object owns the descriptor and
+                # closing it again could close an unrelated, reused descriptor.
                 try:
                     os.close(fd)
                 except OSError:
+                    # Preserve the original fdopen failure.
                     pass
                 raise
-
-            # fsync parent directory to ensure the replacement is durable
-            if self.durable_writes and os.name != "nt":
-                try:
-                    parent_fd = os.open(
-                        resolved_path.parent,
-                        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
-                    )
-                    try:
-                        os.fsync(parent_fd)
-                    finally:
-                        os.close(parent_fd)
-                except OSError as exc:
-                    # Best-effort durability on platforms where fsync on a dir fails
-                    if exc.errno not in {
-                        errno.EINVAL,
-                        errno.ENOTSUP,
-                        getattr(errno, "ENOSYS", errno.EINVAL),
-                    }:
-                        raise exc
+            with fobj as f:
+                f.write(content)
+                f.flush()
+                if self.durable_writes:
+                    os.fsync(f.fileno())
 
             transient_windows_errors = frozenset({32, 33})
             delays = (0.005, 0.010, 0.020, 0.040)
@@ -264,12 +306,26 @@ class FilesystemBackend(BackendProtocol):
                 except OSError as exc:
                     retryable = (
                         os.name == "nt"
-                        and getattr(exc, "winerror", None)
-                        in transient_windows_errors
+                        and getattr(exc, "winerror", None) in transient_windows_errors
                     )
                     if not retryable or attempt == len(delays):
                         raise
                     time.sleep(delays[attempt])
+
+            # The rename is only durable once the directory entry itself is
+            # flushed, so the containing directory must be synced AFTER
+            # os.replace(), not before it.
+            if self.durable_writes:
+                try:
+                    self._fsync_directory(resolved_path.parent)
+                except OSError as exc:
+                    raise DurabilityUnconfirmedError(
+                        exc.errno,
+                        f"{DurabilityUnconfirmedError.status}: "
+                        f"'{resolved_path.name}' now holds the new content, but "
+                        f"the containing directory could not be synced "
+                        f"({exc.strerror or exc}); do not retry blindly",
+                    ) from exc
         except OSError:
             # Best-effort cleanup; re-raise so caller can report the error
             try:
@@ -769,6 +825,10 @@ class FilesystemBackend(BackendProtocol):
                 self._atomic_write(resolved_path, content, mode="wb")
 
                 responses.append(FileUploadResponse(path=path, error=None))
+            except DurabilityUnconfirmedError:
+                responses.append(
+                    FileUploadResponse(path=path, error="durability_unconfirmed")
+                )
             except FileNotFoundError:
                 responses.append(FileUploadResponse(path=path, error="file_not_found"))
             except PermissionError:

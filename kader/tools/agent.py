@@ -62,7 +62,6 @@ class PersistentSlidingWindowConversationManager(SlidingWindowConversationManage
         self.save_on_add = save_on_add
         self._lock = threading.RLock()
         self._last_save_error: Exception | None = None
-        self._last_save_error: Exception | None = None
 
     def flush(self) -> None:
         """Persist the current history immediately."""
@@ -134,6 +133,7 @@ class PersistentHierarchicalConversationManager(HierarchicalConversationManager)
         self.file_path = file_path
         self.save_on_add = save_on_add
         self._lock = threading.RLock()
+        self._last_save_error: Exception | None = None
 
     def flush(self) -> None:
         """Persist the current history immediately."""

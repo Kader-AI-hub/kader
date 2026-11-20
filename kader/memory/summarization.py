@@ -412,6 +412,7 @@ class HierarchicalConversationManager(SlidingWindowConversationManager):
         new: ConversationSummary,
     ) -> ConversationSummary:
         """Merge a newly summarized message batch into the existing summary."""
+
         def _dedupe(values: list[str]) -> list[str]:
             return list(dict.fromkeys(values))
 
@@ -429,9 +430,7 @@ class HierarchicalConversationManager(SlidingWindowConversationManager):
             ),
             summary_text=combined_text,
             key_decisions=_dedupe(existing.key_decisions + new.key_decisions)[-10:],
-            files_modified=sorted(
-                set(existing.files_modified + new.files_modified)
-            ),
+            files_modified=sorted(set(existing.files_modified + new.files_modified)),
             errors_encountered=_dedupe(
                 existing.errors_encountered + new.errors_encountered
             )[-20:],

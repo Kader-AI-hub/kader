@@ -4,6 +4,7 @@ Hardening tests for FilesystemBackend race-safety features.
 Covers Stage 1: atomic writes, advisory file locks, and freshness tokens.
 """
 
+import errno
 import os
 import tempfile
 import threading
@@ -18,7 +19,7 @@ try:
 except ImportError:
     fcntl = None  # type: ignore
 
-from kader.tools.filesystem import FilesystemBackend
+from kader.tools.filesystem import DurabilityUnconfirmedError, FilesystemBackend
 
 
 class TestAtomicWrites:
@@ -145,6 +146,247 @@ class TestAtomicWrites:
 
             assert result.error is None
             fsync_mock.assert_not_called()
+
+    def test_directory_is_synced_after_replace(self):
+        """The directory fsync must FOLLOW os.replace(); before it, the rename
+        is not yet in the directory and nothing about it is persisted."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            backend = FilesystemBackend(root_dir=temp_dir)
+            events: list[str] = []
+            original_replace = os.replace
+
+            def recording_replace(src, dst):
+                events.append("replace")
+                original_replace(src, dst)
+
+            def recording_dir_sync(directory):
+                events.append("dir-sync")
+                assert Path(directory) == Path(temp_dir).resolve()
+
+            with (
+                patch("os.replace", side_effect=recording_replace),
+                patch.object(
+                    FilesystemBackend,
+                    "_fsync_directory",
+                    side_effect=recording_dir_sync,
+                ),
+            ):
+                result = backend.write("ordered.txt", "content")
+
+            assert result.error is None
+            assert events == ["replace", "dir-sync"]
+
+    def test_file_fsync_precedes_replace(self):
+        """durable_writes=True: the temp file is fsynced before replacement."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            backend = FilesystemBackend(root_dir=temp_dir)
+            events: list[str] = []
+            original_replace = os.replace
+
+            def recording_replace(src, dst):
+                events.append("replace")
+                original_replace(src, dst)
+
+            with (
+                patch("os.fsync", side_effect=lambda fd: events.append("fsync")),
+                patch("os.replace", side_effect=recording_replace),
+                patch.object(FilesystemBackend, "_fsync_directory"),
+            ):
+                result = backend.write("synced.txt", "content")
+
+            assert result.error is None
+            assert events == ["fsync", "replace"]
+
+    def test_failed_file_fsync_prevents_replacement(self):
+        """If the temp file cannot be fsynced, the target must not change."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            backend = FilesystemBackend(root_dir=temp_dir)
+            target = Path(temp_dir) / "keep.txt"
+            target.write_text("original")
+
+            with (
+                patch("os.fsync", side_effect=OSError(errno.EIO, "disk error")),
+                patch("os.replace") as replace_mock,
+            ):
+                result = backend.write("keep.txt", "new content")
+
+            assert result.error is not None
+            replace_mock.assert_not_called()
+            assert target.read_text() == "original"
+            assert not list(Path(temp_dir).glob("*.kader-tmp"))
+
+    @pytest.mark.parametrize("failing", ["write", "flush"])
+    def test_failed_write_or_flush_leaves_target_unchanged(self, failing):
+        """A write/flush failure must leave the target untouched."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            backend = FilesystemBackend(root_dir=temp_dir)
+            target = Path(temp_dir) / "keep.bin"
+            target.write_bytes(b"original")
+            real_fdopen = os.fdopen
+
+            class FailingFile:
+                def __init__(self, inner):
+                    self._inner = inner
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *exc):
+                    self._inner.close()
+                    return False
+
+                def fileno(self):
+                    return self._inner.fileno()
+
+                def write(self, data):
+                    if failing == "write":
+                        raise OSError(errno.ENOSPC, "no space")
+                    return self._inner.write(data)
+
+                def flush(self):
+                    if failing == "flush":
+                        raise OSError(errno.ENOSPC, "no space")
+                    return self._inner.flush()
+
+            with (
+                patch(
+                    "kader.tools.filesystem.os.fdopen",
+                    side_effect=lambda *a, **k: FailingFile(real_fdopen(*a, **k)),
+                ),
+                patch("os.replace") as replace_mock,
+            ):
+                responses = backend.upload_files([("keep.bin", b"new")])
+
+            assert responses[0].error is not None
+            replace_mock.assert_not_called()
+            assert target.read_bytes() == b"original"
+            assert not list(Path(temp_dir).glob("*.kader-tmp"))
+
+    def test_fdopen_failure_closes_descriptor_and_keeps_original_error(self):
+        """fdopen() failing: the raw fd is closed, and a cleanup failure must
+        not mask the original error."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            backend = FilesystemBackend(root_dir=temp_dir)
+            real_close = os.close
+            closed: list[int] = []
+
+            def failing_close(fd):
+                closed.append(fd)
+                real_close(fd)
+                raise OSError(errno.EBADF, "close failed")
+
+            with (
+                patch(
+                    "kader.tools.filesystem.os.fdopen",
+                    side_effect=ValueError("fdopen refused"),
+                ),
+                patch("kader.tools.filesystem.os.close", side_effect=failing_close),
+            ):
+                with pytest.raises(ValueError, match="fdopen refused"):
+                    backend._atomic_write(Path(temp_dir) / "x.txt", "content")
+
+            assert len(closed) == 1
+            assert not list(Path(temp_dir).glob("*.kader-tmp"))
+
+    def test_successful_write_closes_descriptor_exactly_once(self):
+        """After fdopen() the file object owns the fd; no second raw close."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            backend = FilesystemBackend(root_dir=temp_dir)
+            with patch("kader.tools.filesystem.os.close", wraps=os.close) as close_mock:
+                result = backend.write("once.txt", "content")
+
+            assert result.error is None
+            # Only the directory descriptor (POSIX) may be raw-closed; never
+            # the temp-file descriptor, which its file object closed.
+            expected = 0 if os.name == "nt" else 1
+            assert close_mock.call_count == expected
+
+    def test_temp_file_creation_is_exclusive(self):
+        """An existing temp path must be refused, never overwritten."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            backend = FilesystemBackend(root_dir=temp_dir)
+            fixed = "0" * 32
+            squatter = Path(temp_dir) / f"x.txt.{fixed}.kader-tmp"
+            squatter.write_text("someone else's file")
+
+            class FixedUuid:
+                hex = fixed
+
+            with patch("kader.tools.filesystem.uuid.uuid4", return_value=FixedUuid):
+                with pytest.raises(FileExistsError):
+                    backend._atomic_write(Path(temp_dir) / "x.txt", "content")
+
+            assert not (Path(temp_dir) / "x.txt").exists()
+
+    def test_directory_sync_failure_after_replace_is_classified(self):
+        """A failed dir sync AFTER a successful replace is not an ordinary
+        failed write: the target holds the new content and the error says so."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            backend = FilesystemBackend(root_dir=temp_dir)
+            target = Path(temp_dir) / "replaced.txt"
+            target.write_text("old")
+
+            with patch.object(
+                FilesystemBackend,
+                "_fsync_directory",
+                side_effect=OSError(errno.EIO, "disk error"),
+            ):
+                with pytest.raises(DurabilityUnconfirmedError) as excinfo:
+                    backend._atomic_write(target, "new")
+                write_result = backend.write("other.txt", "fresh")
+                upload = backend.upload_files([("up.bin", b"data")])
+
+            assert excinfo.value.errno == errno.EIO
+            assert target.read_text() == "new"
+            assert write_result.error is not None
+            assert "REPLACED_DURABILITY_UNCONFIRMED" in write_result.error
+            assert upload[0].error == "durability_unconfirmed"
+            assert not list(Path(temp_dir).glob("*.kader-tmp"))
+
+    def test_non_durable_writes_skip_directory_sync(self):
+        """durable_writes=False must not sync the containing directory."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            backend = FilesystemBackend(root_dir=temp_dir, durable_writes=False)
+            with patch.object(FilesystemBackend, "_fsync_directory") as dir_sync:
+                result = backend.write("fast.txt", "content")
+
+            assert result.error is None
+            dir_sync.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "code", [errno.EINVAL, errno.ENOTSUP, getattr(errno, "ENOSYS", 38)]
+    )
+    def test_directory_sync_tolerates_unsupported_filesystems(self, code):
+        """Unsupported-operation errnos from a directory fsync are tolerated."""
+        with (
+            patch("kader.tools.filesystem.os.name", "posix"),
+            patch("kader.tools.filesystem.os.open", return_value=99),
+            patch(
+                "kader.tools.filesystem.os.fsync",
+                side_effect=OSError(code, "unsupported"),
+            ),
+            patch("kader.tools.filesystem.os.close") as close_mock,
+        ):
+            FilesystemBackend._fsync_directory(Path("dir"))
+
+        close_mock.assert_called_once_with(99)
+
+    def test_directory_sync_raises_real_io_errors(self):
+        """An I/O error from a directory fsync must not be swallowed."""
+        with (
+            patch("kader.tools.filesystem.os.name", "posix"),
+            patch("kader.tools.filesystem.os.open", return_value=99),
+            patch(
+                "kader.tools.filesystem.os.fsync",
+                side_effect=OSError(errno.EIO, "disk error"),
+            ),
+            patch("kader.tools.filesystem.os.close") as close_mock,
+        ):
+            with pytest.raises(OSError) as excinfo:
+                FilesystemBackend._fsync_directory(Path("dir"))
+
+        assert excinfo.value.errno == errno.EIO
+        close_mock.assert_called_once_with(99)
 
     def test_temp_file_exists_during_write_and_is_removed_after(self):
         """The .kader-tmp file must exist during the atomic rename and be gone after."""

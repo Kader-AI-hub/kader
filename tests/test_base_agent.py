@@ -260,3 +260,67 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# --- Memory flush at commit boundaries ---
+
+
+class _SyncFlushMemory:
+    """Wraps a real memory manager and counts sync flushes."""
+
+    def __init__(self, inner):
+        self._inner = inner
+        self.flushes = 0
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+    def flush(self):
+        self.flushes += 1
+
+
+class _AsyncFlushMemory(_SyncFlushMemory):
+    """Adds an async aflush(), which must win over the sync flush()."""
+
+    def __init__(self, inner):
+        super().__init__(inner)
+        self.aflushes = 0
+
+    async def aflush(self):
+        self.aflushes += 1
+
+
+async def test_aflush_memory_awaits_async_aflush():
+    agent = BaseAgent(name="flusher", system_prompt="Sys", provider=MockLLMProvider())
+    memory = _AsyncFlushMemory(agent.memory)
+    agent.memory = memory
+
+    await agent._aflush_memory()
+
+    assert memory.aflushes == 1
+    assert memory.flushes == 0
+
+
+async def test_aflush_memory_falls_back_to_sync_flush():
+    agent = BaseAgent(name="flusher", system_prompt="Sys", provider=MockLLMProvider())
+    memory = _SyncFlushMemory(agent.memory)
+    agent.memory = memory
+
+    await agent._aflush_memory()
+
+    assert memory.flushes == 1
+
+
+def test_invoke_flushes_memory():
+    agent = BaseAgent(
+        name="flusher",
+        system_prompt="Sys",
+        provider=MockLLMProvider(responses=["done"]),
+        retry_attempts=1,
+    )
+    memory = _SyncFlushMemory(agent.memory)
+    agent.memory = memory
+
+    agent.invoke("Hi")
+
+    assert memory.flushes >= 1

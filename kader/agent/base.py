@@ -293,14 +293,17 @@ class BaseAgent:
 
     async def _aflush_memory(self) -> None:
         """Flush memory implementations that batch persistence."""
-        flush = getattr(self.memory, "aflush", None)
-        if not callable(flush):
-            flush = getattr(self.memory, "flush", None)
-        if not callable(flush):
+        # Each getattr() on a method returns a NEW bound-method object, so the
+        # async/sync choice must be remembered rather than re-derived with an
+        # identity check (which is always False and would push an async
+        # aflush() into a worker thread, leaving its coroutine never awaited).
+        aflush = getattr(self.memory, "aflush", None)
+        flush = getattr(self.memory, "flush", None)
+        if not callable(aflush) and not callable(flush):
             return
         try:
-            if getattr(self.memory, "aflush", None) is flush:
-                result = flush()
+            if callable(aflush):
+                result = aflush()
                 if inspect.isawaitable(result):
                     await result
             else:
