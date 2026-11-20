@@ -45,12 +45,59 @@ class TestAtomicWrites:
             def boom(*args, **kwargs):
                 raise OSError("replace refused")
 
-            with patch("os.replace", side_effect=boom):
+            with patch("os.replace", side_effect=boom) as replace_mock:
                 result = backend.write("fail.txt", "new content")
 
             assert result.error is not None
             assert "replace refused" in result.error
             assert not target.exists()
+            assert not list(Path(temp_dir).glob("*.kader-tmp"))
+            assert replace_mock.call_count == 1
+
+    def test_windows_transient_replace_retries_then_succeeds(self):
+        """A sharing violation should retry once and then complete atomically."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            backend = FilesystemBackend(root_dir=temp_dir)
+            original_replace = os.replace
+            attempts = {"count": 0}
+
+            def transient_then_replace(src, dst):
+                attempts["count"] += 1
+                if attempts["count"] == 1:
+                    exc = OSError("sharing violation")
+                    exc.winerror = 32
+                    raise exc
+                original_replace(src, dst)
+
+            with (
+                patch("kader.tools.filesystem.os.name", "nt"),
+                patch("os.replace", side_effect=transient_then_replace),
+            ):
+                result = backend.write("retry.txt", "content")
+
+            assert result.error is None
+            assert attempts["count"] == 2
+            assert (Path(temp_dir) / "retry.txt").read_text() == "content"
+
+    def test_windows_replace_retry_exhaustion_is_bounded(self):
+        """Transient replacement failures should stop after five attempts."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            backend = FilesystemBackend(root_dir=temp_dir)
+
+            def always_transient(*args, **kwargs):
+                exc = OSError("sharing violation")
+                exc.winerror = 32
+                raise exc
+
+            with (
+                patch("kader.tools.filesystem.os.name", "nt"),
+                patch("os.replace", side_effect=always_transient) as replace_mock,
+            ):
+                result = backend.write("retry.txt", "content")
+
+            assert result.error is not None
+            assert replace_mock.call_count == 5
+            assert not (Path(temp_dir) / "retry.txt").exists()
             assert not list(Path(temp_dir).glob("*.kader-tmp"))
 
     def test_edit_atomic_no_partial_file(self):
@@ -85,6 +132,19 @@ class TestAtomicWrites:
             assert (Path(temp_dir) / "a.txt").read_bytes() == b"alpha"
             assert (Path(temp_dir) / "sub" / "b.txt").read_bytes() == b"beta"
             assert not list(Path(temp_dir).rglob("*.kader-tmp"))
+
+    def test_durable_writes_can_skip_fsync(self):
+        """Non-durable writes should avoid file and directory fsync calls."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            backend = FilesystemBackend(
+                root_dir=temp_dir,
+                durable_writes=False,
+            )
+            with patch("os.fsync") as fsync_mock:
+                result = backend.write("fast.txt", "content")
+
+            assert result.error is None
+            fsync_mock.assert_not_called()
 
     def test_temp_file_exists_during_write_and_is_removed_after(self):
         """The .kader-tmp file must exist during the atomic rename and be gone after."""
@@ -272,8 +332,8 @@ class TestFileLocking:
             assert "B\n" not in content
             assert "C\n" not in content
 
-    def test_lock_file_is_removed_after_edit(self):
-        """No stale .kader-lock file must remain after edit() finishes."""
+    def test_lock_file_is_stable_after_edit(self):
+        """The sibling lock file must remain as a stable inode after edit."""
         with tempfile.TemporaryDirectory() as temp_dir:
             backend = FilesystemBackend(root_dir=temp_dir, use_file_lock=True)
             target = Path(temp_dir) / "clean.txt"
@@ -282,10 +342,10 @@ class TestFileLocking:
             result = backend.edit("clean.txt", "world", "universe")
 
             assert result.error is None
-            assert not (Path(temp_dir) / ".kader-lock.clean.txt").exists()
+            assert (Path(temp_dir) / ".kader-lock.clean.txt").exists()
 
-    def test_lock_file_is_removed_even_on_edit_failure(self):
-        """No stale .kader-lock file must remain when edit() fails."""
+    def test_lock_file_is_stable_on_edit_failure(self):
+        """The stable sibling lock file must remain when edit() fails."""
         with tempfile.TemporaryDirectory() as temp_dir:
             backend = FilesystemBackend(root_dir=temp_dir, use_file_lock=True)
             target = Path(temp_dir) / "fail_clean.txt"
@@ -294,4 +354,4 @@ class TestFileLocking:
             result = backend.edit("fail_clean.txt", "nonexistent", "replacement")
 
             assert result.error is not None
-            assert not (Path(temp_dir) / ".kader-lock.fail_clean.txt").exists()
+            assert (Path(temp_dir) / ".kader-lock.fail_clean.txt").exists()

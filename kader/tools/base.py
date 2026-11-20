@@ -743,6 +743,12 @@ class ToolRegistry:
         """Initialize an empty tool registry."""
         self._tools: dict[str, BaseTool] = {}
 
+    def copy(self) -> "ToolRegistry":
+        """Shallow-copy registrations while retaining shared tool instances."""
+        cloned = ToolRegistry()
+        cloned._tools = dict(self._tools)
+        return cloned
+
     def register(self, tool: BaseTool) -> None:
         """
         Register a tool.

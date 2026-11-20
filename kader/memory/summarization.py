@@ -168,8 +168,14 @@ class HierarchicalConversationManager(SlidingWindowConversationManager):
 
         # Generate or retrieve summary for older messages
         if older_messages and len(older_messages) > self._last_summarized_count:
-            summary = self._generate_summary(older_messages)
-            self._summaries.append(summary)
+            new_messages = older_messages[self._last_summarized_count :]
+            new_summary = self._generate_summary(new_messages)
+            if self._summaries:
+                summary = self._merge_summaries(self._summaries[-1], new_summary)
+                self._summaries[-1] = summary
+            else:
+                summary = new_summary
+                self._summaries.append(summary)
             self._last_summarized_count = len(older_messages)
         else:
             summary = self._summaries[-1] if self._summaries else None
@@ -400,6 +406,39 @@ class HierarchicalConversationManager(SlidingWindowConversationManager):
                 "In progress",
             )
 
+    def _merge_summaries(
+        self,
+        existing: ConversationSummary,
+        new: ConversationSummary,
+    ) -> ConversationSummary:
+        """Merge a newly summarized message batch into the existing summary."""
+        def _dedupe(values: list[str]) -> list[str]:
+            return list(dict.fromkeys(values))
+
+        existing_text = existing.summary_text.strip()
+        new_text = new.summary_text.strip()
+        if existing_text and new_text:
+            combined_text = f"{existing_text}\n\n{new_text}"
+        else:
+            combined_text = existing_text or new_text
+
+        return ConversationSummary(
+            summary_id=existing.summary_id,
+            original_message_count=(
+                existing.original_message_count + new.original_message_count
+            ),
+            summary_text=combined_text,
+            key_decisions=_dedupe(existing.key_decisions + new.key_decisions)[-10:],
+            files_modified=sorted(
+                set(existing.files_modified + new.files_modified)
+            ),
+            errors_encountered=_dedupe(
+                existing.errors_encountered + new.errors_encountered
+            )[-20:],
+            current_state=new.current_state or existing.current_state,
+            pending_tasks=_dedupe(existing.pending_tasks + new.pending_tasks)[-10:],
+        )
+
     def _format_summary(self, summary: ConversationSummary) -> str:
         """Format a summary for inclusion as a system message.
 
@@ -469,3 +508,9 @@ class HierarchicalConversationManager(SlidingWindowConversationManager):
             ConversationSummary.from_dict(s) for s in state.get("summaries", [])
         ]
         self._last_summarized_count = state.get("last_summarized_count", 0)
+
+    def clear(self) -> None:
+        """Clear conversation messages and summary state."""
+        super().clear()
+        self._summaries.clear()
+        self._last_summarized_count = 0

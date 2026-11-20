@@ -5,6 +5,8 @@ Defines the BaseAgent class which serves as the foundation for creating specific
 with tools, memory, and LLM provider integration.
 """
 
+import asyncio
+import inspect
 import json
 from pathlib import Path
 from typing import Any, AsyncIterator, Iterator, Optional, Union
@@ -223,9 +225,27 @@ class BaseAgent:
             # Convert ConversationMessage to dict (using .message property)
             messages = [msg.message for msg in self.memory.get_messages()]
             self.session_manager.save_conversation(self.session_id, messages)
-        except Exception:
-            # Log error or handle silently? Best not to crash main flow on save failure
-            pass
+        except Exception as exc:
+            if self.logger_id:
+                agent_logger.log_event(
+                    self.logger_id,
+                    "SESSION_SAVE_FAILED",
+                    {"error_type": exc.__class__.__name__},
+                )
+
+    def _flush_memory(self) -> None:
+        """Flush memory implementations that batch persistence."""
+        flush = getattr(self.memory, "flush", None)
+        if callable(flush):
+            try:
+                flush()
+            except Exception as exc:
+                if self.logger_id:
+                    agent_logger.log_event(
+                        self.logger_id,
+                        "MEMORY_FLUSH_FAILED",
+                        {"error_type": exc.__class__.__name__},
+                    )
 
     async def _aload_session(self) -> None:
         """Load conversation history from session storage (async)."""
@@ -263,8 +283,35 @@ class BaseAgent:
             await self.session_manager.async_save_conversation(
                 self.session_id, messages
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            if self.logger_id:
+                agent_logger.log_event(
+                    self.logger_id,
+                    "SESSION_SAVE_FAILED",
+                    {"error_type": exc.__class__.__name__},
+                )
+
+    async def _aflush_memory(self) -> None:
+        """Flush memory implementations that batch persistence."""
+        flush = getattr(self.memory, "aflush", None)
+        if not callable(flush):
+            flush = getattr(self.memory, "flush", None)
+        if not callable(flush):
+            return
+        try:
+            if getattr(self.memory, "aflush", None) is flush:
+                result = flush()
+                if inspect.isawaitable(result):
+                    await result
+            else:
+                await asyncio.to_thread(flush)
+        except Exception as exc:
+            if self.logger_id:
+                agent_logger.log_event(
+                    self.logger_id,
+                    "MEMORY_FLUSH_FAILED",
+                    {"error_type": exc.__class__.__name__},
+                )
 
     @property
     def tools_map(self) -> dict[str, BaseTool]:
@@ -957,6 +1004,7 @@ class BaseAgent:
 
             # Add assistant response to memory
             self.memory.add_message(response.to_message())
+            self._flush_memory()
 
             # Log the interaction if logger is active
             if self.logger_id:
@@ -996,10 +1044,6 @@ class BaseAgent:
                         self.logger_id,
                         estimated_cost.total_cost,
                     )
-
-            # Save session update
-            if self.use_persistence:
-                self._save_session()
 
             # Check for tool calls
             if response.has_tool_calls:
@@ -1059,6 +1103,8 @@ class BaseAgent:
                         )
                         called_tool._last_rejection_context = None
 
+                self._flush_memory()
+
                 # Save session update after tool results
                 if self.use_persistence:
                     self._save_session()
@@ -1069,6 +1115,10 @@ class BaseAgent:
                 # No tools, final response
                 final_response = response
                 break
+
+        self._flush_memory()
+        if self.use_persistence:
+            self._save_session()
 
         # Invoke agent end callbacks
         self._invoke_agent_end_callbacks()
@@ -1123,6 +1173,7 @@ class BaseAgent:
         # For now, we only save the input part since _prepare_messages called it.
         if self.use_persistence:
             self._save_session()
+        self._flush_memory()
 
     # -------------------------------------------------------------------------
     # Asynchronous Methods
@@ -1166,6 +1217,7 @@ class BaseAgent:
             )
 
             self.memory.add_message(response.to_message())
+            await self._aflush_memory()
 
             # Log the interaction if logger is active
             if self.logger_id:
@@ -1205,10 +1257,6 @@ class BaseAgent:
                         self.logger_id,
                         estimated_cost.total_cost,
                     )
-
-            # Save session update
-            if self.use_persistence:
-                await self._asave_session()
 
             if response.has_tool_calls:
                 tool_result = await self._aprocess_tool_calls(response)
@@ -1266,6 +1314,8 @@ class BaseAgent:
                         )
                         called_tool._last_rejection_context = None
 
+                await self._aflush_memory()
+
                 # Save session update
                 if self.use_persistence:
                     await self._asave_session()
@@ -1273,6 +1323,10 @@ class BaseAgent:
             else:
                 final_response = response
                 break
+
+        await self._aflush_memory()
+        if self.use_persistence:
+            await self._asave_session()
 
         # Invoke agent end callbacks
         await self._ainvoke_agent_end_callbacks()
@@ -1321,6 +1375,7 @@ class BaseAgent:
 
         if self.use_persistence:
             await self._asave_session()
+        await self._aflush_memory()
 
     # -------------------------------------------------------------------------
     # Serialization Methods
