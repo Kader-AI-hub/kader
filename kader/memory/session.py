@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .persistence import RevisionedJsonFile
 from .state import AgentState
 from .types import (
     MemoryConfig,
@@ -305,6 +306,7 @@ class FileSessionManager(SessionManager):
         """
         self.config = config or MemoryConfig()
         self.config.ensure_directories()
+        self._conversation_stores: dict[str, RevisionedJsonFile] = {}
 
     @property
     def sessions_dir(self) -> Path:
@@ -326,6 +328,18 @@ class FileSessionManager(SessionManager):
     def _conversation_file(self, session_id: str) -> Path:
         """Get the conversation file path."""
         return self._session_dir(session_id) / "conversation.json"
+
+    def _conversation_store(self, session_id: str) -> RevisionedJsonFile:
+        """Get the revision-checked owner of a session's conversation file.
+
+        The store remembers the revision this manager last read or wrote, so
+        a save never overwrites a newer history (see RevisionedJsonFile).
+        """
+        store = self._conversation_stores.get(session_id)
+        if store is None:
+            store = RevisionedJsonFile(self._conversation_file(session_id))
+            self._conversation_stores[session_id] = store
+        return store
 
     def create_session(self, agent_id: str) -> Session:
         """Create a new session for an agent.
@@ -416,6 +430,7 @@ class FileSessionManager(SessionManager):
             return False
 
         shutil.rmtree(session_dir)
+        self._conversation_stores.pop(session_id, None)
         return True
 
     def save_agent_state(self, session_id: str, state: AgentState) -> None:
@@ -454,12 +469,21 @@ class FileSessionManager(SessionManager):
     ) -> None:
         """Save conversation history for a session.
 
+        The save is atomic and revision-checked: it is refused when the stored
+        history is newer than the revision this manager last loaded or saved,
+        or when the file exists but this manager never loaded it.
+
         Args:
             session_id: Session identifier
             messages: List of message dictionaries
+
+        Raises:
+            RevisionConflictError: the stored history is not the one this
+                manager last observed; nothing was written.
+            DurabilityUnconfirmedError: replaced, but the directory sync
+                failed; the stored revision has been re-read (never retried).
         """
-        conversation_file = self._conversation_file(session_id)
-        save_json(conversation_file, {"messages": messages})
+        self._conversation_store(session_id).save({"messages": messages})
 
         # Update session timestamp
         self._update_session_timestamp(session_id)
@@ -473,8 +497,7 @@ class FileSessionManager(SessionManager):
         Returns:
             List of message dictionaries
         """
-        conversation_file = self._conversation_file(session_id)
-        data = load_json(conversation_file)
+        data = self._conversation_store(session_id).load()
         return data.get("messages", [])
 
     def _update_session_timestamp(self, session_id: str) -> None:
@@ -633,6 +656,7 @@ class AsyncFileSessionManager(FileSessionManager):
         if not session_dir.exists():
             return False
         await asyncio.to_thread(shutil.rmtree, session_dir)
+        self._conversation_stores.pop(session_id, None)
         return True
 
     async def async_save_agent_state(self, session_id: str, state: AgentState) -> None:
@@ -671,12 +695,17 @@ class AsyncFileSessionManager(FileSessionManager):
     ) -> None:
         """Save conversation history for a session (async).
 
+        Runs the revision-checked sync save in a worker thread, so both paths
+        share one owner per conversation file.
+
         Args:
             session_id: Session identifier
             messages: List of message dictionaries
         """
         self._ensure_directories()
-        await asave_json(self._conversation_file(session_id), {"messages": messages})
+        await asyncio.to_thread(
+            self._conversation_store(session_id).save, {"messages": messages}
+        )
 
     async def async_load_conversation(self, session_id: str) -> list[dict[str, Any]]:
         """Load conversation history for a session (async).
@@ -687,10 +716,8 @@ class AsyncFileSessionManager(FileSessionManager):
         Returns:
             List of message dictionaries
         """
-        conversation_file = self._conversation_file(session_id)
-        if not conversation_file.exists():
-            return []
-        data = await aload_json(conversation_file)
+        store = self._conversation_store(session_id)
+        data = await asyncio.to_thread(store.load)
         return data.get("messages", [])
 
     async def _async_update_session_timestamp(self, session_id: str) -> None:
